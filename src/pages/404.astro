@@ -1,0 +1,95 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="404 - Page Not Found">
+  <div class="min-h-screen flex items-center justify-center px-6" style="background-color: var(--color-brand-white);">
+    <div class="max-w-2xl mx-auto text-center">
+      <!-- 404 Number -->
+      <h1 
+        class="text-9xl font-bold mb-4 tracking-tight"
+        style="color: var(--color-brand-orange);"
+      >
+        404
+      </h1>
+      
+      <!-- Message -->
+      <h2 
+        class="text-3xl md:text-4xl font-bold mb-4"
+        style="color: var(--color-brand-black);"
+      >
+        Page Not Found
+      </h2>
+      
+      <p 
+        class="text-lg md:text-xl mb-8 leading-relaxed"
+        style="color: var(--color-brand-gray-dark);"
+      >
+        Oops! The page you're looking for seems to have wandered off into the digital void.
+        Let's get you back on track.
+      </p>
+      
+      <!-- Action Buttons -->
+      <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+        <a 
+          href="/"
+          class="px-8 py-4 rounded-lg font-medium transition-all inline-block hover-bg-brand-orange"
+          style="background-color: var(--color-brand-black); color: white;"
+        >
+          ← Back to Home
+        </a>
+        <a 
+          href="/#projects"
+          class="px-8 py-4 rounded-lg font-medium transition-all inline-block border hover-border-brand-black"
+          style="border-color: var(--color-brand-gray-light); color: var(--color-brand-black);"
+        >
+          View Projects
+        </a>
+      </div>
+      
+      <!-- Helpful Links -->
+      <div style="color: var(--color-brand-gray-dark);">
+        <p class="mb-4">You might be looking for:</p>
+        <ul class="space-y-2">
+          <li>
+            <a href="/#about" class="hover-text-brand-orange transition-colors">About Me</a>
+          </li>
+          <li>
+            <a href="/blog" class="hover-text-brand-orange transition-colors">Blog Posts</a>
+          </li>
+          <li>
+            <a href="/#contact" class="hover-text-brand-orange transition-colors">Get in Touch</a>
+          </li>
+        </ul>
+      </div>
+      
+      <!-- Decorative Element -->
+      <div class="mt-12 opacity-20">
+        <svg 
+          class="w-32 h-32 mx-auto" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+          style="color: var(--color-brand-gray-dark);"
+        >
+          <path 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            stroke-width="2" 
+            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .hover-bg-brand-orange:hover {
+    background-color: var(--color-brand-orange);
+  }
+  
+  .hover-border-brand-black:hover {
+    border-color: var(--color-brand-black);
+  }
+</style>

@@ -1,0 +1,46 @@
+---
+// Giscus Comments Integration
+// Configure your repo at: https://giscus.app
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<section class={className}>
+  <h2 class="text-2xl font-bold mb-6" style="color: var(--color-text);">
+    Comments
+  </h2>
+  
+  <script 
+    src="https://giscus.app/client.js"
+    data-repo="yourusername/your-repo"
+    data-repo-id="YOUR_REPO_ID"
+    data-category="Comments"
+    data-category-id="YOUR_CATEGORY_ID"
+    data-mapping="pathname"
+    data-strict="0"
+    data-reactions-enabled="1"
+    data-emit-metadata="0"
+    data-input-position="top"
+    data-theme="preferred_color_scheme"
+    data-lang="en"
+    data-loading="lazy"
+    crossorigin="anonymous"
+    async>
+  </script>
+  
+  <noscript>
+    <p style="color: var(--color-text-muted);">
+      Please enable JavaScript to view the comments powered by 
+      <a href="https://giscus.app" target="_blank" rel="noopener" style="color: var(--color-accent);">giscus</a>.
+    </p>
+  </noscript>
+</section>
+
+<style>
+  .giscus {
+    width: 100%;
+  }
+</style>

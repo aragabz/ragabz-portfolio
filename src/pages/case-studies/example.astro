@@ -1,0 +1,81 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { FadeIn, SlideIn } from '../../components/react/Animated';
+import { Icon } from '@iconify/react';
+
+const project = {
+  title: 'E-Commerce Platform Redesign',
+  client: 'RetailCo',
+  year: '2024',
+  role: 'Lead Frontend Developer',
+  duration: '3 months',
+  tags: ['Web App', 'E-Commerce', 'React', 'Performance'],
+  challenge: 'Poor performance leading to cart abandonments. Page load times exceeded 5 seconds.',
+  solution: 'Complete frontend overhaul using React with Next.js for SSR, optimized images, simplified checkout.',
+  results: [
+    { metric: '65%', value: 'Faster', description: 'Page load time reduced from 5.2s to 1.8s' },
+    { metric: '45%', value: 'More Conversions', description: 'Conversion rate increased from 2.1% to 3.1%' },
+    { metric: '30%', value: 'Lower Bounce', description: 'Users stayed longer' },
+  ],
+  techStack: ['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'Stripe'],
+  testimonial: { quote: 'Exceeded expectations. Performance improvements translated to revenue.', author: 'Sarah Johnson', role: 'VP of Product' },
+};
+---
+
+<BaseLayout title={`Case Study: ${project.title}`}>
+  <article class="min-h-screen">
+    <div style="background: var(--color-bg-secondary); border-bottom: 1px solid var(--color-border);">
+      <div class="max-w-container mx-auto px-6 py-16">
+        <FadeIn client:load>
+          <a href="/#projects" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--color-brand-orange); margin-bottom: 2rem; text-decoration: none;">
+            <Icon icon="mdi:arrow-left" width={20} client:load />
+            Back to Projects
+          </a>
+          <h1 class="text-5xl font-bold mb-4">{project.title}</h1>
+          <p class="text-xl" style="color: var(--color-text-secondary);">{project.client} • {project.year}</p>
+        </FadeIn>
+      </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto px-6 py-16">
+      <SlideIn client:load direction="left">
+        <section class="mb-16">
+          <h2 class="text-3xl font-bold mb-6" style="color: var(--color-brand-orange);">The Challenge</h2>
+          <p class="text-lg" style="color: var(--color-text);">{project.challenge}</p>
+        </section>
+      </SlideIn>
+
+      <SlideIn client:load direction="right">
+        <section class="mb-16">
+          <h2 class="text-3xl font-bold mb-6" style="color: var(--color-brand-orange);">The Solution</h2>
+          <p class="text-lg" style="color: var(--color-text);">{project.solution}</p>
+        </section>
+      </SlideIn>
+
+      <FadeIn client:load>
+        <section class="mb-16">
+          <h2 class="text-3xl font-bold mb-8" style="color: var(--color-brand-orange);">The Results</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {project.results.map((r) => (
+              <div key={r.metric} style="padding: 2rem; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 12px; text-align: center;">
+                <div style="font-size: 3rem; font-weight: 700; color: var(--color-brand-orange);">{r.metric}</div>
+                <div style="font-size: 1.25rem; font-weight: 600; margin-top: 0.5rem;">{r.value}</div>
+                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-top: 0.5rem;">{r.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </FadeIn>
+
+      <FadeIn client:load>
+        <section style="padding: 3rem; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 12px;">
+          <blockquote style="font-size: 1.5rem; line-height: 1.6; font-style: italic; margin-bottom: 1.5rem;">
+            "{project.testimonial.quote}"
+          </blockquote>
+          <div style="font-weight: 600;">— {project.testimonial.author}</div>
+          <div style="font-size: 0.875rem; color: var(--color-text-secondary);">{project.testimonial.role}</div>
+        </section>
+      </FadeIn>
+    </div>
+  </article>
+</BaseLayout>

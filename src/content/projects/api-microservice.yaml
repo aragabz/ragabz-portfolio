@@ -1,0 +1,13 @@
+title: "RESTful API Microservice"
+description: "Scalable microservices architecture with Docker, Kubernetes, message queues, and comprehensive API documentation."
+tech:
+  - Go
+  - Docker
+  - Kubernetes
+  - RabbitMQ
+  - PostgreSQL
+github: "https://github.com/yourusername/api-microservice"
+category: "Backend"
+featured: true
+image: "/images/projects/api.jpg"
+order: 8

@@ -1,0 +1,76 @@
+---
+title: "Understanding TypeScript Generics"
+date: 2024-03-10
+excerpt: "Master TypeScript generics to write reusable, type-safe code. From basic concepts to advanced patterns with practical examples."
+tags: ["TypeScript", "JavaScript", "Programming"]
+readingTime: 10
+---
+
+# Understanding TypeScript Generics
+
+Generics are one of TypeScript's most powerful features, enabling you to write flexible, reusable code while maintaining type safety.
+
+## What Are Generics?
+
+Generics allow you to create components that work with multiple types instead of a single one.
+
+```typescript
+// Without generics - limited
+function identityNumber(arg: number): number {
+  return arg;
+}
+
+// With generics - flexible
+function identity<T>(arg: T): T {
+  return arg;
+}
+
+const num = identity<number>(42);
+const str = identity<string>("hello");
+```
+
+## Generic Constraints
+
+Constrain generic types to ensure they have required properties.
+
+```typescript
+interface HasLength {
+  length: number;
+}
+
+function logLength<T extends HasLength>(arg: T): T {
+  console.log(arg.length);
+  return arg;
+}
+
+logLength("hello"); // Works
+logLength([1, 2, 3]); // Works
+// logLength(42); // Error!
+```
+
+## Real-World Example: API Response Handler
+
+```typescript
+interface ApiResponse<T> {
+  data: T;
+  status: number;
+  message: string;
+}
+
+async function fetchData<T>(url: string): Promise<ApiResponse<T>> {
+  const response = await fetch(url);
+  return response.json();
+}
+
+interface User {
+  id: number;
+  name: string;
+}
+
+const userResponse = await fetchData<User>("/api/user/1");
+// userResponse.data is typed as User
+```
+
+## Conclusion
+
+Generics are essential for writing maintainable TypeScript code. Practice these patterns and you'll write better, more reusable code.

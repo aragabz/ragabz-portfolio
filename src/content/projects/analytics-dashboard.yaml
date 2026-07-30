@@ -1,0 +1,12 @@
+title: "Real-Time Analytics Dashboard"
+description: "Live analytics dashboard with interactive charts, data export, and customizable widgets."
+tech:
+  - React
+  - D3.js
+  - WebSocket
+  - Express
+github: "https://github.com/yourusername/analytics-dashboard"
+category: "Frontend"
+featured: false
+image: "/images/projects/analytics.jpg"
+order: 5

@@ -1,0 +1,151 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { Icon } from '@iconify/react';
+import { FadeIn, StaggerContainer, StaggerItem } from '../components/react/Animated';
+
+const categories = [
+  {
+    title: '💻 Hardware',
+    items: [
+      { name: 'MacBook Pro M3', description: 'Primary development machine' },
+      { name: 'LG 27" 4K Monitor', description: 'External display for productivity' },
+      { name: 'Magic Keyboard', description: 'Comfortable typing experience' },
+      { name: 'Magic Trackpad', description: 'Precise navigation' },
+    ],
+  },
+  {
+    title: '🛠️ Development Tools',
+    items: [
+      { name: 'VS Code', description: 'Primary code editor with extensive customization' },
+      { name: 'iTerm2', description: 'Terminal emulator with tmux' },
+      { name: 'Docker', description: 'Containerization and development environments' },
+      { name: 'Postman', description: 'API testing and documentation' },
+      { name: 'TablePlus', description: 'Database management GUI' },
+    ],
+  },
+  {
+    title: '🎨 Design Tools',
+    items: [
+      { name: 'Figma', description: 'UI/UX design and prototyping' },
+      { name: 'Adobe Photoshop', description: 'Image editing and manipulation' },
+      { name: 'Canva', description: 'Quick graphics and social media content' },
+    ],
+  },
+  {
+    title: '📦 VS Code Extensions',
+    items: [
+      { name: 'GitHub Copilot', description: 'AI-powered code suggestions' },
+      { name: 'ESLint', description: 'JavaScript linting' },
+      { name: 'Prettier', description: 'Code formatting' },
+      { name: 'GitLens', description: 'Git supercharged' },
+      { name: 'Thunder Client', description: 'REST API client' },
+      { name: 'Astro', description: 'Astro language support' },
+      { name: 'Tailwind CSS IntelliSense', description: 'Tailwind autocomplete' },
+    ],
+  },
+  {
+    title: '⚡ Tech Stack',
+    items: [
+      { name: 'TypeScript', description: 'Type-safe JavaScript' },
+      { name: 'React', description: 'UI component library' },
+      { name: 'Astro', description: 'Static site generator' },
+      { name: 'Tailwind CSS', description: 'Utility-first CSS framework' },
+      { name: 'Node.js', description: 'JavaScript runtime' },
+      { name: 'PostgreSQL', description: 'Relational database' },
+    ],
+  },
+  {
+    title: '🚀 Productivity',
+    items: [
+      { name: 'Notion', description: 'Notes, docs, and project management' },
+      { name: 'Raycast', description: 'Launcher and productivity tool' },
+      { name: 'Arc Browser', description: 'Modern web browser' },
+      { name: 'Obsidian', description: 'Knowledge base and note-taking' },
+    ],
+  },
+];
+---
+
+<BaseLayout 
+  title="Uses - Tools & Setup"
+  description="Hardware, software, and tools I use for development and productivity"
+>
+  <div class="min-h-screen py-section px-6">
+    <div class="max-w-container mx-auto">
+      <!-- Header -->
+      <FadeIn client:load>
+        <div class="text-center mb-16">
+          <h1 class="text-5xl md:text-6xl font-bold mb-6">
+            What I Use
+          </h1>
+          <p class="text-xl" style="color: var(--color-text-secondary); max-width: 600px; margin: 0 auto;">
+            A comprehensive list of the hardware, software, and tools that power my work.
+            Inspired by <a href="https://uses.tech" target="_blank" rel="noopener noreferrer" style="color: var(--color-brand-orange);">uses.tech</a>
+          </p>
+        </div>
+      </FadeIn>
+
+      <!-- Categories -->
+      <div class="space-y-16">
+        {categories.map((category, categoryIndex) => (
+          <section key={category.title}>
+            <FadeIn client:load delay={categoryIndex * 0.1}>
+              <h2 class="text-3xl font-bold mb-8" style="color: var(--color-brand-orange);">
+                {category.title}
+              </h2>
+            </FadeIn>
+
+            <StaggerContainer client:load staggerDelay={0.05}>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {category.items.map((item) => (
+                  <StaggerItem key={item.name} client:load>
+                    <div
+                      style={{
+                        padding: '1.5rem',
+                        background: 'var(--color-bg-secondary)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '12px',
+                        transition: 'all 0.2s ease',
+                      }}
+                      class="hover-lift"
+                    >
+                      <h3 class="text-xl font-semibold mb-2" style="color: var(--color-text);">
+                        {item.name}
+                      </h3>
+                      <p style="color: var(--color-text-secondary); font-size: 0.875rem;">
+                        {item.description}
+                      </p>
+                    </div>
+                  </StaggerItem>
+                ))}
+              </div>
+            </StaggerContainer>
+          </section>
+        ))}
+      </div>
+
+      <!-- Footer Note -->
+      <FadeIn client:load delay={0.5}>
+        <div 
+          class="mt-16 p-8 text-center"
+          style={{
+            background: 'var(--color-bg-secondary)',
+            borderRadius: '12px',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <p style="color: var(--color-text-secondary); font-size: 0.875rem;">
+            This page is updated regularly as my setup evolves. Last updated: {new Date().toLocaleDateString()}
+          </p>
+        </div>
+      </FadeIn>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  }
+</style>

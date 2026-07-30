@@ -1,0 +1,246 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { FadeIn, ScaleIn } from '../components/react/Animated';
+
+// Update this content monthly!
+const lastUpdated = 'July 2026';
+
+const currentProjects = [
+  { title: 'Portfolio v3', status: 'In Progress', description: 'Redesigning portfolio with Astro 7' },
+  { title: 'Open Source CLI Tool', status: 'Planning', description: 'Building a developer productivity tool' },
+];
+
+const learning = [
+  { topic: 'Rust Programming', progress: 40, description: 'Systems programming language' },
+  { topic: 'AWS Solutions Architect', progress: 65, description: 'Cloud architecture certification' },
+  { topic: 'Design Patterns', progress: 80, description: 'Software architecture patterns' },
+];
+
+const reading = [
+  { title: 'The Pragmatic Programmer', author: 'David Thomas & Andrew Hunt', status: 'Reading' },
+  { title: 'Designing Data-Intensive Applications', author: 'Martin Kleppmann', status: 'Next Up' },
+];
+
+const interests = [
+  { emoji: '🎮', text: 'Building side projects', },
+  { emoji: '📝', text: 'Technical writing and blogging' },
+  { emoji: '🎨', text: 'UI/UX design and animations' },
+  { emoji: '🤝', text: 'Contributing to open source' },
+];
+---
+
+<BaseLayout 
+  title="Now - What I'm Doing"
+  description="What I'm currently working on, learning, and interested in"
+>
+  <div class="min-h-screen py-section px-6">
+    <div class="max-w-3xl mx-auto">
+      <!-- Header -->
+      <FadeIn client:load>
+        <div class="mb-16">
+          <h1 class="text-5xl md:text-6xl font-bold mb-6">
+            What I'm Doing Now
+          </h1>
+          <p class="text-xl mb-4" style="color: var(--color-text-secondary);">
+            A snapshot of my current projects, learning goals, and interests.
+            Inspired by <a href="https://nownownow.com/about" target="_blank" rel="noopener noreferrer" style="color: var(--color-brand-orange);">nownownow.com</a>
+          </p>
+          <p style="color: var(--color-text-secondary); font-size: 0.875rem;">
+            Last updated: {lastUpdated}
+          </p>
+        </div>
+      </FadeIn>
+
+      <!-- Current Projects -->
+      <FadeIn client:load delay={0.1}>
+        <section class="mb-12">
+          <h2 class="text-3xl font-bold mb-6" style="color: var(--color-brand-orange);">
+            📂 Current Projects
+          </h2>
+          <div class="space-y-4">
+            {currentProjects.map((project) => (
+              <div
+                key={project.title}
+                style={{
+                  padding: '1.5rem',
+                  background: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '12px',
+                }}
+              >
+                <div class="flex items-start justify-between mb-2">
+                  <h3 class="text-xl font-semibold" style="color: var(--color-text);">
+                    {project.title}
+                  </h3>
+                  <span 
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      background: project.status === 'In Progress' ? 'var(--color-brand-orange)' : 'var(--color-bg-tertiary)',
+                      color: project.status === 'In Progress' ? 'white' : 'var(--color-text-secondary)',
+                      borderRadius: '999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                    }}
+                  >
+                    {project.status}
+                  </span>
+                </div>
+                <p style="color: var(--color-text-secondary); font-size: 0.875rem;">
+                  {project.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </FadeIn>
+
+      <!-- Learning -->
+      <FadeIn client:load delay={0.2}>
+        <section class="mb-12">
+          <h2 class="text-3xl font-bold mb-6" style="color: var(--color-brand-orange);">
+            📚 Currently Learning
+          </h2>
+          <div class="space-y-4">
+            {learning.map((item) => (
+              <div
+                key={item.topic}
+                style={{
+                  padding: '1.5rem',
+                  background: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '12px',
+                }}
+              >
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-lg font-semibold" style="color: var(--color-text);">
+                    {item.topic}
+                  </h3>
+                  <span style="color: var(--color-brand-orange); font-weight: '600'; font-size: '0.875rem';">
+                    {item.progress}%
+                  </span>
+                </div>
+                <p style="color: var(--color-text-secondary); font-size: '0.875rem'; margin-bottom: '0.75rem';">
+                  {item.description}
+                </p>
+                {/* Progress Bar */}
+                <div 
+                  style={{
+                    width: '100%',
+                    height: '8px',
+                    background: 'var(--color-bg-tertiary)',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${item.progress}%`,
+                      height: '100%',
+                      background: 'var(--color-brand-orange)',
+                      transition: 'width 1s ease',
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </FadeIn>
+
+      <!-- Reading -->
+      <FadeIn client:load delay={0.3}>
+        <section class="mb-12">
+          <h2 class="text-3xl font-bold mb-6" style="color: var(--color-brand-orange);">
+            📖 Reading List
+          </h2>
+          <div class="space-y-4">
+            {reading.map((book) => (
+              <div
+                key={book.title}
+                style={{
+                  padding: '1.5rem',
+                  background: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '12px',
+                }}
+              >
+                <div class="flex items-start justify-between">
+                  <div>
+                    <h3 class="text-lg font-semibold mb-1" style="color: var(--color-text);">
+                      {book.title}
+                    </h3>
+                    <p style="color: var(--color-text-secondary); font-size: '0.875rem';">
+                      by {book.author}
+                    </p>
+                  </div>
+                  <span 
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      background: book.status === 'Reading' ? 'var(--color-brand-orange)' : 'var(--color-bg-tertiary)',
+                      color: book.status === 'Reading' ? 'white' : 'var(--color-text-secondary)',
+                      borderRadius: '999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {book.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </FadeIn>
+
+      <!-- Interests -->
+      <FadeIn client:load delay={0.4}>
+        <section class="mb-12">
+          <h2 class="text-3xl font-bold mb-6" style="color: var(--color-brand-orange);">
+            ✨ Current Interests
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {interests.map((interest) => (
+              <div
+                key={interest.text}
+                style={{
+                  padding: '1.5rem',
+                  background: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                }}
+              >
+                <span style="fontSize: '2rem';">{interest.emoji}</span>
+                <span style="color: var(--color-text); font-size: '1rem';">
+                  {interest.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </FadeIn>
+
+      <!-- Footer -->
+      <FadeIn client:load delay={0.5}>
+        <div 
+          class="p-6 text-center"
+          style={{
+            background: 'var(--color-bg-secondary)',
+            borderRadius: '12px',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <p style="color: var(--color-text-secondary); font-size: '0.875rem'; marginBottom: '0.5rem';">
+            This page is a living document and gets updated regularly.
+          </p>
+          <p style="color: var(--color-text-secondary); font-size: '0.75rem';">
+            Inspired by Derek Sivers' <a href="https://nownownow.com/about" target="_blank" rel="noopener noreferrer" style="color: var(--color-brand-orange);">/now movement</a>
+          </p>
+        </div>
+      </FadeIn>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,14 @@
+title: "Open Source UI Library"
+description: "Accessible React component library with comprehensive documentation, TypeScript support, and extensive testing."
+tech:
+  - React
+  - TypeScript
+  - Storybook
+  - Jest
+  - Rollup
+github: "https://github.com/yourusername/ui-library"
+live: "https://ui-library-docs.vercel.app"
+category: "Open Source"
+featured: true
+image: "/images/projects/ui-library.jpg"
+order: 7

@@ -1,0 +1,62 @@
+---
+title: "Modern CSS Techniques Every Developer Should Know"
+date: 2024-02-20
+excerpt: "Explore modern CSS features like Container Queries, CSS Grid, Custom Properties, and more that will transform your styling workflow."
+tags: ["CSS", "Frontend", "Web Development"]
+readingTime: 6
+---
+
+# Modern CSS Techniques Every Developer Should Know
+
+CSS has evolved dramatically in recent years. Let's explore techniques that will level up your styling game.
+
+## Container Queries
+
+The most exciting addition to CSS in years. Style components based on their container size, not the viewport.
+
+```css
+.card-container {
+  container-type: inline-size;
+}
+
+@container (min-width: 400px) {
+  .card {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+  }
+}
+```
+
+## CSS Custom Properties (Variables)
+
+Create maintainable, themeable designs with CSS variables.
+
+```css
+:root {
+  --color-primary: #ff5d01;
+  --spacing-unit: 8px;
+  --border-radius: 8px;
+}
+
+.button {
+  background: var(--color-primary);
+  padding: calc(var(--spacing-unit) * 2);
+  border-radius: var(--border-radius);
+}
+```
+
+## Modern Layouts with Grid
+
+CSS Grid makes complex layouts simple and maintainable.
+
+```css
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+```
+
+## Conclusion
+
+Modern CSS gives us powerful tools for creating responsive, maintainable designs. Start incorporating these techniques today!

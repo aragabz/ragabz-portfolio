@@ -1,0 +1,9 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://yourname.dev/sitemap-index.xml
+
+# Crawl-delay for politeness
+Crawl-delay: 1

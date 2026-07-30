@@ -1,0 +1,14 @@
+title: "E-Commerce Platform"
+description: "Full-stack e-commerce platform with real-time inventory management, payment integration, and admin dashboard."
+tech:
+  - React
+  - Node.js
+  - PostgreSQL
+  - Stripe
+  - Redis
+github: "https://github.com/yourusername/ecommerce-platform"
+live: "https://demo-ecommerce.vercel.app"
+category: "Full-Stack"
+featured: true
+image: "/images/projects/ecommerce.jpg"
+order: 10
