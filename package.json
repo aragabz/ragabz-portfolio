@@ -13,7 +13,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "stop": "astro dev stop"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.3",

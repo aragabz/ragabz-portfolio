@@ -1,0 +1,377 @@
+---
+title: "Building a Scalable REST API with Node.js and Express"
+date: 2024-06-20
+excerpt: "A complete guide to building production-ready REST APIs with Node.js, Express, MongoDB, and JWT authentication."
+tags: ["Node.js", "Express", "API", "Backend", "MongoDB"]
+readingTime: 15
+---
+
+# Building a Scalable REST API with Node.js and Express
+
+In this comprehensive guide, we'll build a production-ready REST API from scratch using Node.js, Express, MongoDB, and industry best practices.
+
+## Table of Contents
+
+1. Project Setup
+2. Database Design
+3. Authentication & Authorization
+4. API Endpoints
+5. Error Handling
+6. Testing
+7. Deployment
+
+## 1. Project Setup
+
+First, let's initialize our project with the necessary dependencies:
+
+```bash
+mkdir my-api && cd my-api
+npm init -y
+npm install express mongoose dotenv cors helmet
+npm install -D nodemon typescript @types/node @types/express
+```
+
+### Folder Structure
+
+```
+my-api/
+├── src/
+│   ├── config/
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── utils/
+│   └── app.ts
+├── tests/
+├── .env
+├── .env.example
+└── package.json
+```
+
+## 2. Database Design
+
+Let's design our MongoDB schema for a simple blog API:
+
+```typescript
+// models/User.ts
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+
+const userSchema = new mongoose.Schema({
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    minlength: 3,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 8,
+  },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user',
+  },
+}, { timestamps: true });
+
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
+
+export default mongoose.model('User', userSchema);
+```
+
+## 3. Authentication & Authorization
+
+Implementing JWT-based authentication:
+
+```typescript
+// middleware/auth.ts
+import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from 'express';
+
+interface JWTPayload {
+  userId: string;
+  role: string;
+}
+
+export const protect = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'Not authorized' 
+      });
+    }
+
+    const decoded = jwt.verify(
+      token, 
+      process.env.JWT_SECRET!
+    ) as JWTPayload;
+    
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+export const restrictTo = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!roles.includes(req.user?.role)) {
+      return res.status(403).json({ 
+        error: 'Forbidden' 
+      });
+    }
+    next();
+  };
+};
+```
+
+## 4. API Endpoints
+
+Creating RESTful endpoints:
+
+```typescript
+// routes/posts.ts
+import express from 'express';
+import * as postController from '../controllers/postController';
+import { protect, restrictTo } from '../middleware/auth';
+
+const router = express.Router();
+
+router
+  .route('/')
+  .get(postController.getAllPosts)
+  .post(protect, postController.createPost);
+
+router
+  .route('/:id')
+  .get(postController.getPost)
+  .patch(protect, postController.updatePost)
+  .delete(
+    protect, 
+    restrictTo('admin'), 
+    postController.deletePost
+  );
+
+export default router;
+```
+
+## 5. Error Handling
+
+Centralized error handling middleware:
+
+```typescript
+// middleware/errorHandler.ts
+import { Request, Response, NextFunction } from 'express';
+
+class AppError extends Error {
+  statusCode: number;
+  isOperational: boolean;
+
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = true;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export const errorHandler = (
+  err: any,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  err.statusCode = err.statusCode || 500;
+  err.message = err.message || 'Internal Server Error';
+
+  // Mongoose validation error
+  if (err.name === 'ValidationError') {
+    const errors = Object.values(err.errors).map(
+      (e: any) => e.message
+    );
+    err.message = `Validation Error: ${errors.join(', ')}`;
+    err.statusCode = 400;
+  }
+
+  // JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    err.message = 'Invalid token';
+    err.statusCode = 401;
+  }
+
+  res.status(err.statusCode).json({
+    status: 'error',
+    message: err.message,
+    ...(process.env.NODE_ENV === 'development' && { 
+      stack: err.stack 
+    }),
+  });
+};
+```
+
+## 6. Testing
+
+Writing integration tests with Jest and Supertest:
+
+```typescript
+// tests/auth.test.ts
+import request from 'supertest';
+import app from '../src/app';
+import User from '../src/models/User';
+
+describe('Auth Endpoints', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  describe('POST /api/auth/register', () => {
+    it('should register a new user', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'password123',
+        })
+        .expect(201);
+
+      expect(res.body).toHaveProperty('token');
+      expect(res.body.user.email).toBe('test@example.com');
+    });
+
+    it('should not register user with existing email', async () => {
+      await User.create({
+        username: 'existing',
+        email: 'existing@example.com',
+        password: 'password123',
+      });
+
+      await request(app)
+        .post('/api/auth/register')
+        .send({
+          username: 'newuser',
+          email: 'existing@example.com',
+          password: 'password123',
+        })
+        .expect(400);
+    });
+  });
+});
+```
+
+## 7. Deployment
+
+### Environment Variables
+
+```bash
+NODE_ENV=production
+PORT=5000
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/mydb
+JWT_SECRET=your-super-secret-jwt-key
+JWT_EXPIRES_IN=7d
+```
+
+### Docker Setup
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 5000
+CMD ["node", "dist/app.js"]
+```
+
+### Deploy to Railway/Render
+
+1. Push code to GitHub
+2. Connect your repository to Railway/Render
+3. Set environment variables in dashboard
+4. Deploy automatically on push
+
+## Best Practices
+
+1. **Rate Limiting**: Use `express-rate-limit` to prevent abuse
+2. **Validation**: Use `joi` or `express-validator` for input validation
+3. **Logging**: Implement structured logging with Winston or Pino
+4. **Documentation**: Use Swagger/OpenAPI for API documentation
+5. **Monitoring**: Set up error tracking with Sentry
+6. **Caching**: Use Redis for frequently accessed data
+7. **Database Indexing**: Index frequently queried fields
+8. **Security Headers**: Use helmet.js for security headers
+
+## Performance Tips
+
+```typescript
+// Connection pooling
+mongoose.connect(process.env.MONGODB_URI!, {
+  maxPoolSize: 10,
+  minPoolSize: 2,
+});
+
+// Query optimization
+const posts = await Post.find()
+  .select('title excerpt createdAt')
+  .limit(20)
+  .sort('-createdAt')
+  .lean(); // Returns plain JS objects
+
+// Pagination
+const page = parseInt(req.query.page as string) || 1;
+const limit = 20;
+const skip = (page - 1) * limit;
+
+const posts = await Post.find()
+  .skip(skip)
+  .limit(limit);
+```
+
+## Conclusion
+
+You now have a solid foundation for building scalable REST APIs with Node.js and Express. Key takeaways:
+
+- Use TypeScript for type safety
+- Implement proper authentication and authorization
+- Handle errors centrally
+- Write comprehensive tests
+- Follow RESTful conventions
+- Optimize for performance
+
+The complete source code is available on [GitHub](https://github.com/yourusername/nodejs-api-template).
+
+## Next Steps
+
+- Add WebSocket support for real-time features
+- Implement GraphQL alongside REST
+- Set up CI/CD pipeline
+- Add API versioning
+- Implement advanced caching strategies
+
+Happy coding! 🚀

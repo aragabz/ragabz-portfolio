@@ -9,7 +9,6 @@ import Blog from '../components/Blog.astro';
 import Contact from '../components/Contact.astro';
 import BackToTop from '../components/react/BackToTop';
 import ThemeToggle from '../components/react/ThemeToggle';
-import Search from '../components/react/Search';
 import MobileMenu from '../components/react/MobileMenu';
 ---
 
@@ -43,12 +42,10 @@ import MobileMenu from '../components/react/MobileMenu';
           <li><a href="#experience" class="hover-text-brand-orange transition-colors">Experience</a></li>
           <li><a href="#blog" class="hover-text-brand-orange transition-colors">Blog</a></li>
           <li><a href="#contact" class="hover-text-brand-orange transition-colors">Contact</a></li>
-          <li><Search client:load /></li>
           <li><ThemeToggle client:load /></li>
         </ul>
         
         <div class="flex items-center gap-2 md:hidden">
-          <Search client:load />
           <ThemeToggle client:load />
           <MobileMenu client:load />
         </div>

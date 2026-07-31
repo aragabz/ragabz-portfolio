@@ -1,9 +1,11 @@
 ---
 // Hero Section Component
+import TechStackMarquee from './react/TechStackMarquee';
+import { defaultTechStack } from './react/TechStackMarquee';
 ---
 
-<section id="hero" class="min-h-screen flex items-center justify-center px-6">
-  <div class="max-w-container mx-auto text-center">
+<section id="hero" class="min-h-screen flex items-center justify-center px-6 flex-col">
+  <div class="max-w-container mx-auto text-center flex-1 flex flex-col justify-center">
     <h1 class="text-6xl md:text-8xl font-bold mb-6 fade-in tracking-tight-2">
       Your Name
     </h1>
@@ -46,5 +48,15 @@
         </svg>
       </a>
     </div>
+  </div>
+  
+  <!-- Tech Stack Marquee -->
+  <div class="w-full max-w-7xl mx-auto fade-in fade-in-delay-4">
+    <TechStackMarquee 
+      items={defaultTechStack} 
+      speed={50}
+      pauseOnHover={true}
+      client:visible
+    />
   </div>
 </section>
