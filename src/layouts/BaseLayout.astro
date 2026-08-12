@@ -10,16 +10,16 @@ export interface Props {
 }
 
 const {
-  title = 'Your Name - Software Engineer',
-  description = 'Software Engineer specializing in building exceptional digital experiences. Expert in React, TypeScript, Node.js, and modern web technologies.',
+  title = 'Ahmed Ragab - Software Engineering Technical Lead',
+  description = 'Software Engineering Technical Lead and Full-Stack Engineer with 9+ years of experience delivering end-to-end solutions across mobile and back-end systems. Expert in Java, Kotlin, React Native, and modern architectural patterns.',
   image = '/og-image.jpg',
   type = 'website',
-  keywords = ['Software Engineer', 'Web Developer', 'React', 'TypeScript', 'Node.js', 'Full Stack Developer'],
+  keywords = ['Software Engineer', 'Technical Lead', 'Full-Stack Engineer', 'Android', 'React Native', 'Kotlin', 'Java', 'Mobile Developer'],
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const socialImageURL = new URL(image, Astro.site);
-const siteName = 'Your Name - Portfolio';
+const siteName = 'Ahmed Ragab - Portfolio';
 ---
 
 <!doctype html>
@@ -55,7 +55,7 @@ const siteName = 'Your Name - Portfolio';
     <meta name="title" content={title} />
     <meta name="description" content={description} />
     <meta name="keywords" content={keywords.join(', ')} />
-    <meta name="author" content="Your Name" />
+    <meta name="author" content="Ahmed Ragab" />
     <link rel="canonical" href={canonicalURL} />
     
     <!-- Open Graph / Facebook -->
@@ -75,21 +75,20 @@ const siteName = 'Your Name - Portfolio';
     <meta property="twitter:description" content={description} />
     <meta property="twitter:image" content={socialImageURL} />
     <meta property="twitter:image:alt" content={title} />
-    <meta name="twitter:creator" content="@yourusername" />
+    <meta name="twitter:creator" content="@aragabz" />
     
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "Person",
-      "name": "Your Name",
+      "name": "Ahmed Ragab",
       "url": Astro.site?.toString(),
       "image": socialImageURL.toString(),
-      "jobTitle": "Software Engineer",
+      "jobTitle": "Software Engineering Technical Lead",
       "description": description,
       "sameAs": [
-        "https://github.com/yourusername",
-        "https://linkedin.com/in/yourusername",
-        "https://twitter.com/yourusername"
+        "https://github.com/aragabz",
+        "https://www.linkedin.com/in/aragabz/"
       ],
       "knowsAbout": keywords,
     })} />
@@ -103,7 +102,7 @@ const siteName = 'Your Name - Portfolio';
       "description": description,
       "publisher": {
         "@type": "Person",
-        "name": "Your Name"
+        "name": "Ahmed Ragab"
       }
     })} />
     

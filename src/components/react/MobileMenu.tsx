@@ -218,10 +218,9 @@ export default function MobileMenu({
               </p>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 {[
-                  { icon: 'mdi:github', label: 'GitHub', href: 'https://github.com' },
-                  { icon: 'mdi:linkedin', label: 'LinkedIn', href: 'https://linkedin.com' },
-                  { icon: 'mdi:twitter', label: 'Twitter', href: 'https://twitter.com' },
-                  { icon: 'mdi:email', label: 'Email', href: 'mailto:your@email.com' },
+                  { icon: 'mdi:github', label: 'GitHub', href: 'https://github.com/aragabz' },
+                  { icon: 'mdi:linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/in/aragabz/' },
+                  { icon: 'mdi:email', label: 'Email', href: 'mailto:ahmedragab.se@gmail.com' },
                 ].map((social) => (
                   <a
                     key={social.label}
