@@ -3,7 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { FadeIn, SlideIn } from '../../components/react/Animated';
 import { Icon } from '@iconify/react';
 
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 
 const project = {
   title: 'E-Commerce Platform Redesign',
