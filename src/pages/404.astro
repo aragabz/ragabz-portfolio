@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
 ---
 
 <BaseLayout title="404 - Page Not Found">
@@ -32,14 +33,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <!-- Action Buttons -->
       <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
         <a 
-          href="/"
+          href={base}
           class="px-8 py-4 rounded-lg font-medium transition-all inline-block hover-bg-brand-orange"
           style="background-color: var(--color-brand-black); color: white;"
         >
           ← Back to Home
         </a>
         <a 
-          href="/#projects"
+          href={`${base}#projects`}
           class="px-8 py-4 rounded-lg font-medium transition-all inline-block border hover-border-brand-black"
           style="border-color: var(--color-brand-gray-light); color: var(--color-brand-black);"
         >
@@ -52,13 +53,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <p class="mb-4">You might be looking for:</p>
         <ul class="space-y-2">
           <li>
-            <a href="/#about" class="hover-text-brand-orange transition-colors">About Me</a>
+            <a href={`${base}#about`} class="hover-text-brand-orange transition-colors">About Me</a>
           </li>
           <li>
-            <a href="/blog" class="hover-text-brand-orange transition-colors">Blog Posts</a>
+            <a href={`${base}blog`} class="hover-text-brand-orange transition-colors">Blog Posts</a>
           </li>
           <li>
-            <a href="/#contact" class="hover-text-brand-orange transition-colors">Get in Touch</a>
+            <a href={`${base}#contact`} class="hover-text-brand-orange transition-colors">Get in Touch</a>
           </li>
         </ul>
       </div>

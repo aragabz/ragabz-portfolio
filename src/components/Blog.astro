@@ -1,6 +1,8 @@
 ---
 import { getCollection } from 'astro:content';
 
+const base = import.meta.env.BASE_URL;
+
 const blogPosts = (await getCollection('blog'))
   .filter(post => !post.data.draft)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
@@ -35,7 +37,7 @@ function formatDate(date: Date) {
             </div>
             
             <h3 class="text-xl font-semibold mb-3 hover-text-brand-orange transition-colors">
-              <a href={`/blog/${post.id}`}>
+              <a href={`${base}blog/${post.id}`}>
                 {post.data.title}
               </a>
             </h3>
@@ -53,7 +55,7 @@ function formatDate(date: Date) {
             </div>
             
             <a 
-              href={`/blog/${post.id}`}
+              href={`${base}blog/${post.id}`}
               class="text-sm font-medium hover-text-brand-orange transition-colors"
               style="color: var(--color-brand-black);"
             >
@@ -71,7 +73,7 @@ function formatDate(date: Date) {
     {blogPosts.length > 0 && (
       <div class="text-center mt-12">
         <a 
-          href="/blog"
+          href={`${base}blog`}
           class="inline-flex items-center gap-2 px-8 py-4 rounded-lg font-semibold transition-all hover:scale-105 hover:shadow-lg"
           style="background-color: var(--color-brand-orange); color: white;"
         >
