@@ -1,5 +1,6 @@
 ---
 // About Section Component
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 ---
 
 <section id="about" class="py-section px-6">
@@ -11,7 +12,7 @@
       <div class="fade-in" style="width: 90%; margin-inline: auto;">
         <div class="aspect-square rounded-lg overflow-hidden group hover:shadow-xl" style="background-color: var(--color-brand-gray-light); transition: box-shadow 0.6s cubic-bezier(0.22, 1, 0.36, 1);">
           <img 
-            src="/images/profile.jpg" 
+            src={`${base}images/profile.jpg`} 
             alt="Profile" 
             class="w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
             loading="lazy"
@@ -50,7 +51,7 @@
         
         <!-- Resume Button -->
         <a 
-          href="/resume.pdf" 
+          href={`${base}resume.pdf`} 
           download
           class="inline-flex items-center gap-2 px-6 py-3 border rounded-lg hover-bg-brand-black hover:text-white transition-all duration-300 font-medium"
           style="border-color: var(--color-brand-black);"
