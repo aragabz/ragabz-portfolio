@@ -6,9 +6,13 @@ tags: ["TypeScript", "JavaScript", "Programming"]
 readingTime: 10
 ---
 
-# Understanding TypeScript Generics
+import Callout from '../../components/mdx/Callout.astro';
 
 Generics are one of TypeScript's most powerful features, enabling you to write flexible, reusable code while maintaining type safety.
+
+<Callout variant="tip" title="Why generics matter">
+Without generics you're either duplicating code or giving up type safety. Generics let you keep both — one implementation, many types.
+</Callout>
 
 ## What Are Generics?
 
@@ -29,6 +33,10 @@ const num = identity<number>(42);
 const str = identity<string>("hello");
 ```
 
+<Callout variant="note">
+Type parameters are erased at runtime — they exist purely in the type system, so you get safety without any runtime cost.
+</Callout>
+
 ## Generic Constraints
 
 Constrain generic types to ensure they have required properties.
@@ -46,6 +54,57 @@ function logLength<T extends HasLength>(arg: T): T {
 logLength("hello"); // Works
 logLength([1, 2, 3]); // Works
 // logLength(42); // Error!
+```
+
+<Callout variant="note">
+Think of `extends` as a type-level contract: `T` must satisfy `HasLength`, but it stays flexible about everything else.
+</Callout>
+
+## Default Type Parameters
+
+Give callers sensible defaults so the API stays convenient:
+
+```typescript
+function createMap<T, V = string>(items: T[]): Map<T, V> {
+  return new Map();
+}
+
+// V defaults to string
+const map = createMap<number>([1, 2, 3]);
+```
+
+## Conditional Types
+
+Express types that change based on a condition:
+
+```typescript
+type IsArray<T> = T extends unknown[] ? true : false;
+
+type A = IsArray<number[]>;   // true
+type B = IsArray<string>;     // false
+```
+
+<Callout variant="warning">
+Conditional types are evaluated lazily over unions — `IsArray<string | number[]>` distributes and produces `false | true`, not a single result. Wrap the check in a tuple, `[T] extends [unknown[]]`, when you need non-distributive behavior.
+</Callout>
+
+## Utility Types to Know
+
+Generics power TypeScript's built-in utilities:
+
+```typescript
+type User = {
+  id: number;
+  name: string;
+  email: string;
+  age?: number;
+};
+
+type PartialUser = Partial<User>;      // all properties optional
+type RequiredUser = Required<User>;    // all properties required
+type PublicUser = Omit<User, 'email'>; // remove email
+type UserId = Pick<User, 'id'>;        // only id
+type ReadonlyUser = Readonly<User>;    // all readonly
 ```
 
 ## Real-World Example: API Response Handler
@@ -70,6 +129,17 @@ interface User {
 const userResponse = await fetchData<User>("/api/user/1");
 // userResponse.data is typed as User
 ```
+
+<Callout variant="tip" title="Let inference work">
+You don't always need to write the type argument — `fetchData("/api/user/1")` often infers `T` from context. Only specify it explicitly when inference can't determine the shape you want.
+</Callout>
+
+## Key Takeaways
+
+- Generics preserve **type safety** without sacrificing **reuse**
+- `extends` creates **constraints**; default parameters keep APIs convenient
+- Conditional types let you model **logic in the type system**
+- Utility types (`Partial`, `Omit`, `Pick`, `Readonly`) cover most real-world needs
 
 ## Conclusion
 

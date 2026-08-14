@@ -6,7 +6,7 @@ const projects = (await getCollection('projects'))
   .sort((a, b) => b.data.order - a.data.order);
 ---
 
-<section id="projects" class="py-section px-6 bg-white">
+<section id="projects" class="py-section px-6 bg-[var(--color-bg)]">
   <div class="max-w-container mx-auto">
     <div class="text-center mb-16 fade-in">
       <h2 class="text-4xl md:text-5xl font-bold mb-4">Featured Projects</h2>

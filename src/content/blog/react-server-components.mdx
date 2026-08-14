@@ -6,9 +6,13 @@ tags: ["React", "Next.js", "Server Components", "Performance"]
 readingTime: 18
 ---
 
-# React Server Components: The Future of React
+import Callout from '../../components/mdx/Callout.astro';
 
 React Server Components (RSC) represent a fundamental shift in how we build React applications. Let's explore what they are, why they matter, and how to use them effectively.
+
+<Callout variant="note">
+Server Components run **only on the server** and ship zero JavaScript to the browser. Everything in this article assumes you're using the Next.js App Router or a framework with first-class RSC support.
+</Callout>
 
 ## What Are React Server Components?
 
@@ -417,6 +421,10 @@ Total: ~500ms - 1 second
 
 ## Common Gotchas
 
+<Callout variant="warning">
+Watch for serialization limits: functions, classes, `Date` instances, and non-plain objects can't cross the Server → Client boundary without special handling. Only send serializable props.
+</Callout>
+
 ### 1. Props Must Be Serializable
 
 ```jsx
@@ -445,6 +453,10 @@ export function ThemeProvider({ children }) {
   );
 }
 ```
+
+<Callout variant="tip" title="Getting started">
+Make every component a Server Component by default, then add `'use client'` only where interactivity is required. This gives you the best performance with the least effort.
+</Callout>
 
 ## Conclusion
 

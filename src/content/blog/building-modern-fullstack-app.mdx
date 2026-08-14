@@ -6,9 +6,13 @@ tags: ["Full-Stack", "React", "Node.js", "Architecture"]
 readingTime: 12
 ---
 
-# Building a Modern Full-Stack Application in 2024
+import Callout from '../../components/mdx/Callout.astro';
 
 The landscape of full-stack development has evolved significantly. Let's explore the modern approaches and technologies that power today's web applications.
+
+<Callout variant="tip" title="The stack we'll cover">
+React + TypeScript + Vite on the frontend, Node.js on the backend, and a deployment pipeline that takes you from commit to production.
+</Callout>
 
 ## The Modern Stack
 
@@ -82,6 +86,10 @@ app.get('/api/users/:id', async (req: Request, res: Response) => {
 ### 1. API Design: REST vs GraphQL vs tRPC
 
 Each approach has its strengths:
+
+<Callout variant="note">
+Your choice of API style is a trade-off. Start with REST for public-facing APIs, reach for tRPC when you control both ends, and use GraphQL when query flexibility outweighs complexity.
+</Callout>
 
 - **REST**: Simple, widely supported, great for public APIs
 - **GraphQL**: Flexible querying, reduces over-fetching
@@ -184,6 +192,10 @@ jobs:
 
 ## Security Best Practices
 
+<Callout variant="warning">
+Security is a property of the whole system, not a checklist. Validate every input, never log secrets, and keep dependencies patched with automated tooling like Dependabot.
+</Callout>
+
 1. **Authentication**: Use established solutions (Auth0, Clerk, NextAuth)
 2. **Authorization**: Implement role-based access control (RBAC)
 3. **Input Validation**: Validate all user inputs
@@ -243,6 +255,10 @@ Essential tools:
 - **Datadog/New Relic**: Application performance
 - **LogRocket**: Session replay
 - **Prometheus + Grafana**: Metrics and dashboards
+
+<Callout variant="tip" title="Start simple, scale deliberately">
+Resist adding infrastructure you don't need yet. A monolith with clean boundaries outperforms a premature microservices architecture almost every time.
+</Callout>
 
 ## Conclusion
 

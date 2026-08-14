@@ -2,7 +2,6 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import RelatedPosts from '../../components/RelatedPosts.astro';
-import Comments from '../../components/Comments.astro';
 
 export async function getStaticPaths() {
   const blogPosts = await getCollection('blog');
@@ -13,8 +12,47 @@ export async function getStaticPaths() {
 }
 
 const { post } = Astro.props;
-const { Content } = await render(post);
+const { Content, headings } = await render(post);
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
+const articleURL = new URL(Astro.url.pathname, Astro.site);
+
+interface TocNode {
+  depth: number;
+  slug: string;
+  text: string;
+  number?: string;
+  children: TocNode[];
+}
+
+function buildToc(headings: { depth: number; slug: string; text: string }[]): TocNode[] {
+  const root: TocNode[] = [];
+  const stack: TocNode[] = [];
+  for (const h of headings) {
+    const node: TocNode = { depth: h.depth, slug: h.slug, text: h.text, children: [] };
+    while (stack.length > 0 && stack[stack.length - 1].depth >= h.depth) {
+      stack.pop();
+    }
+    if (stack.length === 0) {
+      root.push(node);
+    } else {
+      stack[stack.length - 1].children.push(node);
+    }
+    stack.push(node);
+  }
+  return root;
+}
+
+function numberToc(nodes: TocNode[], parents: number[] = []): void {
+  let i = 0;
+  for (const node of nodes) {
+    i++;
+    node.number = [...parents, i].join('.');
+    numberToc(node.children, [...parents, i]);
+  }
+}
+
+const toc = buildToc(headings.filter(h => h.depth > 1 && h.depth <= 4));
+numberToc(toc);
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
@@ -30,110 +68,271 @@ function formatDate(date: Date) {
   description={post.data.excerpt}
   type="article"
 >
-  <article class="min-h-screen pt-32 pb-20 px-6">
-    <div class="max-w-3xl mx-auto">
+  <div class="reading-progress" aria-hidden="true"></div>
+
+  <article class="min-h-screen pt-24 pb-24 px-6">
+    <div class="max-w-5xl mx-auto">
       <!-- Back Button -->
-      <div class="mb-8">
+      <div class="mb-12">
         <a 
-          href={`${base}blog`} 
-          style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--color-text-secondary); text-decoration: none;"
-          class="hover-text-brand-orange"
+          href={`${base}blog`}
+          class="back-link"
         >
-          ← Back to Blog
+          ← All articles
         </a>
       </div>
 
       <!-- Article Header -->
-      <header class="mb-12">
-        <h1 class="text-4xl md:text-5xl font-bold mb-6 leading-tight" style="color: var(--color-text);">
+      <header class="mb-14 max-w-[720px]">
+        <p class="eyebrow">Blog</p>
+
+        <h1 class="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.08] font-bold tracking-tight mb-8" style="color: var(--color-text);">
           {post.data.title}
         </h1>
-        
-        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; color: var(--color-text-secondary); font-size: 0.875rem;">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            📅 <time datetime={post.data.date.toISOString()}>
-              {formatDate(post.data.date)}
-            </time>
-          </div>
-          <span>•</span>
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            ⏱️ <span>{post.data.readingTime || 5} min read</span>
-          </div>
+
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" style="color: var(--color-text-tertiary);">
+          <time datetime={post.data.date.toISOString()}>
+            {formatDate(post.data.date)}
+          </time>
+          <span aria-hidden="true">·</span>
+          <span>{post.data.readingTime || 5} min read</span>
         </div>
-        
-        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+
+        <div class="flex flex-wrap gap-2 mt-6">
           {post.data.tags.map(tag => (
-            <span 
-              style="padding: 0.5rem 1rem; border-radius: 999px; font-size: 0.875rem; background: var(--color-bg-secondary); color: var(--color-text-secondary); border: 1px solid var(--color-border);"
-            >
+            <span class="tag">
               {tag}
             </span>
           ))}
         </div>
       </header>
 
-      <!-- Article Content -->
-      <div class="blog-content mb-16">
-        <Content />
+      <!-- Article Body + TOC -->
+      <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:gap-16">
+        <div class="blog-content max-w-[720px]">
+          <Content />
+        </div>
+
+        {toc.length > 0 && (
+          <aside class="hidden lg:block" aria-label="Table of contents">
+            <nav class="toc sticky top-10">
+              <p class="toc-label">On this page</p>
+              <ul class="toc-root">
+                {toc.map(section => (
+                  <li>
+                    <a href={`#${section.slug}`} class="toc-link toc-h2">
+                      <span class="toc-num">{section.number}</span>
+                      {section.text}
+                    </a>
+                    {section.children.length > 0 && (
+                      <ul class="toc-sub">
+                        {section.children.map(sub => (
+                          <li>
+                            <a href={`#${sub.slug}`} class="toc-link toc-h3">
+                              <span class="toc-num">{sub.number}</span>
+                              {sub.text}
+                            </a>
+                            {sub.children.length > 0 && (
+                              <ul class="toc-sub">
+                                {sub.children.map(detail => (
+                                  <li>
+                                    <a href={`#${detail.slug}`} class="toc-link toc-h4">
+                                      <span class="toc-num">{detail.number}</span>
+                                      {detail.text}
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </aside>
+        )}
       </div>
 
       <!-- Author/Share Section -->
-      <div style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--color-border);">
+      <div class="max-w-[720px] mt-20 pt-10 border-t" style="border-color: var(--color-border);">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 0.5rem;">
+            <p class="text-xs uppercase tracking-[0.15em] mb-3" style="color: var(--color-text-tertiary);">
               Share this article
             </p>
-            <div style="display: flex; gap: 0.75rem;">
+            <div class="flex gap-2">
               <a 
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent('https://yoursite.com/blog/' + post.id)}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(articleURL)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style="display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; border-radius: 8px; background: var(--color-bg-secondary); color: var(--color-text); border: 1px solid var(--color-border); text-decoration: none;"
-                class="hover-bg-brand-blue"
-                aria-label="Share on Twitter"
+                class="share-btn"
+                aria-label="Share on X (Twitter)"
               >
-                𝕏 Twitter
+                X
               </a>
               <a 
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://yoursite.com/blog/' + post.id)}`}
+                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleURL)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style="display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; border-radius: 8px; background: var(--color-bg-secondary); color: var(--color-text); border: 1px solid var(--color-border); text-decoration: none;"
-                class="hover-bg-brand-blue"
+                class="share-btn"
                 aria-label="Share on LinkedIn"
               >
-                in LinkedIn
+                LinkedIn
               </a>
+              <button type="button" class="share-btn copy-link" aria-label="Copy link to article">
+                Copy link
+              </button>
             </div>
           </div>
-          
+
           <a 
             href={`${base}blog`}
-            style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: var(--color-brand-orange); color: white; border-radius: 8px; text-decoration: none; font-weight: 600;"
-            class="hover-bg-brand-orange"
+            class="back-link"
           >
-            ← More Articles
+            All articles →
           </a>
         </div>
       </div>
     </div>
 
     <!-- Related Posts -->
-    <div class="max-w-container mx-auto px-6 mt-16">
+    <div class="max-w-5xl mx-auto mt-20">
       <RelatedPosts currentSlug={post.id} currentTags={post.data.tags} />
-    </div>
-
-    <!-- Comments -->
-    <div class="max-w-3xl mx-auto mt-16">
-      <Comments />
     </div>
   </article>
 
   <style>
+    .reading-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      width: 100%;
+      background: var(--color-accent);
+      transform-origin: 0 50%;
+      transform: scaleX(0);
+      z-index: 100;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--color-accent-strong);
+    }
+
+    .eyebrow {
+      margin-bottom: 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--color-accent-strong);
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.875rem;
+      border-radius: 999px;
+      color: var(--color-text-secondary);
+      background: transparent;
+      border: 1px solid var(--color-border);
+    }
+
+    /* ---- Table of contents ---- */
+    .toc {
+      font-size: 0.8125rem;
+    }
+
+    .toc-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--color-text-tertiary);
+      margin-bottom: 0.875rem;
+    }
+
+    .toc ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .toc-root {
+      border-left: 1px solid var(--color-border);
+    }
+
+    .toc-link {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      padding: 0.3125rem 0 0.3125rem 0.875rem;
+      margin-left: -1px;
+      border-left: 1px solid transparent;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      line-height: 1.4;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .toc-link:hover {
+      color: var(--color-text);
+    }
+
+    .toc-link.active {
+      color: var(--color-accent-strong);
+      border-left-color: var(--color-accent-strong);
+    }
+
+    .toc-num {
+      flex-shrink: 0;
+      font-size: 0.75em;
+      color: var(--color-text-tertiary);
+    }
+
+    .toc-link.active .toc-num {
+      color: var(--color-accent-strong);
+    }
+
+    .toc-h3 { padding-left: 2rem; }
+    .toc-h4 { padding-left: 3.25rem; }
+
+    /* ---- Share buttons ---- */
+    .share-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      font-size: 0.8125rem;
+      background: transparent;
+      color: var(--color-text-secondary);
+      border: 1px solid var(--color-border);
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .share-btn:hover {
+      color: var(--color-accent-strong);
+      border-color: var(--color-accent-strong);
+    }
+
+    /* ---- Article prose ---- */
     .blog-content {
       color: var(--color-text);
-      line-height: 1.7;
+      font-size: 1.125rem;
+      line-height: 1.8;
     }
 
     .blog-content h1,
@@ -144,121 +343,135 @@ function formatDate(date: Date) {
     .blog-content h6 {
       color: var(--color-text);
       font-weight: 700;
-      margin-top: 2.5rem;
-      margin-bottom: 1rem;
       letter-spacing: -0.02em;
-      line-height: 1.2;
+      line-height: 1.15;
+      margin-top: 3rem;
+      margin-bottom: 1.125rem;
+      scroll-margin-top: 2rem;
     }
 
-    .blog-content h1 { font-size: 2.25rem; }
+    .blog-content h1 { font-size: 2.125rem; }
     .blog-content h2 { font-size: 1.875rem; }
     .blog-content h3 { font-size: 1.5rem; }
     .blog-content h4 { font-size: 1.25rem; }
+    .blog-content h5,
+    .blog-content h6 { font-size: 1.125rem; }
 
     .blog-content p {
-      margin-bottom: 1.5rem;
-      line-height: 1.7;
+      margin-bottom: 1.75rem;
+      line-height: 1.8;
     }
 
     .blog-content a {
-      color: var(--color-brand-orange);
+      color: var(--color-accent-strong);
       text-decoration: underline;
-      text-decoration-color: transparent;
-      transition: text-decoration-color 0.2s;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
+      transition: text-decoration-thickness 0.2s;
     }
 
     .blog-content a:hover {
-      text-decoration-color: var(--color-brand-orange);
+      text-decoration-thickness: 2px;
     }
 
     .blog-content ul,
     .blog-content ol {
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.75rem;
       padding-left: 1.5rem;
     }
 
     .blog-content li {
-      margin-bottom: 0.75rem;
-      line-height: 1.7;
+      margin-bottom: 0.625rem;
+      line-height: 1.8;
     }
 
-    .blog-content ul li {
-      list-style-type: disc;
-    }
-
-    .blog-content ol li {
-      list-style-type: decimal;
-    }
+    .blog-content ul li { list-style-type: disc; }
+    .blog-content ol li { list-style-type: decimal; }
 
     .blog-content code {
       background-color: var(--color-bg-secondary);
-      color: var(--color-accent);
-      padding: 0.25rem 0.5rem;
+      color: var(--color-accent-strong);
+      padding: 0.2em 0.45em;
       border-radius: 0.375rem;
-      font-size: 0.875em;
+      font-size: 0.85em;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-      border: 1px solid var(--color-border);
     }
 
     .blog-content pre {
-      background-color: var(--color-bg-secondary);
-      color: var(--color-text);
       padding: 1.5rem;
       border-radius: 0.75rem;
       overflow-x: auto;
-      margin: 2rem 0;
-      border: 1px solid var(--color-border);
-      line-height: 1.5;
+      margin: 2.5rem 0;
+      line-height: 1.6;
+      font-size: 0.875rem;
+      tab-size: 2;
     }
 
     .blog-content pre code {
       background-color: transparent;
       padding: 0;
-      border: none;
+      border-radius: 0;
       color: inherit;
+      font-size: inherit;
     }
 
     .blog-content blockquote {
-      border-left: 4px solid var(--color-accent);
+      margin: 2.5rem 0;
       padding-left: 1.5rem;
+      border-left: 2px solid var(--color-accent);
       font-style: italic;
-      margin: 2rem 0;
+      font-size: 1.25rem;
+      line-height: 1.6;
       color: var(--color-text-secondary);
-      background: var(--color-bg-secondary);
-      padding: 1.5rem;
-      padding-left: 2rem;
-      border-radius: 0 0.5rem 0.5rem 0;
     }
 
     .blog-content img {
       border-radius: 0.75rem;
-      margin: 2rem 0;
+      margin: 2.5rem 0;
       border: 1px solid var(--color-border);
     }
 
     .blog-content hr {
       border: none;
-      border-top: 1px solid var(--color-border);
-      margin: 3rem 0;
+      height: 1rem;
+      margin: 3.5rem 0;
+      text-align: center;
+      position: relative;
+    }
+
+    .blog-content hr::before {
+      content: '· · ·';
+      color: var(--color-text-tertiary);
+      letter-spacing: 1.2em;
+      padding-left: 1.2em;
+      font-size: 0.875rem;
     }
 
     .blog-content table {
       width: 100%;
       border-collapse: collapse;
-      margin: 2rem 0;
+      margin: 2.5rem 0;
+      font-size: 0.9375rem;
     }
 
     .blog-content th,
     .blog-content td {
-      border: 1px solid var(--color-border);
       padding: 0.75rem 1rem;
       text-align: left;
+      border-bottom: 1px solid var(--color-border);
     }
 
     .blog-content th {
-      background-color: var(--color-bg-secondary);
+      font-size: 0.75rem;
       font-weight: 600;
-      color: var(--color-text);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-text-secondary);
+      border-bottom: 1px solid var(--color-border-secondary);
+    }
+
+    .blog-content tr:last-child td {
+      border-bottom: none;
     }
 
     .blog-content strong {
@@ -271,25 +484,59 @@ function formatDate(date: Date) {
     }
 
     @media (max-width: 768px) {
-      .blog-content h1 { font-size: 1.875rem; }
-      .blog-content h2 { font-size: 1.5rem; }
-      .blog-content h3 { font-size: 1.25rem; }
-      .blog-content h4 { font-size: 1.125rem; }
-      
+      .blog-content { font-size: 1rem; }
+      .blog-content h1 { font-size: 1.75rem; }
+      .blog-content h2 { font-size: 1.5625rem; }
+      .blog-content h3 { font-size: 1.375rem; }
+      .blog-content h4 { font-size: 1.1875rem; }
+
       .blog-content pre {
         margin-left: -1.5rem;
         margin-right: -1.5rem;
         border-radius: 0;
       }
     }
-
-    .hover-bg-brand-blue:hover {
-      background-color: var(--color-brand-orange) !important;
-      color: white !important;
-    }
-
-    .hover-bg-brand-orange:hover {
-      background-color: var(--color-accent) !important;
-    }
   </style>
+
+  <script is:inline>
+    const progress = document.querySelector('.reading-progress');
+    const updateProgress = () => {
+      const doc = document.documentElement;
+      const scrollTop = doc.scrollTop || document.body.scrollTop;
+      const height = doc.scrollHeight - doc.clientHeight;
+      progress.style.transform = `scaleX(${height > 0 ? Math.min(scrollTop / height, 1) : 0})`;
+    };
+    document.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+
+    const tocLinks = Array.from(document.querySelectorAll('.toc-link'));
+    const tocTargets = tocLinks
+      .map(link => document.getElementById(link.getAttribute('href').slice(1)))
+      .filter(Boolean);
+
+    const setActiveToc = () => {
+      const pos = window.scrollY + 140;
+      let current = tocTargets[0] && tocTargets[0].id;
+      for (const heading of tocTargets) {
+        if (heading.offsetTop <= pos) current = heading.id;
+      }
+      tocLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === `#${current}`);
+      });
+    };
+    document.addEventListener('scroll', setActiveToc, { passive: true });
+    setActiveToc();
+
+    document.querySelectorAll('.copy-link').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const url = window.location.href;
+        try {
+          await navigator.clipboard.writeText(url);
+          const original = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => (btn.textContent = original), 2000);
+        } catch (e) {}
+      });
+    });
+  </script>
 </BaseLayout>

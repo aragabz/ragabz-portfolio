@@ -6,9 +6,16 @@ tags: ["JavaScript", "Async", "Promises", "Programming"]
 readingTime: 10
 ---
 
-# Mastering Async/Await and Promises in JavaScript
+import Callout from '../../components/mdx/Callout.astro';
 
 Asynchronous programming is fundamental to JavaScript. Let's master it once and for all.
+
+<Callout variant="tip" title="What you'll learn">
+- How promises and `async`/`await` work under the hood
+- Error-handling patterns that don't leak
+- Advanced patterns like retries, timeouts, and queues
+- Common pitfalls and how to avoid them
+</Callout>
 
 ## Understanding Promises
 
@@ -101,6 +108,12 @@ async function getFirstResponse() {
 ```
 
 ## Error Handling
+
+Unhandled rejections are one of the most common sources of silent bugs.
+
+<Callout variant="warning">
+Always terminate the promise chain. In Node.js, an unhandled rejection now crashes the process by default — handle every error explicitly, even if it's just logging it.
+</Callout>
 
 ### Try/Catch
 
@@ -314,6 +327,10 @@ async function loadUserDashboard(userId) {
 6. **Implement retry logic** for critical operations
 7. **Cache responses** when appropriate
 8. **Use async/await** over raw promises for readability
+
+<Callout variant="tip" title="Golden rule">
+Prefer `async`/`await` over raw promise chains for readability, but never `await` inside loops when work can run in parallel — use `Promise.all` instead.
+</Callout>
 
 ## Common Pitfalls
 

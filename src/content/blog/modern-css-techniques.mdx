@@ -6,13 +6,25 @@ tags: ["CSS", "Frontend", "Web Development"]
 readingTime: 6
 ---
 
-# Modern CSS Techniques Every Developer Should Know
+import Callout from '../../components/mdx/Callout.astro';
 
 CSS has evolved dramatically in recent years. Let's explore techniques that will level up your styling game.
+
+<Callout variant="tip" title="What you'll learn">
+- Container queries that respond to **component** size
+- Fluid typography with `clamp()`
+- The `:has()` selector and parent-aware styling
+- Dynamic colors with `color-mix()`
+- Modern layout tools like Grid and Subgrid
+</Callout>
 
 ## Container Queries
 
 The most exciting addition to CSS in years. Style components based on their container size, not the viewport.
+
+### Why container queries matter
+
+Traditionally, responsive design only looked at the viewport. Container queries let a component adapt to *its own* context — a card in a narrow sidebar can lay out differently from the same card in a wide grid.
 
 ```css
 .card-container {
@@ -26,6 +38,42 @@ The most exciting addition to CSS in years. Style components based on their cont
   }
 }
 ```
+
+<Callout variant="note">
+`container-type: inline-size` is enough for most cases. Add `container-name` when you need multiple, differently-named containers on the same page.
+</Callout>
+
+### Named containers
+
+```css
+.card {
+  container: card / inline-size;
+}
+
+@container card (min-width: 400px) {
+  .card {
+    display: flex;
+  }
+}
+```
+
+## Fluid Typography with clamp()
+
+Stop juggling media queries for every font size. `clamp()` scales smoothly between a minimum and a maximum:
+
+```css
+.hero-title {
+  font-size: clamp(2rem, 5vw, 4rem);
+}
+```
+
+- **2rem** — minimum size on small screens
+- **5vw** — the preferred fluid value
+- **4rem** — maximum size on large screens
+
+<Callout variant="tip">
+Pair `clamp()` with `--spacing-*` custom properties to keep vertical rhythm consistent as type scales up.
+</Callout>
 
 ## CSS Custom Properties (Variables)
 
@@ -45,6 +93,55 @@ Create maintainable, themeable designs with CSS variables.
 }
 ```
 
+### Theming with custom properties
+
+Because custom properties cascade and are inheritable, they're perfect for theming:
+
+```css
+:root { --bg: #fff; --text: #111; }
+[data-theme="dark"] { --bg: #0f172a; --text: #f1f5f9; }
+
+body { background: var(--bg); color: var(--text); }
+```
+
+## The :has() Selector
+
+`:has()` lets you style an element based on its children — the "parent selector" CSS was missing for years.
+
+```css
+.card:has(img) {
+  grid-template-columns: 1fr 2fr;
+}
+
+.form-group:has(input:focus) {
+  border-color: var(--color-primary);
+}
+
+/* Style a nav item only when it contains an active link */
+.nav-item:has(a.active) {
+  font-weight: 700;
+}
+```
+
+## color-mix() and Modern Color Functions
+
+Mix colors directly in CSS, no preprocessor required:
+
+```css
+.button {
+  background: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 50%, black);
+}
+
+.alert--danger {
+  background: color-mix(in srgb, red 15%, white);
+}
+```
+
+<Callout variant="tip">
+`color-mix()` keeps your palette maintainable — adjust one variable and every derived shade updates automatically.
+</Callout>
+
 ## Modern Layouts with Grid
 
 CSS Grid makes complex layouts simple and maintainable.
@@ -57,6 +154,32 @@ CSS Grid makes complex layouts simple and maintainable.
 }
 ```
 
-## Conclusion
+### Subgrid
+
+Align nested grids to their parent's tracks with `subgrid`:
+
+```css
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.card {
+  display: grid;
+  grid-template-columns: subgrid;
+}
+```
+
+## Key Takeaways
+
+- Container queries respond to **component** size, not viewport size
+- `clamp()` gives you fluid, responsive type without media queries
+- `:has()` unlocks parent-aware and state-aware styling
+- `color-mix()` replaces preprocessor color math
+- Subgrid keeps nested layouts perfectly aligned
+
+<Callout variant="note" title="Browser support">
+All of these features are supported in modern evergreen browsers. Use `@supports` when you need progressive enhancement for older ones.
+</Callout>
 
 Modern CSS gives us powerful tools for creating responsive, maintainable designs. Start incorporating these techniques today!

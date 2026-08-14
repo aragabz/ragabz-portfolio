@@ -17,7 +17,7 @@ function formatDate(date: Date) {
 }
 ---
 
-<section id="blog" class="py-section px-6 bg-white">
+<section id="blog" class="py-section px-6 bg-[var(--color-bg)]">
   <div class="max-w-container mx-auto">
     <div class="text-center mb-16 fade-in">
       <h2 class="text-4xl md:text-5xl font-bold mb-4">Latest Articles</h2>
@@ -26,7 +26,7 @@ function formatDate(date: Date) {
     
     <div class="grid md:grid-cols-3 gap-8">
       {blogPosts.map((post, index) => (
-        <article class={`bg-white border rounded-lg overflow-hidden card-hover fade-in fade-in-delay-${Math.min(index + 1, 3)}`} style="border-color: var(--color-brand-gray-light);">
+        <article class={`bg-[var(--color-bg-secondary)] border rounded-lg overflow-hidden card-hover fade-in fade-in-delay-${Math.min(index + 1, 3)}`} style="border-color: var(--color-brand-gray-light);">
           <div class="p-6">
             <div class="flex items-center gap-3 text-sm mb-3" style="color: var(--color-brand-gray-dark);">
               <time datetime={post.data.date.toISOString()}>
@@ -57,7 +57,7 @@ function formatDate(date: Date) {
             <a 
               href={`${base}blog/${post.id}`}
               class="text-sm font-medium hover-text-brand-orange transition-colors"
-              style="color: var(--color-brand-black);"
+              style="color: var(--color-accent-strong);"
             >
               Read More →
             </a>

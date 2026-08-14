@@ -32,13 +32,14 @@
   --color-bg-tertiary: #f3f4f6;
   
   --color-text: #111827;
-  --color-text-secondary: #6b7280;
-  --color-text-tertiary: #9ca3af;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
   
   --color-border: #e5e7eb;
   --color-border-secondary: #d1d5db;
   
   --color-accent: #ff5d01;
+  --color-accent-strong: #c2410c;
 }
 
 /* Theme Colors - Dark Mode */
@@ -56,6 +57,7 @@
   --color-border-secondary: #475569;
   
   --color-accent: #ff6b35;
+  --color-accent-strong: #ff8a5c;
   
   /* Invert brand colors for dark mode */
   --color-brand-black: #f1f5f9;
@@ -167,7 +169,7 @@ a {
 }
 
 .hover-text-brand-orange:hover {
-  color: var(--color-accent) !important;
+  color: var(--color-accent-strong) !important;
 }
 
 .hover-text-brand-black:hover {

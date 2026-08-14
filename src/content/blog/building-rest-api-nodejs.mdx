@@ -6,9 +6,13 @@ tags: ["Node.js", "Express", "API", "Backend", "MongoDB"]
 readingTime: 15
 ---
 
-# Building a Scalable REST API with Node.js and Express
+import Callout from '../../components/mdx/Callout.astro';
 
 In this comprehensive guide, we'll build a production-ready REST API from scratch using Node.js, Express, MongoDB, and industry best practices.
+
+<Callout variant="note" title="What we're building">
+A REST API for a blog with JWT authentication, centralized error handling, validation, and tests — the patterns scale to any domain.
+</Callout>
 
 ## Table of Contents
 
@@ -97,6 +101,10 @@ export default mongoose.model('User', userSchema);
 ## 3. Authentication & Authorization
 
 Implementing JWT-based authentication:
+
+<Callout variant="warning">
+Serve JWTs through HTTP-only cookies rather than `localStorage` to reduce XSS exposure. Rotate your `JWT_SECRET` in production and keep token lifetimes short — hours, not weeks.
+</Callout>
 
 ```typescript
 // middleware/auth.ts
@@ -234,6 +242,10 @@ export const errorHandler = (
 
 Writing integration tests with Jest and Supertest:
 
+<Callout variant="tip">
+Test the public contract — what a client sends and receives — not the implementation. Supertest lets you hit your routes without spinning up a real server.
+</Callout>
+
 ```typescript
 // tests/auth.test.ts
 import request from 'supertest';
@@ -352,6 +364,10 @@ const posts = await Post.find()
   .skip(skip)
   .limit(limit);
 ```
+
+<Callout variant="tip" title="Ship with confidence">
+Pair these patterns with a CI pipeline that runs your tests, a linter, and a security scan. A deployable API is only production-ready when it fails predictably.
+</Callout>
 
 ## Conclusion
 

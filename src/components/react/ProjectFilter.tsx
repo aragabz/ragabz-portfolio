@@ -36,7 +36,7 @@ export default function ProjectFilter({ projects }: Props) {
             key={category}
             onClick={() => setActiveFilter(category)}
             className={`px-6 py-2 rounded-full border transition-all duration-300 ${
-              activeFilter === category ? '' : 'bg-white hover-border-brand-gray-dark'
+              activeFilter === category ? '' : 'bg-[var(--color-bg-secondary)] hover-border-brand-gray-dark'
             }`}
             style={
               activeFilter === category
@@ -61,7 +61,7 @@ export default function ProjectFilter({ projects }: Props) {
         {filteredProjects.map(project => (
           <div
             key={project.slug}
-            className="bg-white border rounded-lg overflow-hidden card-hover"
+            className="bg-[var(--color-bg-secondary)] border rounded-lg overflow-hidden card-hover"
             style={{ borderColor: 'var(--color-brand-gray-light)' }}
           >
             {/* Project Image */}

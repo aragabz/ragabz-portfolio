@@ -6,13 +6,21 @@ tags: ["Performance", "Web Development", "Optimization", "Core Web Vitals"]
 readingTime: 15
 ---
 
-# Web Performance Optimization: A Complete Guide
+import Callout from '../../components/mdx/Callout.astro';
 
 Performance is not just about speed—it's about user experience, SEO rankings, and business success. Let's explore comprehensive optimization strategies.
 
+<Callout variant="tip" title="Start with quick wins">
+Before the deep-dive: compress images, enable gzip/brotli, add `loading="lazy"` to images, and preconnect to third-party origins. These four changes often recover 30-50% of page weight.
+</Callout>
+
 ## Understanding Core Web Vitals
 
-Google's Core Web Vitals are essential metrics for measuring user experience:
+Google's Core Web Vitals are essential metrics for measuring user experience. They measure three dimensions: loading (LCP), interactivity (FID), and visual stability (CLS).
+
+<Callout variant="note">
+Core Web Vitals are part of Google's ranking signals — but more importantly, they correlate strongly with conversion rate. Optimizing them is good for your users *and* your bottom line.
+</Callout>
 
 ### 1. Largest Contentful Paint (LCP)
 
@@ -360,6 +368,10 @@ Set concrete performance budgets for your project:
 
 ## Monitoring and Analytics
 
+<Callout variant="warning">
+Synthetic tests (Lighthouse, WebPageTest) are a starting point, not a finish line. Real-user conditions — slow networks, older devices, browser extensions — can differ wildly from lab results. Always pair lab testing with RUM data.
+</Callout>
+
 ### Web Vitals Tracking
 
 ```javascript
@@ -449,6 +461,10 @@ webpagetest test https://example.com \
 - [ ] Monitor Core Web Vitals
 - [ ] Test on real devices
 - [ ] Audit with Lighthouse (score 90+)
+
+<Callout variant="tip" title="Keep it measurable">
+Set a performance budget (e.g., JS < 300KB gzipped, LCP < 2.5s) and enforce it in CI. What you don't measure, you don't improve.
+</Callout>
 
 ## Conclusion
 
