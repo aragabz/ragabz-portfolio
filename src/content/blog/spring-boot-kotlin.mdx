@@ -1,0 +1,471 @@
+---
+title: "Building Production-Ready APIs with Spring Boot and Kotlin"
+date: 2026-08-17
+excerpt: "A complete guide to building REST APIs with Spring Boot and Kotlin, covering project structure, request validation with Jakarta Bean Validation, and error handling."
+tags: ["Kotlin", "Spring Boot", "Backend", "Validation"]
+readingTime: 15
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Kotlin has become a first-class citizen in the Spring ecosystem, and for good reason — its conciseness, null safety, and functional style make it a fantastic fit for building robust backends. In this guide, I'll walk you through setting up a Spring Boot project with Kotlin, structuring it the right way, and applying validation correctly.
+
+<Callout variant="tip" title="What you'll learn">
+- How to bootstrap a Spring Boot + Kotlin project from scratch
+- The best package structure for a clean, scalable codebase
+- How to validate incoming requests with Jakarta Bean Validation
+- How to map validation errors into clean API responses
+- Common pitfalls and how to avoid them
+</Callout>
+
+## Why Spring Boot + Kotlin?
+
+Spring Boot gives you production-grade features out of the box: dependency injection, auto-configuration, embedded servers, metrics, and security. Kotlin adds on top of that:
+
+- **Null safety** — the compiler prevents the infamous `NullPointerException`
+- **Data classes** — a one-liner replaces dozens of lines of boilerplate
+- **Extension functions** — clean, expressive ways to extend existing types
+- **Coroutines** — lightweight concurrency without thread-per-request overhead
+
+The combination produces noticeably less code than Java, with the same safety guarantees.
+
+## Setting Up the Project
+
+The easiest way to start is [Spring Initializr](https://start.spring.io/), selecting **Kotlin** as the language and **Gradle - Kotlin** as the build tool. Spring Initializr defaults to Gradle with the Kotlin DSL, which pairs naturally with Kotlin code.
+
+### Gradle (Kotlin DSL) — recommended
+
+The minimal set of dependencies in `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+}
+```
+
+### Maven — alternative
+
+If you prefer Maven, the same dependencies in `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.jetbrains.kotlin</groupId>
+    <artifactId>kotlin-reflect</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.fasterxml.jackson.module</groupId>
+    <artifactId>jackson-module-kotlin</artifactId>
+</dependency>
+```
+
+`kotlin-reflect` and `jackson-module-kotlin` are essential — Spring's auto-configuration and Jackson's JSON (de)serialization both rely on them. Spring Initializr adds them for you automatically.
+
+### The Application Entry Point
+
+```kotlin
+package com.example.blogapi
+
+import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.runApplication
+
+@SpringBootApplication
+class BlogApiApplication
+
+fun main(args: Array<String>) {
+    runApplication<BlogApiApplication>(*args)
+}
+```
+
+Notice the main function is top-level and outside the class. This is idiomatic Kotlin and keeps the class body free of boilerplate.
+
+## The Best Project Structure
+
+A common mistake is organising code by technical layer (everything called `controller`, `service`, `repository` in flat packages). That works for tiny projects but collapses under growth. The better approach is to organise **by feature (or module)**.
+
+```
+src/main/kotlin/com/example/blogapi/
+├── BlogApiApplication.kt
+├── config/                        # Beans, security, OpenAPI config
+│   └── OpenApiConfig.kt
+├── common/                        # Shared utilities & error types
+│   └── exception/
+│       ├── ApiException.kt
+│       └── GlobalExceptionHandler.kt
+├── post/                          # ← feature module
+│   ├── PostController.kt          # web layer
+│   ├── PostService.kt             # business logic
+│   ├── PostRepository.kt          # data access
+│   ├── Post.kt                    # entity / model
+│   └── dto/
+│       ├── CreatePostRequest.kt   # request (validated)
+│       └── PostResponse.kt        # response
+└── user/
+    ├── UserController.kt
+    ├── UserService.kt
+    └── ...
+```
+
+### Why feature-first?
+
+- **Cohesion** — everything that changes for a feature lives in one package; you navigate by domain, not by framework layer.
+- **Scalability** — new features are added as isolated packages instead of scattering files across generic `controller/`, `service/`, `repository/` folders.
+- **Onboarding** — a new developer can read a whole feature top-to-bottom without jumping between folders.
+
+<Callout variant="note">
+If your project grows large enough to need its own deployment units, each package can be promoted to a separate Gradle module without restructuring — the boundaries are already correct.
+</Callout>
+
+### Key layers within a module
+
+| Layer | Responsibility | Example |
+|-------|---------------|---------|
+| **Controller** | Maps HTTP to service calls, handles DTOs, never contains business logic | `PostController` |
+| **Service** | Business rules, transactions, orchestration | `PostService` |
+| **Repository** | Data access (Spring Data) | `PostRepository` |
+| **DTO** | Request/response shapes; requests carry validation annotations | `CreatePostRequest` |
+
+A rule of thumb: **controllers validate, services orchestrate, repositories access data**. Never leak entities to the web layer — always translate through DTOs.
+
+## Applying Validation
+
+Spring Boot's validation support is built on **Jakarta Bean Validation** (`jakarta.validation`). Annotate your request DTOs and let the framework enforce the rules before the controller is even invoked.
+
+### A validated request DTO
+
+```kotlin
+package com.example.blogapi.post.dto
+
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
+
+data class CreatePostRequest(
+    @field:NotBlank(message = "Title is required")
+    @field:Size(max = 200, message = "Title must not exceed 200 characters")
+    val title: String,
+
+    @field:NotBlank(message = "Content is required")
+    val content: String,
+
+    @field:Size(max = 10, message = "At most 10 tags are allowed")
+    val tags: List<String> = emptyList(),
+)
+```
+
+The `@field:` target prefix is critical in Kotlin. Because `data class` constructor parameters generate both a constructor parameter and a property, you must explicitly point the annotation at the field to avoid `Target mismatch` errors.
+
+### Activating validation in the controller
+
+```kotlin
+package com.example.blogapi.post
+
+import com.example.blogapi.post.dto.CreatePostRequest
+import com.example.blogapi.post.dto.PostResponse
+import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+
+@RestController
+@RequestMapping("/api/posts")
+class PostController(private val postService: PostService) {
+
+    @PostMapping
+    fun create(@Valid @RequestBody request: CreatePostRequest): ResponseEntity<PostResponse> {
+        val post = postService.create(request)
+        return ResponseEntity.status(HttpStatus.CREATED).body(post.toResponse())
+    }
+
+    @GetMapping("/{id}")
+    fun getById(@PathVariable id: Long): PostResponse =
+        postService.getById(id).toResponse()
+}
+```
+
+Two things to note:
+
+1. `@Valid` triggers validation on the request body. If validation fails, Spring throws `MethodArgumentNotValidException` — which we'll handle centrally below.
+2. The service and DTOs are injected via constructor; no `@Autowired` field injection needed in Kotlin.
+
+### Common validation annotations
+
+| Annotation | Purpose |
+|------------|---------|
+| `@NotBlank` | String is not null and not whitespace |
+| `@NotEmpty` | Collection/string is not empty |
+| `@NotNull` | Value is not null |
+| `@Size(min, max)` | Length/collection size bounds |
+| `@Min` / `@Max` | Numeric bounds |
+| `@Email` | Email format check |
+| `@Pattern(regexp)` | Custom regex match |
+| `@Valid` | Recursively validate nested objects |
+
+### Validating path variables and query params
+
+It's not just bodies. You can validate `@PathVariable` and `@RequestParam` values too — but you must add `@Validated` on the controller class for those to take effect.
+
+```kotlin
+@RestController
+@RequestMapping("/api/posts")
+@Validated
+class PostController(private val postService: PostService) {
+
+    @GetMapping("/{id}")
+    fun getById(@PathVariable @Min(1) id: Long): PostResponse =
+        postService.getById(id).toResponse()
+
+    @GetMapping
+    fun search(@RequestParam(required = false) @Size(min = 3) query: String?): List<PostResponse> =
+        postService.search(query)
+}
+```
+
+For path/query validation, failures throw `ConstraintViolationException` instead of `MethodArgumentNotValidException`, so your handler must cover both.
+
+### Validation in the service layer
+
+Validation isn't only for API boundaries. Use `jakarta.validation.Validator` directly when validating internal commands or entities:
+
+```kotlin
+package com.example.blogapi.post
+
+import jakarta.validation.Validator
+
+@Service
+class PostService(
+    private val postRepository: PostRepository,
+    private val validator: Validator,
+) {
+
+    fun create(request: CreatePostRequest): Post {
+        val violations = validator.validate(request)
+        if (violations.isNotEmpty()) {
+            throw ApiException("Validation failed", violations.map { it.message })
+        }
+        // persist...
+        return postRepository.save(request.toEntity())
+    }
+}
+```
+
+## Handling Validation Errors Gracefully
+
+By default, Spring returns the framework's error shape, which is inconsistent across endpoints. You'll want one consistent API error contract. Let's build one.
+
+### An error response DTO
+
+```kotlin
+package com.example.blogapi.common.exception
+
+data class ApiError(
+    val status: Int,
+    val code: String,
+    val message: String,
+    val errors: List<FieldError> = emptyList(),
+) {
+    data class FieldError(
+        val field: String,
+        val message: String,
+    )
+}
+```
+
+### A global exception handler
+
+```kotlin
+package com.example.blogapi.common.exception
+
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.RestControllerAdvice
+import jakarta.validation.ConstraintViolationException
+
+@RestControllerAdvice
+class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleBodyValidation(ex: MethodArgumentNotValidException): ResponseEntity<ApiError> {
+        val errors = ex.bindingResult.fieldErrors.map {
+            ApiError.FieldError(it.field, it.defaultMessage.orEmpty())
+        }
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Request validation failed", errors)
+    }
+
+    @ExceptionHandler(ConstraintViolationException::class)
+    fun handlePathQueryValidation(ex: ConstraintViolationException): ResponseEntity<ApiError> {
+        val errors = ex.constraintViolations.map {
+            ApiError.FieldError(it.propertyPath.toString(), it.message)
+        }
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Request validation failed", errors)
+    }
+
+    @ExceptionHandler(ApiException::class)
+    fun handleApiException(ex: ApiException): ResponseEntity<ApiError> =
+        build(ex.status, ex.code, ex.message.orEmpty())
+
+    @ExceptionHandler(NoSuchElementException::class)
+    fun handleNotFound(ex: NoSuchElementException): ResponseEntity<ApiError> =
+        build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.message.orEmpty())
+
+    private fun build(
+        status: HttpStatus,
+        code: String,
+        message: String,
+        errors: List<ApiError.FieldError> = emptyList(),
+    ): ResponseEntity<ApiError> = ResponseEntity
+        .status(status)
+        .body(ApiError(status.value(), code, message, errors))
+}
+```
+
+<Callout variant="tip">
+The `ApiError` shape is a contract with your frontend. Keeping it consistent means your client only ever needs one error parser — which is why frontend teams love a single, well-defined error format.
+</Callout>
+
+## A Complete Feature Walkthrough
+
+Let's tie everything together with a minimal, real feature. First the repository:
+
+```kotlin
+package com.example.blogapi.post
+
+import org.springframework.data.jpa.repository.JpaRepository
+
+interface PostRepository : JpaRepository<Post, Long>
+```
+
+The entity:
+
+```kotlin
+package com.example.blogapi.post
+
+import jakarta.persistence.*
+
+@Entity
+@Table(name = "posts")
+data class Post(
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
+
+    @Column(nullable = false)
+    val title: String,
+
+    @Column(nullable = false, length = 10000)
+    val content: String,
+)
+```
+
+The service with a couple of business rules:
+
+```kotlin
+package com.example.blogapi.post
+
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
+@Service
+class PostService(private val postRepository: PostRepository) {
+
+    @Transactional
+    fun create(request: CreatePostRequest): Post {
+        if (postRepository.existsByTitle(request.title)) {
+            throw DuplicateTitleException(request.title)
+        }
+        return postRepository.save(
+            Post(title = request.title, content = request.content)
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun getById(id: Long): Post =
+        postRepository.findById(id).orElseThrow { NoSuchElementException("Post $id not found") }
+}
+```
+
+And the controller from earlier calls into this service. Now you have a coherent, validated, and consistently error-handled feature.
+
+## Testing Validation
+
+Unit test the validation rules independently of the framework:
+
+```kotlin
+package com.example.blogapi.post
+
+import jakarta.validation.Validation
+import jakarta.validation.Validator
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class CreatePostRequestTest {
+
+    private val validator: Validator = Validation.buildDefaultValidatorFactory().validator
+
+    @Test
+    fun `blank title is rejected`() {
+        val violations = validator.validate(CreatePostRequest(title = "  ", content = "Hello"))
+        assertTrue(violations.isNotEmpty())
+        assertEquals("Title is required", violations.first().message)
+    }
+
+    @Test
+    fun `valid request passes`() {
+        val violations = validator.validate(CreatePostRequest(title = "Kotlin", content = "Hello world"))
+        assertTrue(violations.isEmpty())
+    }
+}
+```
+
+Then verify end-to-end with `@WebMvcTest` or `MockMvc`, asserting the `ApiError` shape is returned:
+
+```kotlin
+mockMvc.perform(
+    post("/api/posts")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""{"title":"","content":""}""")
+)
+    .andExpect(status().isBadRequest)
+    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+```
+
+## Best Practices Recap
+
+1. **Feature-first packages** — organise by domain, not by framework layer.
+2. **DTOs at the boundary** — never expose JPA entities directly to the API.
+3. **Always use `@field:`** on validation annotations in Kotlin data classes.
+4. **`@Valid` on bodies, `@Validated` on controllers** for path/query params.
+5. **One global exception handler** producing a consistent `ApiError` shape.
+6. **Validate at every boundary** — controllers for input, services for invariants.
+7. **Keep controllers thin** — they translate HTTP and delegate; nothing else.
+8. **Prefer constructor injection** — it's idiomatic, testable, and Kotlin-friendly.
+
+<Callout variant="warning">
+A frequent Kotlin gotcha: forgetting `jackson-module-kotlin` on the classpath. Without it, Jackson can't construct data classes (no default constructor) and you'll hit cryptic deserialization errors on the first POST. Add it explicitly if your tooling doesn't.
+</Callout>
+
+## Conclusion
+
+Spring Boot + Kotlin is a productivity powerhouse. Combined with a feature-first structure, Jakarta Bean Validation on every boundary, and a single global exception handler, you get a backend that is easy to extend, safe from malformed input, and pleasant for frontend teams to integrate with.
+
+Start with `start.spring.io`, keep your controllers thin, and let validation be the first line of defense. Your future self — and your API consumers — will thank you.
+
+## Resources
+
+- [Spring Initializr](https://start.spring.io/)
+- [Spring Boot Reference — Validation](https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html)
+- [Jakarta Bean Validation Specification](https://jakarta.ee/specifications/bean-validation/)
+- [Kotlin + Spring documentation](https://kotlinlang.org/docs/spring-boot.html)
+
+Happy coding! 🚀

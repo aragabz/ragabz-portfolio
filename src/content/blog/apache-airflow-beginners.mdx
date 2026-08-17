@@ -1,0 +1,196 @@
+---
+title: "Apache Airflow for Beginners: From Zero to Your First DAG"
+date: 2026-08-15
+excerpt: "Learn what Apache Airflow is, understand its core building blocks, install it locally, and write and run your very first DAG."
+tags: ["Apache Airflow", "Data Engineering", "Python", "ETL"]
+readingTime: 12
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Data pipelines are everywhere: ingesting logs, syncing databases, training ML models, refreshing dashboards. The tricky part isn't the individual task — it's orchestrating hundreds of tasks with dependencies, retries, and monitoring. That's exactly the problem Apache Airflow solves.
+
+<Callout variant="tip" title="What you'll learn">
+- What Airflow is and when to use it
+- The core concepts: DAGs, tasks, operators, scheduler, and executors
+- How to install Airflow locally
+- How to write and run your first DAG
+- How to explore the Airflow web UI
+</Callout>
+
+## What Is Apache Airflow?
+
+Airflow is an open-source workflow orchestration platform that lets you define your pipelines **as code**. You write Python, Airflow handles the scheduling, dependency management, retries, and monitoring.
+
+The key idea: instead of a script that does everything in one go, you break work into **tasks**, group them into a **DAG**, and let Airflow figure out when and how to run each task.
+
+### A DAG in one picture
+
+A DAG (Directed Acyclic Graph) is your pipeline:
+
+```
+extract_data ──▶ transform_data ──▶ load_data
+```
+
+Each box is a **task**. The arrows are dependencies. "Acyclic" simply means there are no cycles — you can't have a pipeline that loops back on itself forever. Airflow will refuse to run a cyclic DAG.
+
+## Core Concepts
+
+Before writing anything, get familiar with these building blocks:
+
+| Concept | What it is |
+|---------|-----------|
+| **DAG** | Your pipeline definition — the graph of tasks and their dependencies |
+| **Task** | A single unit of work inside a DAG |
+| **Operator** | A template for a task type (`BashOperator`, `PythonOperator`, sensors, etc.) |
+| **Scheduler** | The component that decides when tasks run and triggers them |
+| **Executor** | How tasks are actually executed (locally, in a cluster, on Kubernetes, ...) |
+| **Webserver** | The UI for inspecting and managing DAGs |
+| **Metadata database** | Where Airflow stores DAG state, task runs, logs, and variables |
+
+The typical architecture: the **scheduler** reads your DAG files, and whenever a task's schedule and dependencies are satisfied, it hands the task to the **executor**, which runs it and records the result back in the **metadata database**.
+
+### When should you use Airflow?
+
+Airflow shines when you have:
+
+- Pipelines with **multiple steps and dependencies** that must run in a specific order
+- **Recurring schedules** (hourly, daily, weekly, cron expressions)
+- Workflows that need **retries, backfills, and monitoring**
+- Team workflows that benefit from **version control** on pipeline code
+
+<Callout variant="warning">
+Airflow is a scheduler and orchestrator, not a data-processing engine. It's not the right tool for heavy streaming or sub-second workloads. For heavy compute, keep Airflow as the *brain* that triggers workers (Spark, EMR, Kubernetes jobs) rather than doing the heavy lifting itself.
+</Callout>
+
+## Installing Airflow Locally
+
+The fastest way to get started is with a Python virtual environment:
+
+```bash
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install Airflow (check https://pypi.org/project/apache-airflow/ for the latest)
+export AIRFLOW_HOME="$PWD/airflow"
+pip install "apache-airflow[standalone]"
+```
+
+Then simply run:
+
+```bash
+airflow standalone
+```
+
+`airflow standalone` boots everything you need for local development: the metadata database (SQLite), the scheduler, the webserver, and a bunch of example DAGs. You'll see a login and password printed in the terminal — use them to sign in at `http://localhost:8080`.
+
+<Callout variant="tip">
+Alternatively, install a single component at a time: `airflow db migrate` to initialize the database, then `airflow scheduler` and `airflow webserver` in separate terminals. And if you prefer containers, the official `apache/airflow` Docker image or the Astro CLI are great options.
+</Callout>
+
+## Your First DAG
+
+DAGs live in the `dags/` folder under `AIRFLOW_HOME` (or wherever you configure it). Let's write a minimal but realistic pipeline.
+
+```python
+from datetime import datetime, timedelta
+
+from airflow.decorators import dag, task
+
+
+@dag(
+    schedule="@daily",
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+    tags=["example"],
+)
+def hello_pipeline():
+    @task
+    def extract():
+        print("Extracting data...")
+        return {"value": 42}
+
+    @task
+    def transform(value: int) -> int:
+        print(f"Transforming {value}...")
+        return value * 2
+
+    @task
+    def load(value: int):
+        print(f"Loading {value}...")
+
+    data = extract()
+    transformed = transform(data)
+    load(transformed)
+
+
+hello_pipeline()
+```
+
+This uses the **TaskFlow API** (`@dag` + `@task` decorators), which is the modern, recommended way to write Airflow pipelines. The function names become task IDs, and the data flow through function calls becomes task dependencies — exactly the graph from earlier.
+
+Let's walk through the key parts:
+
+| Piece | What it does |
+|-------|-------------|
+| `schedule="@daily"` | Runs once per day. Accepts cron strings too |
+| `start_date` | When scheduling starts. Required for `@dag` |
+| `catchup=False` | Don't backfill missed runs from `start_date` up to now |
+| `@task` | Turns the function into an Airflow task |
+| `extract()` → `transform(data)` → `load(transformed)` | Creates task dependencies automatically |
+
+### Checking the UI
+
+Refresh the web UI and you'll see `hello_pipeline` in the DAG list. Click it to see:
+
+- The **Graph view** — your three tasks and their dependencies
+- The **Grid view** — past runs of the DAG across time
+- The **Code view** — the Python source of the DAG
+- **Logs** per task instance — click a green square, then *Log*
+
+Trigger it manually with the *Run* button and watch the states go from *queued* → *running* → *success*.
+
+## Understanding DAG Structure vs. Execution
+
+One thing that confuses beginners: **the DAG file is read by the scheduler on every schedule tick.** The code that runs at import time is the *definition* of the pipeline; the code inside `@task` functions runs when the scheduler decides each task is ready.
+
+```python
+# This runs at DAG parse time (every scheduler tick) — keep it light!
+print("Parsing DAG")
+
+@dag(...)
+def my_dag():
+    # This runs when a task executes — not at parse time
+    @task
+    def do_work():
+        print("Running task")
+```
+
+<Callout variant="warning">
+Never put heavy logic at DAG-parse time. If parsing takes too long, the scheduler gets slower for *all* DAGs. Keep top-level code minimal — imports, constant definitions, and the DAG structure itself.
+</Callout>
+
+## Common Pitfalls for Beginners
+
+1. **Forgetting to assign the DAG to a variable** — the decorator returns a DAG object, so you must call it (`hello_pipeline()`), otherwise Airflow never registers it.
+2. **Ignoring `catchup`** — by default Airflow backfills every missed schedule between `start_date` and now. For new DAGs, that's often not what you want; set `catchup=False`.
+3. **Mutating data between tasks** — tasks communicate through **XComs** (small messages), not shared Python state. Each task may run on a different worker with no memory in common.
+4. **Too many tiny tasks** — every task has overhead. If two steps always run together with no need for retries between them, consider merging them.
+5. **Not pinning versions in production** — install Airflow with a pinned version, never a floating `latest`.
+
+## Next Steps
+
+You've got a working Airflow setup and your first DAG. From here:
+
+- Learn more about **operators and the TaskFlow API** — that's the next post in this series
+- Explore **XComs**, **sensors**, and **dynamic task mapping**
+- Read up on **production deployment**: Celery/Kubernetes executors, secrets backends, and CI/CD
+
+## Resources
+
+- [Apache Airflow documentation](https://airflow.apache.org/docs/)
+- [Airflow Tutorial](https://airflow.apache.org/docs/apache-airflow/stable/tutorial/index.html)
+- [Airflow Concepts](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/index.html)
+
+Happy orchestrating! 🚀

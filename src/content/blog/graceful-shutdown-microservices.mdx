@@ -1,0 +1,262 @@
+---
+title: "Graceful Shutdown in Microservices: Draining Traffic Before the Container Dies"
+date: 2026-08-18
+excerpt: "A practical guide to shutting down microservices safely: stop new traffic, finish in-flight requests, and drain connection pools before the container exits."
+tags: ["Microservices", "Spring Boot", "Kubernetes", "DevOps"]
+readingTime: 14
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+When a container is terminated, the default behavior is brutal: the runtime sends the process a signal, and if it doesn't exit quickly, the process is killed outright. For a microservice holding database connections, processing a long HTTP request, or mid-way through a message queue transaction, that's a recipe for corrupted state and user-visible errors.
+
+Graceful shutdown is the discipline of controlling that death: stop taking new work, finish what's in flight, and close resources cleanly — before the process actually exits.
+
+<Callout variant="tip" title="What you'll learn">
+- What happens to a container during termination, step by step
+- How to stop accepting new traffic (readiness probes + preStop hooks)
+- How to let active HTTP requests finish (graceful server shutdown)
+- How to drain connection pools for databases, HTTP clients, and brokers
+- How to size `terminationGracePeriodSeconds` correctly
+</Callout>
+
+## The Life of a Container Termination
+
+When Kubernetes decides to kill your pod (scale-down, rollout, node drain, OOM), this sequence runs:
+
+```
+1. Pod marked "Terminating"
+2. preStop hook runs (if defined) — extra time to prepare
+3. SIGTERM sent to the main process
+4. Service endpoints removed → load balancer stops routing new traffic
+5. Grace period (default 30s) counts down
+6. If process still alive → SIGKILL
+```
+
+The critical detail: steps 3 and 4 happen **almost simultaneously**. The pod keeps its IP and is *still reachable* until the endpoints controller propagates. That's why relying on "just catch SIGTERM" isn't enough — the load balancer may keep sending you requests for a second or two after termination begins.
+
+That overlap window is exactly what graceful shutdown must handle.
+
+## Step 1: Stop Accepting New Traffic
+
+### Readiness probes are the traffic gate
+
+Kubernetes routes traffic to a pod only when its readiness probe succeeds. The cleanest shutdown starts by making the probe start failing.
+
+```yaml
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+```
+
+Once a pod fails readiness, it's removed from Service endpoints, and the load balancer stops sending it new requests. The pod keeps running — which is exactly what you want: time to finish work already in flight.
+
+### The preStop hook buys you time
+
+The classic pattern is a `preStop` hook that sleeps briefly. Its purpose isn't to "wait" — it's to give the endpoints controller a moment to remove the pod from rotation *before* the SIGTERM arrives, so you never receive new traffic during shutdown.
+
+```yaml
+lifecycle:
+  preStop:
+    exec:
+      command: ["sh", "-c", "sleep 10"]
+```
+
+<Callout variant="warning">
+The `sleep 10` is a deliberate overlap buffer, not a magic number. It should cover the time it takes for your Service's endpoints to be updated — typically a few seconds. If your control plane is slow (large clusters, frequent churn), increase it; don't set it to 0 and "hope the probe handles it."
+</Callout>
+
+### Deregister before you drain
+
+On cloud providers with their own load balancers (AWS ALB/NLB, GCP, Azure), the pod may sit behind a cloud LB that has its own registration. Deregister from that LB *first* (via the controller), then drain, then exit. With the Kubernetes ingress/Service model, the readiness probe handles this for you.
+
+## Step 2: Let Active HTTP Requests Finish
+
+SIGTERM arriving doesn't mean the app must die instantly. The app should:
+
+1. Receive SIGTERM
+2. Stop accepting *new* connections
+3. Wait for in-flight requests to complete (with a cap)
+4. Close the HTTP server
+
+### Spring Boot: one property
+
+For Spring Boot 2.3+, graceful shutdown is built in — you just turn it on:
+
+```properties
+server.shutdown=graceful
+spring.lifecycle.timeout-per-shutdown-phase=25s
+```
+
+That's it. Spring Boot stops accepting new requests and waits up to the timeout for in-flight ones to finish before closing. Non-graceful (default) behavior just kills the server immediately.
+
+### Every framework has a version of this
+
+| Framework | Graceful shutdown setting |
+|-----------|--------------------------|
+| Spring Boot (Servlet) | `server.shutdown=graceful` |
+| Spring Boot WebFlux (Netty) | Same property — Netty drains automatically |
+| Go `net/http` | `srv.Shutdown(ctx)` + `signal.NotifyContext` |
+| Node.js Express | `server.close(callback)` on SIGTERM |
+| Python FastAPI | `lifespan` shutdown context / `uvicorn` graceful timeout |
+
+### The pattern, framework-agnostic
+
+Whatever the stack, the shape is identical:
+
+```python
+# Pseudocode — the universal shutdown pattern
+handle = signal_handler(SIGTERM) {
+    readiness.set_failing()          # 1. tell the LB: stop sending
+    server.stop_accepting()          # 2. close the listener
+    wait_for_in_flight(timeout=25s)  # 3. drain active requests
+    close_connection_pools()         # 4. release external resources
+    exit(0)
+}
+```
+
+## Step 3: Drain Connection Pools
+
+The HTTP server draining is only half the battle. In-flight requests may still be using connections to databases, caches, or downstream services. Closing those pools abruptly mid-request causes exceptions in the very requests you're trying to finish gracefully.
+
+### Database connection pools
+
+The pool needs to stop handing out new connections *after* the current requests finish, not before. Spring Boot does this cooperatively with graceful shutdown — but if you're managing pools manually (or with frameworks that don't integrate), stop the pool, wait for it to drain, then close.
+
+```java
+// HikariCP example
+HikariDataSource dataSource = ...;
+
+// Stop accepting new connection requests, then wait for active ones
+dataSource.getHikariPoolMXBean().suspend();
+while (dataSource.getHikariPoolMXBean().getActiveConnections() > 0) {
+    Thread.sleep(100);
+}
+dataSource.close();
+```
+
+With Spring Boot's graceful shutdown, HikariCP is closed in the right order for you — so often the framework does this automatically.
+
+### HTTP clients and message consumers
+
+**Outbound HTTP clients** (RestTemplate, WebClient, OkHttp, Go's `http.Client`): close their connection pools too. `RestTemplate`/`WebClient` get closed as beans. OkHttp exposes `okHttpClient.dispatcher().executorService().shutdown()` + `connectionPool().evictAll()`.
+
+**Message queue consumers**: don't just close the broker connection — commit or acknowledge the current message first, stop consuming, then close.
+
+```kotlin
+// Kafka consumer graceful stop
+consumer.stop()          // stop polling new records
+consumer.commitSync()    // commit what you've processed
+consumer.close()         // then close cleanly
+```
+
+<Callout variant="warning">
+The worst shutdown bug is closing a pool while a request still needs it. The correct order is: **stop accepting → wait for in-flight requests → close pools → exit**. If you close pools first, the very requests you're protecting will fail.
+</Callout>
+
+## The Complete Example (Spring Boot + Kubernetes)
+
+Putting it all together. First the app configuration:
+
+```properties
+# application.properties
+server.shutdown=graceful
+spring.lifecycle.timeout-per-shutdown-phase=25s
+server.port=8080
+```
+
+Now the Kubernetes deployment with readiness probe + preStop:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: orders-service
+    spec:
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: app
+          image: registry.example.com/orders-service:1.4.0
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"]
+```
+
+### Timing the numbers
+
+The timeline needs to add up to less than `terminationGracePeriodSeconds`:
+
+```
+preStop sleep              → 10s  (endpoints propagate, probe goes red)
+SIGTERM → graceful drain   → 25s  (Spring Boot drains in-flight requests)
+Connection pool cleanup    →  5s  (overhead/buffer)
+Total budget               → 40s
+terminationGracePeriodSeconds = 45  (breathing room over the total)
+```
+
+<Callout variant="note">
+`terminationGracePeriodSeconds` counts **everything** — preStop hook included — and it applies per pod. If your pipeline can't finish in the budget, the process gets SIGKILL and the shutdown was not graceful. Size it generously.
+</Callout>
+
+## Handling the SIGKILL Edge Case
+
+Graceful shutdown is a *best effort*, not a guarantee. A pod can still be force-killed if it exceeds the grace period, the node dies, or memory pressure triggers the OOM killer. Design for it:
+
+1. **Make tasks resumable/idempotent** — a retried task must not corrupt state.
+2. **Use outbox patterns or consumer offsets** — commit only after the work is durable.
+3. **Let the scheduler/LB handle retries** — Kubernetes moves the load elsewhere; your job is to not make the failure worse.
+4. **Keep a shutdown budget that includes rollback time** for the longest acceptable request.
+
+## Best Practices Checklist
+
+- [ ] `server.shutdown=graceful` (or framework equivalent) is enabled
+- [ ] Readiness probe makes the pod fail readiness immediately on SIGTERM
+- [ ] `preStop` sleep covers the endpoint-propagation window
+- [ ] `terminationGracePeriodSeconds` > preStop + drain + pool cleanup
+- [ ] Connection pools closed *after* in-flight requests finish
+- [ ] Message consumers ack/commit before closing connections
+- [ ] Shutdown path is tested: force a rollout and watch for in-flight request failures
+- [ ] Design tolerates a SIGKILL worst case (idempotent tasks)
+
+## Testing Graceful Shutdown
+
+Don't discover shutdown bugs in production. A quick test: start a request that takes 30 seconds, then `kubectl delete pod`, and observe:
+
+1. The pod flips to not-ready immediately.
+2. No *new* requests arrive during shutdown.
+3. The 30s request completes successfully (200).
+4. The pod exits cleanly within the grace period.
+
+If any step fails, your shutdown isn't graceful — fix it before the rollout.
+
+## Conclusion
+
+Graceful shutdown is three coordinated moves: **stop accepting new traffic** (readiness + preStop), **finish what's in flight** (graceful HTTP drain), and **release resources safely** (connection pools and consumers, in the right order). Combined with a correctly sized grace period, it's the difference between a routine deploy and a "why is my checkout failing during rollouts" incident.
+
+Start with the Spring Boot property, add the preStop hook, and verify with a real test rollout. The five minutes it takes to configure will pay for itself the first time a deployment crosses a long-running request.
+
+## Resources
+
+- [Spring Boot graceful shutdown reference](https://docs.spring.io/spring-boot/reference/web/graceful-shutdown.html)
+- [Kubernetes pod lifecycle docs](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
+- [Kubernetes termination docs](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination)
+- [Configuring Liveness, Readiness and Startup Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+
+Happy deploying! 🚀

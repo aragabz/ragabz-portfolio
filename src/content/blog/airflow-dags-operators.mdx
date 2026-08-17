@@ -1,0 +1,290 @@
+---
+title: "Mastering Airflow DAGs and Operators"
+date: 2026-08-16
+excerpt: "Go beyond the basics: design robust DAGs, choose the right operators, pass data between tasks with XComs, and use dynamic task mapping."
+tags: ["Apache Airflow", "Python", "ETL", "Data Engineering"]
+readingTime: 14
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+In the [previous post](/blog/apache-airflow-beginners/), we got a basic DAG running. Now it's time to build pipelines that can survive the real world: choosing the right operator, passing data between tasks, handling retries, and keeping DAGs maintainable as they grow.
+
+<Callout variant="tip" title="What you'll learn">
+- How to structure dependencies between tasks
+- When to use operators vs the TaskFlow API
+- How XComs work and when to avoid them
+- How to add retries, timeouts, and scheduling rules
+- How dynamic task mapping keeps DAGs DRY
+</Callout>
+
+## Task Dependencies
+
+A DAG's meaning lives in its edges. You express dependencies with the bitwise shift operators — Airflow's most distinctive syntax:
+
+```python
+# Equivalent ways to define dependencies
+first >> second >> third
+
+first.set_downstream(second)
+second.set_downstream(third)
+```
+
+The `>>` syntax reads naturally as "then". For fancier graphs:
+
+```python
+extract >> transform_a >> load
+extract >> transform_b >> load
+```
+
+Both `transform_a` and `transform_b` wait for `extract`, and `load` waits for both. With the TaskFlow API, the same graph is created implicitly by passing return values between `@task` functions.
+
+### Branching
+
+Sometimes the next step depends on a condition. Use `@task.branch`:
+
+```python
+from airflow.decorators import task
+from airflow.models.baseoperator import chain
+
+@task.branch
+def choose_branch(x: int):
+    return "process_small" if x < 100 else "process_large"
+
+@task
+def process_small(): ...
+
+@task
+def process_large(): ...
+
+@task
+def finish(): ...
+
+choose_branch(x=50) >> [process_small(), process_large()] >> finish()
+```
+
+The branch function returns the task ID (or list of task IDs) that should run next.
+
+<Callout variant="warning">
+A branch **always** skips the tasks not selected. If a downstream task must run regardless of the branch, set its `trigger_rule="none_failed"` (or `all_done`) — otherwise it will be skipped along with the unselected branch.
+</Callout>
+
+## Operators: The Workhorse
+
+Operators define *what kind* of work a task does. The core ones you'll use constantly:
+
+| Operator | When to use it |
+|----------|---------------|
+| `PythonOperator` | Run arbitrary Python |
+| `BashOperator` | Run shell commands, CLIs, scripts |
+| `@task` (TaskFlow) | The modern replacement for `PythonOperator` |
+| `@task.virtualenv` | Run Python in an isolated environment |
+| `@task.docker` / `@task.kubernetes` | Run a container as a task |
+| Sensors | **Wait** for a condition (file, API, SQL row, ...) |
+| `@task.branch` | Choose a path conditionally |
+
+### The TaskFlow API is the default
+
+For almost everything new, write `@task` functions rather than classic operators:
+
+```python
+@task
+def normalize(raw: str) -> str:
+    return raw.strip().lower()
+```
+
+Under the hood this creates a `PythonOperator`. The TaskFlow version is shorter, type-annotated, and handles XCom passing for you — both directions.
+
+### When classic operators still make sense
+
+Some operators don't have a TaskFlow equivalent and are worth learning:
+
+```python
+from airflow.operators.bash import BashOperator
+
+run_script = BashOperator(
+    task_id="run_script",
+    bash_command="python /path/to/script.py --env prod",
+    retries=2,
+    retry_delay=timedelta(minutes=1),
+)
+```
+
+Use `BashOperator` when you already have battle-tested scripts or command-line tools — no need to rewrite them in Python.
+
+### Sensors: waiting for a condition
+
+Sensors are tasks that *wait*. They poll until their condition is true or they time out:
+
+```python
+from airflow.sensors.filesystem import FileSensor
+
+wait_for_file = FileSensor(
+    task_id="wait_for_file",
+    filepath="/data/landing/orders_{{ ds_nodash }}.csv",
+    poke_interval=30,
+    timeout=60 * 30,  # give up after 30 minutes
+    mode="poke",
+)
+```
+
+Common sensors: `FileSensor`, `ExternalTaskSensor`, `SqlSensor`, `HttpSensor`, and `@task.sensor` for custom ones.
+
+<Callout variant="warning">
+Sensors that poll forever block scheduler slots. Prefer `mode="reschedule"` over the default `"poke"` for long waits, set a sensible `timeout`, and prefer event-driven triggers (like the EventBridge/Kafka triggers) when available.
+</Callout>
+
+## Passing Data with XComs
+
+Tasks don't share memory. To move data between tasks you use **XComs** (cross-communications) — small key/value messages stored in the metadata database.
+
+The TaskFlow API handles XComs implicitly:
+
+```python
+@task
+def compute() -> dict:
+    return {"total": 10_000}        # pushed as an XCom
+
+@task
+def report(total: int):              # pulled automatically
+    print(f"Total: {total}")
+
+report(compute())
+```
+
+Classic operators push XComs explicitly:
+
+```python
+@task
+def push_data(**context):
+    context["ti"].xcom_push(key="total", value=10_000)
+
+@task
+def pull_data(**context):
+    total = context["ti"].xcom_pull(key="total", task_ids="push_data")
+```
+
+### When XComs go wrong
+
+XComs are stored in the database, which means:
+
+- **Large payloads** bloat the metadata DB and slow everything down.
+- Pulling/pushing by `task_ids` string creates hidden coupling — a rename breaks it silently.
+
+<Callout variant="tip">
+Pass only small summaries through XComs (counts, paths, status). For real data, write it to storage (S3, database, object store) and pass the *reference* — a file path or an object key — through the XCom.
+</Callout>
+
+## Scheduling, Catchup, and Backfills
+
+The schedule controls when a DAG is *created*. In Airflow, `schedule` values like `@daily` create one DAG run per day after `start_date`:
+
+```python
+@dag(
+    schedule="@daily",
+    start_date=datetime(2026, 1, 1),
+    catchup=True,
+)
+def backfill_demo(): ...
+```
+
+With `catchup=True`, Airflow creates a run for *every* missed interval between `start_date` and now. That's a **backfill** — perfect when you've been collecting data for months and want to process it all retroactively.
+
+If you need a one-off historical run, `airflow dags backfill` is more controlled:
+
+```bash
+airflow dags backfill --start-date 2026-01-01 --end-date 2026-01-07 backfill_demo
+```
+
+<Callout variant="note">
+Remember that `start_date` is evaluated in **UTC** by default. For business pipelines, set a `timezone` on the DAG so "daily" means "daily in your local timezone".
+</Callout>
+
+## Reliability: Retries, Timeouts, and SLA
+
+Production pipelines fail. The difference between a good and a bad pipeline is how it fails.
+
+### Retries with exponential backoff
+
+```python
+@task(
+    retries=3,
+    retry_delay=timedelta(minutes=1),
+    retry_exponential_backoff=True,
+    max_retry_delay=timedelta(hours=2),
+)
+def flaky_api_call():
+    ...
+```
+
+### Timeouts so tasks can't hang forever
+
+```python
+@task(
+    execution_timeout=timedelta(hours=2),
+)
+def long_running(): ...
+```
+
+Set `execution_timeout` on tasks that touch external systems. A hung task that never times out can silently stall your whole schedule.
+
+### SLA monitoring
+
+```python
+@dag(
+    schedule="@daily",
+    sla_miss_callback=notify_on_miss,
+)
+def sla_demo(): ...
+```
+
+When a task runs past its `sla`, Airflow fires `sla_miss_callback` — a great hook for paging your team.
+
+## Dynamic Task Mapping: DAGs That Scale Themselves
+
+Often you don't know at parse time how many instances of a task you need — maybe there are 10 files today and 5,000 tomorrow. **Dynamic task mapping** creates one task instance per element of a mapped input:
+
+```python
+from airflow.decorators import task
+
+@task
+def process_file(path: str) -> dict:
+    return {"file": path, "rows": sum(1 for _ in open(path))}
+
+@task
+def aggregate(results: list[dict]):
+    total = sum(r["rows"] for r in results)
+    print(f"Processed {len(results)} files, {total} rows total")
+
+file_paths = ["/data/a.csv", "/data/b.csv", "/data/c.csv"]
+
+aggregate(process_file.expand(path=file_paths))
+```
+
+`expand()` creates one `process_file` instance per path — the graph view will show them fanning out. The mapped outputs flow back into `aggregate` as a list.
+
+<Callout variant="warning">
+Before mapping hundreds of thousands of items, think about the limits. Set `max_active_tis_per_dagrun` and `max_map_length`, and remember the mapped results still travel through XCom — keep each mapped task's output small.
+</Callout>
+
+## Keep Your DAGs Maintainable
+
+1. **One DAG file, one DAG** — don't cram multiple pipelines into one file; it hurts parse time and reviewability.
+2. **Use consistent `task_id`s** — they become database keys and XCom keys; renaming later is painful.
+3. **Define constants at the top** — paths, table names, API URLs in one place (or better, in Airflow Variables).
+4. **Add tags and docstrings** — `tags=["etl"]` and a module docstring make the UI and codebase navigable.
+5. **Idempotent tasks** — every task should be safe to re-run. If a DAG fails halfway and you retry, the world should be no worse off.
+6. **Write tests** — import your DAG in a test and assert the graph is correct. (Covered in the next post.)
+
+## What's Next
+
+With solid DAGs and operators under your belt, the final frontier is production: choosing an executor, securing connections and secrets, testing, and monitoring. That's exactly what the next post covers.
+
+## Resources
+
+- [Airflow DAG writing best practices](https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html)
+- [Operators Reference](https://airflow.apache.org/docs/apache-airflow/stable/core-operators/index.html)
+- [Dynamic Task Mapping](https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/dynamic-task-mapping.html)
+- [XComs documentation](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html)
+
+Happy orchestrating! 🚀

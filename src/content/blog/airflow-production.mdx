@@ -1,0 +1,256 @@
+---
+title: "Apache Airflow in Production: Executors, Secrets, and Best Practices"
+date: 2026-08-17
+excerpt: "Take Airflow from a laptop to production: choose the right executor, secure connections and variables, write tests, and monitor your pipelines."
+tags: ["Apache Airflow", "Data Engineering", "DevOps", "Python"]
+readingTime: 15
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Getting a DAG running locally is easy. Running Airflow in production — reliably, securely, at scale — is a different beast. In this final post of the series we'll cover the decisions that separate a toy deployment from a platform your team trusts.
+
+<Callout variant="tip" title="What you'll learn">
+- How executors work and which one to pick
+- Why you must move connections and variables to a secrets backend
+- The Airflow config knobs that matter
+- How to test DAGs in CI before they break production
+- How to monitor and alert on your pipelines
+</Callout>
+
+## Executors: Where Tasks Actually Run
+
+The executor determines how the scheduler hands work to a worker. This is the single biggest architectural decision.
+
+| Executor | Scale | When to use |
+|----------|-------|-------------|
+| `SequentialExecutor` | 1 task at a time | Local dev only (default with SQLite) |
+| `LocalExecutor` | 1 machine, parallel tasks | Single-node production, small teams |
+| `CeleryExecutor` | Many machines, queues | The classic multi-node choice |
+| `KubernetesExecutor` | Per-task pods | Cloud-native, elastic scale |
+| `LocalKubernetesExecutor` | Hybrid | Scheduler on one node, tasks as pods |
+
+### LocalExecutor
+
+Runs tasks in parallel processes on one machine. Fine up to a modest number of concurrent tasks, provided the box is sized correctly.
+
+```toml
+# airflow.cfg
+[core]
+executor = LocalExecutor
+
+[celery_executor]
+worker_concurrency = 8
+```
+
+### CeleryExecutor
+
+The workhorse for mid-size deployments. Tasks are pushed to a broker (Redis or RabbitMQ) and picked up by Celery workers, which you can scale horizontally:
+
+```toml
+[core]
+executor = CeleryExecutor
+
+[celery]
+broker_url = redis://redis:6379/0
+result_backend = db+postgresql://airflow:airflow@postgres/airflow
+```
+
+<Callout variant="note">
+CeleryExecutor requires the **PostgreSQL** metadata database — SQLite can't handle concurrent writes. This is Airflow's first hard production requirement.
+</Callout>
+
+### KubernetesExecutor
+
+Every task gets its own pod. The scheduler creates pods on the fly, so capacity scales automatically with demand and you get strong isolation between tasks:
+
+```toml
+[core]
+executor = KubernetesExecutor
+
+[kubernetes_executor]
+namespace = airflow
+```
+
+This is the default choice on managed platforms and for teams already on Kubernetes. You pay with higher overhead per task (pod startup time) and more moving parts.
+
+## Connections and Variables: Never Hardcode Secrets
+
+The number one production mistake is stuffing credentials into DAG code. Airflow gives you proper homes for configuration:
+
+- **Connections** — credentials for external systems (databases, APIs, cloud providers), stored encrypted in the metadata DB or in a secrets backend
+- **Variables** — simple key/value configuration for your DAGs
+
+```python
+from airflow.models import Connection, Variable
+
+api_token = Variable.get("api_token", default_var="")
+conn = Connection.get_conn_from_secrets("my_database")
+```
+
+Retrieve them at runtime inside tasks — never commit secrets to git, never build them into DAG files.
+
+### Use a secrets backend
+
+For production, sync connections and variables from a real secrets manager instead of storing them in the metadata DB:
+
+```toml
+[secrets]
+backend = airflow.providers.amazon.aws.secrets.secrets_manager.SecretsManagerBackend
+backend_kwargs = {"connections_prefix": "airflow/connections", "variables_prefix": "airflow/variables"}
+```
+
+The same pattern exists for GCP Secret Manager, Azure Key Vault, HashiCorp Vault, and others. Now rotating a credential is a single update in your secrets manager — no DAG redeploy, no metadata DB access.
+
+<Callout variant="warning">
+Enable Airflow's built-in authentication on the webserver (`auth_backends`), never expose it to the public internet, and treat the metadata database as highly sensitive — it contains connection details.
+</Callout>
+
+## Configuration Knobs That Matter
+
+A few settings have outsized impact on reliability:
+
+```toml
+[core]
+# Parse time budget for all DAGs — keep it low
+dagbag_import_timeout = 30
+max_active_runs_per_dag = 3
+
+[scheduler]
+# How often the scheduler checks for work
+scheduler_heartbeat_sec = 5
+min_file_process_interval = 30
+parsing_processes = 2
+
+[celery_executor]
+worker_concurrency = 8
+```
+
+Tuning is iterative: watch the scheduler's metrics and adjust `parsing_processes` and `worker_concurrency` based on actual load. Airflow 3.x reworked scheduling around time-based `schedule` semantics and made the scheduler more efficient by default, so keep the image reasonably current.
+
+## Testing DAGs in CI
+
+Your pipelines deserve the same rigor as your application code. Airflow DAGs are Python — test them like Python.
+
+### Assert the graph is correct
+
+```python
+# tests/test_dags.py
+import pytest
+from airflow.models import DagBag
+
+def test_no_import_errors():
+    dag_bag = DagBag(dag_folder="dags/", include_examples=False)
+    assert not dag_bag.import_errors, (
+        f"DAG import failures: {dag_bag.import_errors}"
+    )
+
+def test_dag_has_schedule():
+    dag_bag = DagBag(dag_folder="dags/", include_examples=False)
+    for dag_id, dag in dag_bag.dags.items():
+        assert dag.schedule is not None, f"{dag_id} has no schedule"
+```
+
+### Test task logic in isolation
+
+The `@task` functions are plain Python — unit test them directly:
+
+```python
+def test_transform():
+    from my_project.tasks import transform
+    assert transform("  hello  ") == "hello"
+```
+
+Run these in CI on every pull request. A broken DAG caught in CI costs seconds; the same bug in production costs a morning.
+
+<Callout variant="tip">
+Keep the `airflow` package version in your test environment identical to production. DAGs written for Airflow 2.x can break subtly under 3.x — test against the same version your scheduler runs.
+</Callout>
+
+## Monitoring and Alerting
+
+Airflow provides the primitives; you must wire up the alarm.
+
+### Metrics with statsd / Prometheus
+
+Airflow emits statsd metrics (or you can use the Prometheus exporter). Track at minimum:
+
+- **Scheduler heartbeat** (`scheduler_heartbeat`) — if it stops, nothing runs
+- **DAG parse time** — climbing parse times warn of DAG-bag bloat
+- **Skipped/failed task instances** — rising failures signal flaky tasks or infrastructure
+- **Queue depth** (Celery) — tasks queued but not executing = workers under-provisioned
+
+### SLA callbacks and notifications
+
+```python
+from airflow.models.dag import DAG
+from airflow.utils.email import send_email
+
+def alert_on_miss(context):
+    send_email(
+        to=["data-team@example.com"],
+        subject=f"SLA missed: {context['dag'].dag_id}",
+        html_content="A task missed its SLA. Check Airflow.",
+    )
+
+@dag(schedule="@hourly", sla_miss_callback=alert_on_miss)
+def hourly_pipeline(): ...
+```
+
+For failures inside a task, Airflow 3.x supports failure callbacks (`on_failure_callback`) or a single central `on_dagrun_failure` — wire one and route it to your alerting channel (Slack, PagerDuty, email).
+
+### Structured logging
+
+Set up JSON logging and ship it to a log aggregator:
+
+```toml
+[logging]
+log_format = json
+remote_logging = True
+```
+
+Enable remote logging (S3/CloudWatch/GCS) so task logs survive worker restarts and are searchable.
+
+## Deploying DAGs Safely
+
+The right way to ship DAGs is via **CI/CD**, not manual copying:
+
+1. Store DAGs in a git repository (ideally as a Docker image or synced volume).
+2. In CI: lint, run the tests from above, and validate imports.
+3. Build a Docker image containing the DAGs and **pinned** dependency versions.
+4. Deploy the image to your Airflow cluster — the scheduler picks up the new DAG definitions on its next parse.
+
+A pinned image with reproducible dependencies turns "why did my DAG break?" into "here's the diff between these two images."
+
+<Callout variant="warning">
+DAG versioning matters. When you deploy a new image, Airflow compares DAG versions and backfills or updates runs accordingly. Communicate changes to whoever depends on the schedule before you deploy.
+</Callout>
+
+## A Production Checklist
+
+Before you call your Airflow deployment production-ready:
+
+- [ ] PostgreSQL metadata database, backed up regularly
+- [ ] Executor chosen for your scale (`LocalExecutor` at minimum, never `Sequential`)
+- [ ] Secrets backend configured; no credentials in DAGs or git
+- [ ] Webserver authentication enabled, not publicly exposed
+- [ ] Retries/timeouts/SLA set on mission-critical tasks
+- [ ] CI tests: no import errors, expected graph structure, unit-tested tasks
+- [ ] Metrics, structured logging, and alerting wired up
+- [ ] Pinned, reproducible deployment image
+- [ ] Documented backfill and rollback procedure
+
+## Wrapping Up the Series
+
+You've now gone from *"what is Airflow?"* to running a monitored, tested, scaled platform. The journey is: understand the core model, write clean DAGs with the right operators, and treat production like production — secrets, tests, and observability from day one.
+
+The rest is experience. Start small, measure, and let Airflow's scheduling engine carry the weight.
+
+## Resources
+
+- [Airflow production deployment guide](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/deployment.html)
+- [Security and secrets backend docs](https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/index.html)
+- [Airflow best practices](https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html)
+- [The Airflow Blog](https://airflow.apache.org/blog/)
+
+Happy orchestrating! 🚀

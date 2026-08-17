@@ -204,7 +204,7 @@ function formatDate(date: Date) {
     </div>
   </article>
 
-  <style>
+  <style is:global>
     .reading-progress {
       position: fixed;
       top: 0;
@@ -344,16 +344,46 @@ function formatDate(date: Date) {
       color: var(--color-text);
       font-weight: 700;
       letter-spacing: -0.02em;
-      line-height: 1.15;
+      line-height: 1.2;
       margin-top: 3rem;
       margin-bottom: 1.125rem;
       scroll-margin-top: 2rem;
     }
 
-    .blog-content h1 { font-size: 2.125rem; }
-    .blog-content h2 { font-size: 1.875rem; }
-    .blog-content h3 { font-size: 1.5rem; }
-    .blog-content h4 { font-size: 1.25rem; }
+    .blog-content h1 {
+      font-size: 2.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .blog-content h2 {
+      font-size: 1.875rem;
+      position: relative;
+      padding-bottom: 0.875rem;
+    }
+
+    .blog-content h2::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 3.5rem;
+      height: 3px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
+    }
+
+    .blog-content h3 {
+      font-size: 1.5rem;
+      padding-left: 0.875rem;
+      border-left: 3px solid var(--color-accent);
+    }
+
+    .blog-content h4 {
+      font-size: 1.25rem;
+      color: var(--color-accent-strong);
+    }
+
     .blog-content h5,
     .blog-content h6 { font-size: 1.125rem; }
 
@@ -389,7 +419,7 @@ function formatDate(date: Date) {
     .blog-content ol li { list-style-type: decimal; }
 
     .blog-content code {
-      background-color: var(--color-bg-secondary);
+      background-color: var(--color-bg-tertiary);
       color: var(--color-accent-strong);
       padding: 0.2em 0.45em;
       border-radius: 0.375rem;
@@ -398,10 +428,10 @@ function formatDate(date: Date) {
     }
 
     .blog-content pre {
-      padding: 1.5rem;
-      border-radius: 0.75rem;
+      margin: 0;
+      padding: 1.25rem 1.5rem;
       overflow-x: auto;
-      margin: 2.5rem 0;
+      border-radius: 0;
       line-height: 1.6;
       font-size: 0.875rem;
       tab-size: 2;
@@ -413,6 +443,59 @@ function formatDate(date: Date) {
       border-radius: 0;
       color: inherit;
       font-size: inherit;
+    }
+
+    .code-block {
+      margin: 2.5rem 0;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      border: 1px solid var(--color-border);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
+      background-color: #24292e;
+    }
+
+    .code-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.625rem 1rem;
+      background-color: #1f2428;
+      border-bottom: 1px solid #343a40;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    }
+
+    .code-lang {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8b949e;
+    }
+
+    .code-copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.3125rem 0.75rem;
+      border-radius: 0.375rem;
+      border: 1px solid #3d444d;
+      background-color: transparent;
+      color: #c9d1d9;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .code-copy-btn:hover {
+      background-color: #30363d;
+      color: #ffffff;
+    }
+
+    .code-copy-btn.copied {
+      background-color: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #ffffff;
     }
 
     .blog-content blockquote {
@@ -449,14 +532,22 @@ function formatDate(date: Date) {
 
     .blog-content table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       margin: 2.5rem 0;
       font-size: 0.9375rem;
+      border: 1px solid var(--color-border);
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+
+    .blog-content thead {
+      background-color: var(--color-bg-tertiary);
     }
 
     .blog-content th,
     .blog-content td {
-      padding: 0.75rem 1rem;
+      padding: 0.875rem 1.125rem;
       text-align: left;
       border-bottom: 1px solid var(--color-border);
     }
@@ -467,10 +558,17 @@ function formatDate(date: Date) {
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--color-text-secondary);
-      border-bottom: 1px solid var(--color-border-secondary);
     }
 
-    .blog-content tr:last-child td {
+    .blog-content tbody tr:nth-child(even) {
+      background-color: var(--color-bg-secondary);
+    }
+
+    .blog-content tbody tr:hover {
+      background-color: var(--color-bg-tertiary);
+    }
+
+    .blog-content tbody tr:last-child td {
       border-bottom: none;
     }
 
@@ -490,10 +588,16 @@ function formatDate(date: Date) {
       .blog-content h3 { font-size: 1.375rem; }
       .blog-content h4 { font-size: 1.1875rem; }
 
-      .blog-content pre {
+      .code-block {
         margin-left: -1.5rem;
         margin-right: -1.5rem;
         border-radius: 0;
+      }
+
+      .blog-content table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
       }
     }
   </style>
@@ -536,6 +640,46 @@ function formatDate(date: Date) {
           btn.textContent = 'Copied!';
           setTimeout(() => (btn.textContent = original), 2000);
         } catch (e) {}
+      });
+    });
+  </script>
+
+  <script>
+    document.querySelectorAll('.blog-content pre').forEach((pre) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'code-block';
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'code-toolbar';
+
+      const lang = document.createElement('span');
+      lang.className = 'code-lang';
+      lang.textContent = pre.dataset.language || 'code';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'code-copy-btn';
+      btn.textContent = 'Copy';
+      btn.setAttribute('aria-label', 'Copy code to clipboard');
+
+      toolbar.append(lang, btn);
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.append(toolbar, pre);
+
+      btn.addEventListener('click', async () => {
+        const text = pre.querySelector('code')?.innerText ?? '';
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+        } catch {
+          btn.textContent = 'Copy failed';
+          btn.classList.add('copied');
+        }
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
       });
     });
   </script>
