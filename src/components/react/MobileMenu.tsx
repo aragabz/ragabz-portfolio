@@ -263,6 +263,7 @@ export default function MobileMenu({
 // Helper function to get appropriate icons
 function getIconForLink(label: string): string {
   const iconMap: Record<string, string> = {
+    'Home': 'mdi:home',
     'About': 'mdi:account-circle',
     'Experience': 'mdi:briefcase',
     'Blog': 'mdi:post',

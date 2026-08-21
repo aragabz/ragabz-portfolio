@@ -1,0 +1,19 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Navbar from '../components/Navbar.astro';
+import Contact from '../components/Contact.astro';
+import BackToTop from '../components/react/BackToTop';
+---
+
+<BaseLayout 
+  title="Contact Me - Ahmed Ragab"
+  description="Get in touch with Ahmed Ragab for collaboration, opportunities, or technical consulting."
+>
+  <Navbar />
+
+  <main id="main-content" role="main" class="py-12">
+    <Contact />
+  </main>
+
+  <BackToTop client:load />
+</BaseLayout>

@@ -1,26 +1,27 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Navbar from '../components/Navbar.astro';
 import { FadeIn, ScaleIn } from '../components/react/Animated';
-
+ 
 // Update this content monthly!
 const lastUpdated = 'July 2026';
-
+ 
 const currentProjects = [
   { title: 'Portfolio v3', status: 'In Progress', description: 'Redesigning portfolio with Astro 7' },
   { title: 'Open Source CLI Tool', status: 'Planning', description: 'Building a developer productivity tool' },
 ];
-
+ 
 const learning = [
   { topic: 'Rust Programming', progress: 40, description: 'Systems programming language' },
   { topic: 'AWS Solutions Architect', progress: 65, description: 'Cloud architecture certification' },
   { topic: 'Design Patterns', progress: 80, description: 'Software architecture patterns' },
 ];
-
+ 
 const reading = [
   { title: 'The Pragmatic Programmer', author: 'David Thomas & Andrew Hunt', status: 'Reading' },
   { title: 'Designing Data-Intensive Applications', author: 'Martin Kleppmann', status: 'Next Up' },
 ];
-
+ 
 const interests = [
   { emoji: '🎮', text: 'Building side projects', },
   { emoji: '📝', text: 'Technical writing and blogging' },
@@ -28,12 +29,14 @@ const interests = [
   { emoji: '🤝', text: 'Contributing to open source' },
 ];
 ---
-
+ 
 <BaseLayout 
   title="Now - What I'm Doing"
   description="What I'm currently working on, learning, and interested in"
 >
-  <div class="min-h-screen py-section px-6">
+  <Navbar />
+ 
+  <div class="min-h-screen py-12 px-6">
     <div class="max-w-3xl mx-auto">
       <!-- Header -->
       <FadeIn client:load>

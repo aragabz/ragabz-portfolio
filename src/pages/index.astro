@@ -1,13 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Navbar from '../components/Navbar.astro';
 import Hero from '../components/Hero.astro';
-import About from '../components/About.astro';
-import Experience from '../components/Experience.astro';
+import Projects from '../components/Projects.astro';
 import Blog from '../components/Blog.astro';
-import Contact from '../components/Contact.astro';
 import BackToTop from '../components/react/BackToTop';
-import ThemeToggle from '../components/react/ThemeToggle';
-import MobileMenu from '../components/react/MobileMenu';
 ---
 
 <BaseLayout>
@@ -20,52 +17,14 @@ import MobileMenu from '../components/react/MobileMenu';
     Skip to main content
   </a>
   
-  <!-- Navigation -->
-  <nav
-    class="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b"
-    style="background-color: color-mix(in srgb, var(--color-bg) 80%, transparent); border-color: var(--color-border);"
-    role="navigation"
-    aria-label="Main navigation"
-  >
-    <div class="max-w-container mx-auto px-6 py-4">
-      <div class="flex justify-between items-center">
-        <a href="#hero" class="text-xl font-bold transition-colors" style="color: var(--color-accent);">
-          AR
-        </a>
-        
-        <ul class="hidden md:flex gap-8 items-center">
-          <li><a href="#about" class="hover-text-brand-orange transition-colors">About</a></li>
-          <li><a href="#experience" class="hover-text-brand-orange transition-colors">Experience</a></li>
-          <li><a href="#blog" class="hover-text-brand-orange transition-colors">Blog</a></li>
-          <li><a href="#contact" class="hover-text-brand-orange transition-colors">Contact</a></li>
-          <li><ThemeToggle client:load /></li>
-        </ul>
-        
-        <div class="flex items-center gap-2 md:hidden">
-          <ThemeToggle client:load />
-          <MobileMenu client:load />
-        </div>
-      </div>
-    </div>
-  </nav>
+  <Navbar />
 
   <main id="main-content" role="main">
     <Hero />
-    <About />
-    <Experience />
+    <Projects />
     <Blog />
-    <Contact />
   </main>
 
   <!-- Back to Top Button -->
   <BackToTop client:load />
-
-  <script>
-    const menuBtn = document.getElementById('mobile-menu-btn');
-    const mobileMenu = document.getElementById('mobile-menu');
-    menuBtn?.addEventListener('click', () => mobileMenu?.classList.toggle('hidden'));
-    document.querySelectorAll('#mobile-menu a').forEach(link => {
-      link.addEventListener('click', () => mobileMenu?.classList.add('hidden'));
-    });
-  </script>
 </BaseLayout>

@@ -1,0 +1,65 @@
+---
+import ThemeToggle from './react/ThemeToggle';
+import MobileMenu from './react/MobileMenu';
+
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
+const pathname = Astro.url.pathname;
+
+// Standardize route checking by removing trailing slashes
+const cleanPathname = pathname.replace(/\/$/, '') || '/';
+
+const navLinks = [
+  { href: `${base}`, label: 'Home', isExact: true },
+  { href: `${base}about`, label: 'About', isExact: false },
+  { href: `${base}blog`, label: 'Blog', isExact: false },
+  { href: `${base}contact`, label: 'Contact', isExact: false },
+];
+
+function isLinkActive(linkHref: string, isExact: boolean) {
+  const cleanLinkHref = linkHref.replace(/\/$/, '') || '/';
+  if (isExact) {
+    return cleanPathname === cleanLinkHref;
+  }
+  return cleanPathname.startsWith(cleanLinkHref);
+}
+---
+
+<nav
+  class="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b"
+  style="background-color: color-mix(in srgb, var(--color-bg) 80%, transparent); border-color: var(--color-border);"
+  role="navigation"
+  aria-label="Main navigation"
+>
+  <div class="max-w-container mx-auto px-6 py-4">
+    <div class="flex justify-between items-center">
+      <a href={base} class="text-xl font-bold transition-colors hover:opacity-80" style="color: var(--color-accent);">
+        AR
+      </a>
+      
+      <ul class="hidden md:flex gap-8 items-center list-none m-0 p-0">
+        {navLinks.map((link) => {
+          const active = isLinkActive(link.href, link.isExact);
+          return (
+            <li>
+              <a 
+                href={link.href} 
+                class="transition-colors hover-text-brand-orange font-medium"
+                style={active ? "color: var(--color-brand-orange);" : "color: var(--color-text);"}
+              >
+                {link.label}
+              </a>
+            </li>
+          );
+        })}
+        <li><ThemeToggle client:load /></li>
+      </ul>
+      
+      <div class="flex items-center gap-2 md:hidden">
+        <ThemeToggle client:load />
+        <MobileMenu client:load links={navLinks} />
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="h-[73px]"></div> <!-- Spacer to prevent content from going behind fixed navbar -->

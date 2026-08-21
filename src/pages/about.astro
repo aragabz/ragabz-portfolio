@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Navbar from '../components/Navbar.astro';
+import About from '../components/About.astro';
+import Skills from '../components/Skills.astro';
+import Experience from '../components/Experience.astro';
+import BackToTop from '../components/react/BackToTop';
+---
+
+<BaseLayout 
+  title="About Me - Ahmed Ragab"
+  description="Learn more about my background, skills, and professional experience as a Software Engineering Technical Lead."
+>
+  <Navbar />
+
+  <main id="main-content" role="main" class="py-12">
+    <About />
+    <Skills />
+    <Experience />
+  </main>
+
+  <BackToTop client:load />
+</BaseLayout>

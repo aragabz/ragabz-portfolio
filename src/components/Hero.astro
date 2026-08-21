@@ -2,6 +2,8 @@
 // Hero Section Component
 import TechStackMarquee from './react/TechStackMarquee';
 import { defaultTechStack } from './react/TechStackMarquee';
+
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 ---
 
 <section id="hero" class="min-h-screen flex items-center justify-center px-6 flex-col pt-28">
@@ -19,14 +21,14 @@ import { defaultTechStack } from './react/TechStackMarquee';
     
     <div class="flex gap-4 justify-center fade-in fade-in-delay-3">
       <a 
-        href="#contact" 
+        href={`${base}contact`} 
         class="px-8 py-4 rounded-lg hover-bg-brand-orange transition-colors duration-300 font-medium"
         style="background-color: var(--color-brand-black); color: var(--color-brand-white);"
       >
         Get in Touch
       </a>
       <a 
-        href="#experience" 
+        href={`${base}about#experience`} 
         class="px-8 py-4 border rounded-lg hover-border-brand-gray-dark transition-colors duration-300 font-medium"
         style="border-color: var(--color-brand-gray-light);"
       >
@@ -36,7 +38,7 @@ import { defaultTechStack } from './react/TechStackMarquee';
     
     <!-- Scroll Indicator -->
     <div class="mt-20 fade-in fade-in-delay-3">
-      <a href="#about" class="inline-block animate-bounce">
+      <a href="#projects" class="inline-block animate-bounce">
         <svg 
           class="w-6 h-6" 
           style="color: var(--color-brand-gray-dark);"

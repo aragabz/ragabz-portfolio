@@ -1,0 +1,14 @@
+title: "Android Clean Architecture Template"
+description: "A modern, modular Android template using Jetpack Compose, Kotlin, Detekt/Ktlint static analysis, Fastlane CI/CD automation, and custom Gradle build-logic to accelerate app development."
+tech:
+  - Kotlin
+  - Jetpack Compose
+  - Gradle
+  - Fastlane
+  - Detekt
+  - Ktlint
+github: "https://github.com/aragabz/androidtemplate"
+category: "Open Source"
+featured: true
+image: "/images/projects/api.jpg"
+order: 2

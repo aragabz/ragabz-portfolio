@@ -1,8 +1,9 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Navbar from '../components/Navbar.astro';
 import { Icon } from '@iconify/react';
 import { FadeIn, StaggerContainer, StaggerItem } from '../components/react/Animated';
-
+ 
 const categories = [
   {
     title: '💻 Hardware',
@@ -65,12 +66,14 @@ const categories = [
   },
 ];
 ---
-
+ 
 <BaseLayout 
   title="Uses - Tools & Setup"
   description="Hardware, software, and tools I use for development and productivity"
 >
-  <div class="min-h-screen py-section px-6">
+  <Navbar />
+
+  <div class="min-h-screen py-12 px-6">
     <div class="max-w-container mx-auto">
       <!-- Header -->
       <FadeIn client:load>

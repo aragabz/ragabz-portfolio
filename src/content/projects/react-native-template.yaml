@@ -1,0 +1,14 @@
+title: "React Native Template Ultimacode"
+description: "A comprehensive Expo and React Native template focused on clean architecture, TypeScript, Zustand, TanStack Query, MMKV storage, and localization (English/Arabic) with RTL support."
+tech:
+  - React Native
+  - Expo
+  - TypeScript
+  - Zustand
+  - TanStack Query
+  - MMKV
+live: "https://www.npmjs.com/package/react-native-template-ultimacode"
+category: "Open Source"
+featured: true
+image: "/images/projects/ui-library.jpg"
+order: 1

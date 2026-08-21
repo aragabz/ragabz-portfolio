@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Navbar from '../../components/Navbar.astro';
 import RelatedPosts from '../../components/RelatedPosts.astro';
 
 export async function getStaticPaths() {
@@ -68,6 +69,8 @@ function formatDate(date: Date) {
   description={post.data.excerpt}
   type="article"
 >
+  <Navbar />
+
   <div class="reading-progress" aria-hidden="true"></div>
 
   <article class="min-h-screen pt-24 pb-24 px-6">
