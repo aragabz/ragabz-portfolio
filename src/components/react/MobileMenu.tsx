@@ -9,8 +9,6 @@ interface MobileMenuProps {
 export default function MobileMenu({ 
   links = [
     { href: '#about', label: 'About' },
-    { href: '#projects', label: 'Projects' },
-    { href: '#skills', label: 'Skills' },
     { href: '#experience', label: 'Experience' },
     { href: '#blog', label: 'Blog' },
     { href: '#contact', label: 'Contact' },
@@ -266,8 +264,6 @@ export default function MobileMenu({
 function getIconForLink(label: string): string {
   const iconMap: Record<string, string> = {
     'About': 'mdi:account-circle',
-    'Projects': 'mdi:folder-multiple',
-    'Skills': 'mdi:code-braces',
     'Experience': 'mdi:briefcase',
     'Blog': 'mdi:post',
     'Contact': 'mdi:email',

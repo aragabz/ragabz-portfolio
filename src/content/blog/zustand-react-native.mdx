@@ -1,0 +1,270 @@
+---
+title: "State Management in React Native with Zustand"
+date: 2026-08-21
+excerpt: "Learn why Zustand is a great fit for React Native, how to set up your first store, and patterns for async state, persistence, and TypeScript."
+tags: ["React Native", "Zustand", "JavaScript", "State Management"]
+readingTime: 13
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+State management is where React Native apps tend to get messy. Props drilling gets painful as screens grow, Context causes unnecessary re-renders, and Redux brings a lot of boilerplate for small and medium apps. Zustand gives you a small, fast, and scalable store with almost zero boilerplate — and it works beautifully in React Native.
+
+<Callout variant="tip" title="What you'll learn">
+- Why Zustand is a good fit for React Native
+- How to create your first store
+- How to read and update state from components
+- How to handle async actions (API calls)
+- How to persist state with AsyncStorage
+- TypeScript tips and best practices
+</Callout>
+
+## What Is Zustand?
+
+Zustand is a tiny (under 1 kB) state management library for React. Its core idea is a **store**: a plain JavaScript object of state plus actions, created with the `create` function, and shared across your whole app.
+
+```bash
+npm install zustand
+```
+
+There is one important difference from other libraries: with Redux you *dispatch* actions and write reducers; with Zustand you just call functions that mutate state directly. No providers, no reducers, no actions objects.
+
+## Why Zustand in React Native?
+
+React Native presents some specific challenges that Zustand handles well:
+
+- **No Provider nesting** — RN apps are already deep in navigation and theme providers. Zustand works without wrapping your app in anything.
+- **Selective subscriptions** — you subscribe only to the slices of state you use, so a component re-renders only when *its* data changes, not on every store update.
+- **Runs everywhere** — it's plain JS, so it works in the JS thread, in worklets, and in any environment where React runs.
+- **Persistence built in** — a `persist` middleware pairs perfectly with `AsyncStorage`, React Native's standard storage.
+
+<Callout variant="warning">
+If your app is tiny (one screen, a handful of local fields), stick with `useState`. Reach for Zustand when state is shared across many screens, is fetched from an API, or needs to survive navigation unmounts.
+</Callout>
+
+## Your First Store
+
+A store is created once and imported anywhere. Let's build a shopping-cart-style store:
+
+```ts
+// stores/cart.ts
+import { create } from 'zustand';
+
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+interface CartState {
+  items: CartItem[];
+  addItem: (item: CartItem) => void;
+  removeItem: (id: string) => void;
+  clear: () => void;
+}
+
+export const useCartStore = create<CartState>((set) => ({
+  items: [],
+
+  addItem: (item) =>
+    set((state) => ({
+      items: state.items.some((i) => i.id === item.id)
+        ? state.items.map((i) =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
+          )
+        : [...state.items, item],
+    })),
+
+  removeItem: (id) =>
+    set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
+
+  clear: () => set({ items: [] }),
+}));
+```
+
+Notes on this example:
+
+| Piece | What it does |
+|-------|-------------|
+| `create<CartState>(...)` | Creates the store, typed with TypeScript |
+| `set` | A function that merges partial state into the store |
+| `(state) => ...` | The updater form of `set`, so you read the latest state |
+| `useCartStore` | A React hook you can use in any component |
+
+## Reading and Updating State
+
+The hook works just like any React hook. You grab the slices you need:
+
+```tsx
+import { useCartStore } from '../../stores/cart';
+
+function CartScreen() {
+  const items = useCartStore((s) => s.items);
+  const clear = useCartStore((s) => s.clear);
+
+  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+  return (
+    <View>
+      {items.map((item) => (
+        <Text key={item.id}>
+          {item.name} × {item.quantity} — ${item.price * item.quantity}
+        </Text>
+      ))}
+      <Text>Total: ${total}</Text>
+      <Button title="Clear cart" onPress={clear} />
+    </View>
+  );
+}
+```
+
+<Callout variant="warning">
+Selectors matter. `useCartStore((s) => s.items)` re-renders only when `items` changes. If instead you did `useCartStore()` and destructured, you'd re-render on *every* store change — including a field you never use.
+</Callout>
+
+You can also read state outside React — in a navigation listener, a saga, or a plain utility function:
+
+```ts
+import { useCartStore } from './stores/cart';
+
+// Works anywhere, not just inside components
+const count = useCartStore.getState().items.length;
+useCartStore.getState().clear();
+```
+
+## Async Actions
+
+Real apps fetch data. Actions can be async — just call `set` when the data arrives:
+
+```ts
+interface AuthState {
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => void;
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  loading: false,
+  error: null,
+
+  signIn: async (email, password) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.login(email, password);
+      set({ user: response.user, loading: false });
+    } catch (err) {
+      set({ error: (err as Error).message, loading: false });
+    }
+  },
+
+  signOut: () => set({ user: null, error: null }),
+}));
+```
+
+Components don't care whether the action is sync or async — they just call it:
+
+```tsx
+const signIn = useAuthStore((s) => s.signIn);
+const { user, loading, error } = useAuthStore((s) => ({
+  user: s.user,
+  loading: s.loading,
+  error: s.error,
+}));
+
+useEffect(() => {
+  signIn('me@example.com', 'secret');
+}, []);
+```
+
+<Callout variant="warning">
+Be careful with object selectors like the one above: `useAuthStore((s) => ({ user: s.user, ... }))` returns a *new object every render*, which triggers re-renders on any state change. For multiple slices, use `useShallow`:
+`useAuthStore(useShallow((s) => ({ user: s.user, loading: s.loading })))`.
+</Callout>
+
+## Persisting State
+
+Your cart shouldn't disappear when the app restarts. Zustand's `persist` middleware handles this, and in React Native you point it at `AsyncStorage`:
+
+```bash
+npm install @react-native-async-storage/async-storage
+```
+
+```ts
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const useCartStore = create<CartState>()(
+  persist(
+    (set) => ({
+      items: [],
+      addItem: /* ... as before ... */,
+      removeItem: /* ... */,
+      clear: () => set({ items: [] }),
+    }),
+    {
+      name: 'cart-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    },
+  ),
+);
+```
+
+The `name` is the key under which the whole store is saved. On startup the store rehydrates automatically from storage.
+
+### Partial persistence
+
+Sometimes you don't want to persist everything — for example, don't persist a token for a user that signed out:
+
+```ts
+{
+  name: 'auth-storage',
+  storage: createJSONStorage(() => AsyncStorage),
+  partialize: (state) => ({ user: state.user }),
+}
+```
+
+`partialize` lets you pick exactly which fields get saved.
+
+<Callout variant="tip">
+If you need your UI to wait until rehydration finishes before rendering (e.g. to route to a login screen correctly), use `onRehydrateStorage` to set a flag, or check `useCartStore.persist.hasHydrated()`.
+</Callout>
+
+## TypeScript Tips
+
+The one-line rule for typing a store with middleware: use `create<State>()(...)`, with the *extra pair of parentheses* — the curried form that keeps TypeScript happy.
+
+```ts
+export const useCartStore = create<CartState>()(
+  persist((set) => ({ /* ... */ }), { name: 'cart-storage' }),
+);
+```
+
+This is the single most common TypeScript gotcha with Zustand. Without the `()` after `create<State>`, inference with middleware breaks.
+
+## Common Pitfalls in React Native
+
+1. **Selecting too much** — subscribing to the whole store defeats Zustand's selective-subscription performance benefit. Pick the smallest slice.
+2. **Calling actions during render** — updating state during a render (other than in an event handler or `useEffect`) can cause stale-closure bugs. Keep mutations in handlers.
+3. **Forgetting AsyncStorage setup** — on a fresh RN project, `@react-native-async-storage/async-storage` must be installed and, on iOS, `pod install` must be run.
+4. **Storing non-serializable values** — `persist` stores JSON. Dates, functions, and `Map`/`Set` won't survive a restart unless you provide a custom serializer.
+5. **Creating stores inside components** — create stores at module scope, never inside a component body, or you'll recreate state on every render.
+
+## Next Steps
+
+- Learn about **slices** to split large stores into composable pieces
+- Explore the `devtools` middleware to inspect state in Redux DevTools
+- Check out `useShallow` and `subscribeWithSelector` for advanced subscriptions
+- Compare Zustand with `useReducer`/Context for larger teams and apps
+
+## Resources
+
+- [Zustand documentation](https://zustand.docs.pmnd.rs/)
+- [Zustand GitHub](https://github.com/pmndrs/zustand)
+- [AsyncStorage for React Native](https://react-native-async-storage.github.io/async-storage/)
+
+Happy state managing! 🚀

@@ -1,0 +1,215 @@
+---
+title: "Authorization Tokens Explained: Opaque vs JWT vs JWE and When to Use Each"
+date: 2026-08-20
+excerpt: "Every token type in authorization decoded: opaque tokens, JWT/JWS, JWE, and access vs refresh tokens — how they differ, their trade-offs, and how to pick the right one."
+tags: ["Security", "Authentication", "Authorization", "JWT"]
+readingTime: 12
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Almost every modern API starts with the same handshake: the client sends a token, the server checks it, and access is granted or denied. But "a token" is doing a lot of work in that sentence. An opaque token, a JWT, and a JWE all look vaguely similar in a header — and they behave completely differently under the hood.
+
+Choosing the right token type is one of those decisions you make once and regret for years if you get it wrong. This post walks through every major token type, how they compare, where the trade-offs really are, and when each one is the right call.
+
+<Callout variant="tip" title="What you'll learn">
+- What opaque tokens are and how they actually work (introspection + revocation)
+- How JWT/JWS tokens work and why "self-contained" cuts both ways
+- Where JWE (encrypted tokens) fits in
+- Access vs refresh tokens and how they interact
+- A direct comparison: opaque vs JWT, and what to pick when
+</Callout>
+
+## The Two Camps: Reference Tokens vs Value Tokens
+
+Every token in existence belongs to one of two families, and this is the mental model that makes everything else click:
+
+**Reference tokens (opaque).** The token is just a random string — a "receipt" or key — that means nothing by itself. The server stores the real session state (who the user is, their scopes, expiry) in a database or cache and looks it up every time it receives the token. The token *references* stored data.
+
+**Value tokens (structured).** The token *contains* the data itself. The claims — subject, scopes, expiry, issuer — are encoded inside the token, signed so they can't be tampered with. The server can read them without asking anyone else.
+
+That one distinction drives every trade-off in this post: revocation, performance, storage, leak risk, and complexity.
+
+## Opaque (Reference) Tokens
+
+Opaque tokens are random strings — often 64 to 128 characters of base64-encoded entropy. A real one looks like this:
+
+```
+eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.9f4c3f2b1a9d8e7f6c5b4a3d2e1f0c9b8a7d6e5f4b3a2c1d0e9f8a7b6c5d4e3f2a1
+```
+
+Wait — that starts with `eyJ`, which decodes to `{"typ":"JWT"...}`. Ignore that; a *true* opaque token is just random. It carries no structure, no claims, no metadata you can decode. That's the whole point.
+
+### How it works
+
+1. Client authenticates → server generates a random token, stores `(token, user, scopes, expires_at)` in Redis or a database, and returns the token.
+2. Client sends the token on each request.
+3. Server looks the token up in storage. If it exists and isn't expired, the request proceeds; the stored record tells the server who the user is and what they can do.
+
+### Strengths
+
+- **Instant revocation.** Want to kill a session? Delete the record (or set a flag). The next request with that token is rejected. Revocation is immediate and cheap.
+- **Tiny tokens.** A 32-byte random value. No growth as you add claims.
+- **No sensitive data exposed.** The token encodes nothing, so there's nothing to leak if it falls into the wrong hands beyond the session itself.
+- **Simple to invalidate on password change / logout / breach.** One delete call.
+
+### Weaknesses
+
+- **Server-side state.** Every request is a database/cache round-trip. That's latency, and it's a scalability constraint — your token store becomes part of your request path.
+- **You're building the infrastructure.** Session store, TTLs, eviction, high availability for that store. Some of this comes free with value tokens.
+- **No offline verification.** A microservice can't validate the token without calling back to the authorization server.
+
+## JWT / JWS (Signed Value Tokens)
+
+JWT (JSON Web Token) is the most common value token. Formally, the *signed* flavor is JWS (JSON Web Signature); "JWT" in practice almost always means a signed JWS token. It's three base64url segments separated by dots:
+
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFobWVkIiwic2NvcGVzIjpbInJlYWQiXSwiZXhwIjoxNzU1Njk2MDAwfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+Segment 1 is the **header** (algorithm + type), segment 2 is the **payload** (the claims), segment 3 is the **signature**.
+
+### How it works
+
+1. Client authenticates → the authorization server signs the claims and returns the JWT.
+2. Client sends the JWT on each request.
+3. Server verifies the signature with the shared secret (HMAC) or the public key (RSA/ECDSA), checks `exp`, and reads the claims directly.
+
+### Strengths
+
+- **Self-contained.** The server reads identity, scopes, and expiry straight from the token — no database lookup, no round-trip. Great for high-traffic, distributed backends.
+- **Stateless.** No session store to build, scale, or make highly available.
+- **Offline verification.** Any service with the verification key can validate tokens from another service. Ideal for API gateways, service-to-service auth, and edge validation.
+- **Standardized.** JWT is an RFC; libraries exist in every language. Tools like `jwt.io` make debugging trivial.
+
+### Weaknesses
+
+- **Revocation is hard.** Once issued, a JWT is valid until `exp`. To revoke early you need an allow/denylist — which reintroduces the state you tried to eliminate. Short `exp` + short-lived access tokens is the usual mitigation.
+- **You cannot un-leak a signed token.** If an attacker steals a 1-hour JWT, they can use it for up to 1 hour. There is no central place to kill it (unless you add denylist infrastructure).
+- **Payload is readable.** A signed JWT is *not* encrypted — anyone can base64-decode the payload. Never put secrets in claims.
+- **Algorithm confusion attacks.** If the server trusts `alg` from the header blindly, attackers can switch `RS256` to `HS256` and sign with the public key. Always pin the algorithm server-side and never accept `none`.
+
+<Callout variant="warning">
+A signed JWT is readable by anyone who has the token. "Signed" means *tamper-proof*, not *confidential*. Sensitive data (passwords, PII, internal identifiers you'd rather not reveal) must never go in a plain JWS payload.
+</Callout>
+
+## JWE (Encrypted Tokens)
+
+JWE (JSON Web Encryption) is the encrypted sibling of JWS. Where a JWT/JWS is signed but readable, a JWE is *encrypted* — the payload is unreadable without the decryption key. JWE tokens typically embed a nested JWS inside the encrypted payload, so you get both integrity and confidentiality:
+
+```
+eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.
+QzlmM2I... (encrypted content encryption key)
+qX3hYg... (ciphertext — an inner signed JWT)
+1RfB1Z_... (auth tag)
+```
+
+### Strengths
+
+- **Confidentiality.** No one can read the claims without the decryption key.
+- **Confirms the token belongs to the expected audience** — only the intended recipient can decrypt it.
+
+### Weaknesses
+
+- **Everything from JWT, plus more.** Same revocation problem, plus bigger tokens (encryption overhead) and more CPU cost per verify.
+- **More complex cryptography** to get right — key management matters, and nested JWS-in-JWE setup trips up many teams.
+
+### When it makes sense
+
+JWE is for cases where the token *payload itself* is a secret that must survive transit and inspection — for example, wrapping sensitive data end-to-end between services, or protecting tokens in cookies from offline disclosure. For ordinary access tokens, plain signed JWTs are usually fine because you simply don't put sensitive claims in them.
+
+## Access Tokens vs Refresh Tokens
+
+Whatever underlying format you choose, production authorization flows typically use two token types working together:
+
+**Access token.** Short-lived (minutes to an hour). Sent on every API call. Should be scoped tightly. If it leaks, the blast radius is small because it expires quickly.
+
+**Refresh token.** Long-lived (days to months). Used *only* at the token endpoint to mint new access tokens. Stored carefully (server-side, or in HttpOnly cookies). Can be revoked, rotated, and issued per-device.
+
+```
+Client ── auth ──▶ Auth Server
+     ◀─ access + refresh ──
+Client ── GET /api/data + access token ──▶ API
+     ◀─ 401 (expired) ──
+Client ── refresh token ──▶ Auth Server ──▶ new access token
+```
+
+The pair exists to solve a fundamental tension: you want access tokens short-lived (to limit leak damage) but issuing them shouldn't require a login every time. The refresh token is the long-lived credential that keeps the user signed in, and it can be revoked server-side if it's compromised.
+
+<Callout variant="tip">
+Short access token + revocable refresh token is the standard defense-in-depth combo: the token that crosses your API boundary every second barely outlives a single session, and the token that can't be revoked (a long-lived JWT) never gets issued. Even if your access tokens are opaque or JWT, this pattern holds.
+</Callout>
+
+## Opaque vs JWT: Direct Comparison
+
+| Dimension | Opaque token | JWT (JWS) |
+|-----------|-------------|-----------|
+| What it contains | Nothing (random string) | Claims + signature |
+| Where state lives | Server-side store | In the token |
+| Revocation | Instant (delete the record) | Requires denylist or short `exp` |
+| Validation cost | Store lookup per request | Local signature check (no I/O) |
+| Token size | ~32 bytes | Grows with claims (often 300–1,000+ bytes) |
+| Offline verification | Impossible | Trivial with the public key |
+| Infrastructure | Session store you must run | Key distribution, no store |
+| Leak impact | Kill the session immediately | Valid until `exp` unless denylisted |
+| Symmetric trust | Centralized (must trust one store) | Distributed (trust the signer) |
+
+There is no universally "best" token — the right answer depends on your architecture:
+
+**Choose opaque tokens when:**
+- You need instant revocation and tight session control (logout, device management, account compromise).
+- Your traffic is low-to-moderate and a cache lookup is affordable.
+- You're building an internal/monolith app where all services share one backend.
+- You want the smallest possible attack surface (no token content to leak).
+
+**Choose JWT when:**
+- You have many services / a microservice or edge-gateway architecture that must validate tokens locally without a central round-trip.
+- You're doing heavy stateless scale-out — every request without a store hit matters.
+- You need offline verification (mobile/offline-first, edge caching, service-to-service auth).
+- You accept the discipline that comes with it: short `exp`, tight scopes, and a revocation strategy (short TTLs, refresh-token rotation, or a small denylist).
+
+**Choose JWE when:**
+- The claims themselves are sensitive and must be confidential in transit and at rest in the token.
+- You need an inner signed token protected from inspection (e.g., hiding PII from intermediate proxies).
+
+## The Pragmatic Recommendation
+
+For most real-world systems, the strongest default is a **hybrid**:
+
+1. **Access token: JWT, short-lived (5–30 min), minimal scopes, no sensitive claims.** Distributed services verify it locally and cheaply.
+2. **Refresh token: opaque, long-lived, stored server-side, rotated on every use.** Revocation, logout, and compromise response happen at the refresh-token layer — which is the one place you genuinely need server-side state.
+3. **Add a small denylist only if you need to kill access tokens early** (e.g., password change, account suspension). Keep the list tiny by relying on short TTLs for everything else.
+
+This gives you the stateless performance of JWT where it matters and the revocation superpower of opaque tokens where it matters. OAuth 2.0 / OpenID Connect flows (Authorization Code + PKCE, `aud`/`iss` checks, refresh-token rotation) plug directly into this design.
+
+<Callout variant="note">
+If you need *instant* revocation of the token actually hitting your APIs — think an enterprise admin dashboard that must lock a user out right now — opaque access tokens are the honest answer, and the cache round-trip is the price you pay. There's no free lunch: every token design trades one property for another.
+</Callout>
+
+## Best Practices Checklist
+
+- [ ] Token payload contains no secrets or sensitive PII (or use JWE if it must)
+- [ ] Algorithm pinned server-side; `alg: none` rejected outright
+- [ ] JWT uses `exp` with a tight window; claims include `iss`, `aud`, `sub`, and scopes
+- [ ] Access tokens short-lived; refresh tokens rotated on every use and revocable
+- [ ] Refresh tokens stored securely (server-side or HttpOnly + Secure cookies)
+- [ ] No session state in distributed verification paths unless it's a deliberate denylist
+- [ ] Token size budgeted: keep claims minimal, especially in `Authorization` headers and URLs
+- [ ] TLS everywhere; tokens in cookies are marked `HttpOnly` and `Secure`
+
+## Conclusion
+
+Tokens split into two families — reference (opaque) and value (JWT/JWE) — and the entire decision tree follows from that. Opaque tokens buy you instant revocation at the cost of a server-side store; JWTs buy you stateless, offline-verifiable access at the cost of painful revocation and readable payloads; JWEs add confidentiality for the rare case claims are secrets.
+
+The best approach isn't picking one — it's pairing a **short-lived JWT access token** with a **long-lived, revocable opaque refresh token**, so each token type is used exactly where its strengths are. That hybrid is what the best OAuth/OIDC implementations in production already do, and it's a solid default for almost anything you build next.
+
+## Resources
+
+- [RFC 7519 — JSON Web Token (JWT)](https://datatracker.ietf.org/doc/html/rfc7519)
+- [RFC 7515 — JSON Web Signature (JWS)](https://datatracker.ietf.org/doc/html/rfc7515)
+- [RFC 7516 — JSON Web Encryption (JWE)](https://datatracker.ietf.org/doc/html/rfc7516)
+- [RFC 6749 — The OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)
+- [OAuth 2.0 Security Best Current Practice (RFC 9700)](https://datatracker.ietf.org/doc/html/rfc9700)
+- [jwt.io — JWT debugger and library index](https://jwt.io)
+
+Happy authenticating! 🚀

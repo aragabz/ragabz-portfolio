@@ -17,7 +17,22 @@ interface TimelineProps {
 
 export default function EnhancedTimeline({ experiences }: TimelineProps) {
   const [visibleItems, setVisibleItems] = useState<Set<number>>(new Set());
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(
+    () => new Set()
+  );
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const toggleItem = (index: number) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -56,6 +71,7 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
 
         {experiences.map((exp, index) => {
           const isVisible = visibleItems.has(index);
+          const isExpanded = expandedItems.has(index);
           const achievements = exp.achievements.map(a => typeof a === 'string' ? a : a.text);
 
           return (
@@ -102,7 +118,12 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                 }}
               >
                 {/* Header */}
-                <div className="flex flex-wrap justify-between items-start mb-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleItem(index)}
+                  aria-expanded={isExpanded}
+                  className="flex w-full flex-wrap justify-between items-start mb-2 gap-2 cursor-pointer text-left bg-transparent border-none p-0"
+                >
                   <h3
                     className="text-xl font-semibold"
                     style={{
@@ -125,7 +146,7 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                   >
                     {exp.duration}
                   </span>
-                </div>
+                </button>
 
                 {/* Company */}
                 <p
@@ -140,7 +161,38 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                   {exp.company}
                 </p>
 
+                {/* Expand/Collapse Toggle */}
+                <button
+                  type="button"
+                  onClick={() => toggleItem(index)}
+                  aria-expanded={isExpanded}
+                  className="flex items-center gap-2 mb-4 text-sm font-medium cursor-pointer bg-transparent border-none p-0"
+                  style={{
+                    color: 'var(--color-brand-orange)',
+                    opacity: isVisible ? 1 : 0,
+                    transition: `all 0.5s ease ${index * 0.1 + 0.35}s`,
+                  }}
+                >
+                  <svg
+                    className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  {isExpanded ? 'Hide details' : 'Show details'}
+                </button>
+
                 {/* Achievements with Staggered Animation */}
+                <div
+                  className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                  style={{
+                    gridTemplateRows: isExpanded ? '1fr' : '0fr',
+                  }}
+                >
+                  <div className="overflow-hidden">
                 <ul className="space-y-2">
                   {achievements.map((achievement, achIndex) => (
                     <li
@@ -169,6 +221,8 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                     </li>
                   ))}
                 </ul>
+                  </div>
+                </div>
               </div>
             </div>
           );
