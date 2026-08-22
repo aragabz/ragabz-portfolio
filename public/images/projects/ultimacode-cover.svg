@@ -1,0 +1,135 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>UltimaCode — React Native template</title>
+<desc>Dark, neon-accented cover image for the react-native-template-ultimacode npm package, featuring the template name and its core stack: TypeScript, React Navigation, i18next, MMKV storage, Axios, and Gesture Handler.</desc>
+<defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+    .display { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  </style>
+
+  <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#0A0C14"/>
+    <stop offset="55%" stop-color="#0B0E18"/>
+    <stop offset="100%" stop-color="#07080D"/>
+  </linearGradient>
+
+  <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#A78BFA"/>
+    <stop offset="55%" stop-color="#67E8F9"/>
+    <stop offset="100%" stop-color="#F0ABFC"/>
+  </linearGradient>
+
+  <linearGradient id="phoneEdge" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#A78BFA"/>
+    <stop offset="100%" stop-color="#22D3EE"/>
+  </linearGradient>
+
+  <radialGradient id="glowViolet" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.55"/>
+    <stop offset="100%" stop-color="#7C3AED" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glowCyan" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.45"/>
+    <stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glowPink" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#F472B6" stop-opacity="0.35"/>
+    <stop offset="100%" stop-color="#F472B6" stop-opacity="0"/>
+  </radialGradient>
+
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="30"/>
+  </filter>
+
+  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+    <circle cx="1.2" cy="1.2" r="1.2" fill="#FFFFFF" opacity="0.05"/>
+  </pattern>
+</defs>
+
+<rect width="1200" height="630" fill="url(#bgGrad)"/>
+<rect width="1200" height="630" fill="url(#dots)"/>
+
+<circle cx="140" cy="80" r="260" fill="url(#glowViolet)" filter="url(#soft)"/>
+<circle cx="960" cy="560" r="280" fill="url(#glowCyan)" filter="url(#soft)"/>
+<circle cx="1040" cy="120" r="180" fill="url(#glowPink)" filter="url(#soft)"/>
+
+<rect x="0.5" y="0.5" width="1199" height="629" fill="none" stroke="#1B2030" stroke-width="1"/>
+
+<rect x="80" y="90" width="330" height="30" rx="15" fill="#12141F" stroke="#2A2F45" stroke-width="1"/>
+<circle cx="98" cy="105" r="4" fill="#22D3EE"/>
+<text x="112" y="110" class="mono" font-size="13" letter-spacing="1.5" fill="#67E8F9">OPEN-SOURCE RN TEMPLATE</text>
+
+<text x="78" y="255" class="display" font-size="96" font-weight="700" fill="url(#titleGrad)">UltimaCode</text>
+
+<text x="80" y="300" class="display" font-size="21" font-weight="500" fill="#AAB2C8">
+  <tspan x="80" dy="0">Production-ready React Native starter — navigation,</tspan>
+  <tspan x="80" dy="30">i18n, and native storage wired up from the first commit.</tspan>
+</text>
+
+<g class="mono" font-size="15" font-weight="500">
+  <rect x="80" y="358" width="118" height="42" rx="21" fill="#12141F" stroke="#8B5CF6" stroke-width="1.2"/>
+  <text x="139" y="384" text-anchor="middle" fill="#C4B5FD">TypeScript</text>
+
+  <rect x="214" y="358" width="198" height="42" rx="21" fill="#12141F" stroke="#22D3EE" stroke-width="1.2"/>
+  <text x="313" y="384" text-anchor="middle" fill="#67E8F9">React Navigation</text>
+
+  <rect x="428" y="358" width="112" height="42" rx="21" fill="#12141F" stroke="#F472B6" stroke-width="1.2"/>
+  <text x="484" y="384" text-anchor="middle" fill="#F9A8D4">i18next</text>
+
+  <rect x="80" y="414" width="168" height="42" rx="21" fill="#12141F" stroke="#8B5CF6" stroke-width="1.2"/>
+  <text x="164" y="440" text-anchor="middle" fill="#C4B5FD">MMKV storage</text>
+
+  <rect x="264" y="414" width="98" height="42" rx="21" fill="#12141F" stroke="#22D3EE" stroke-width="1.2"/>
+  <text x="313" y="440" text-anchor="middle" fill="#67E8F9">Axios</text>
+
+  <rect x="378" y="414" width="200" height="42" rx="21" fill="#12141F" stroke="#F472B6" stroke-width="1.2"/>
+  <text x="478" y="440" text-anchor="middle" fill="#F9A8D4">Gesture Handler</text>
+</g>
+
+<rect x="80" y="486" width="486" height="46" rx="10" fill="#0D0F19" stroke="#2A2F45" stroke-width="1"/>
+<circle cx="102" cy="509" r="4" fill="#34D399"/>
+<text x="118" y="514" class="mono" font-size="15" fill="#D1D5E0">npx react-native init MyApp --template ultimacode</text>
+
+<text x="80" y="575" class="mono" font-size="14" fill="#5B637A">npmjs.com/package/react-native-template-ultimacode</text>
+
+<g transform="translate(900,320)">
+  <ellipse cx="0" cy="0" rx="230" ry="230" fill="none" stroke="#3B2E6B" stroke-width="1" stroke-dasharray="2 8" opacity="0.7"/>
+  <circle cx="0" cy="-230" r="5" fill="#8B5CF6"/>
+  <circle cx="199" cy="115" r="5" fill="#22D3EE"/>
+  <circle cx="-199" cy="115" r="5" fill="#F472B6"/>
+
+  <rect x="-118" y="-235" width="236" height="470" rx="42" fill="#0A0C14" stroke="url(#phoneEdge)" stroke-width="3"/>
+  <rect x="-102" y="-213" width="204" height="426" rx="26" fill="#0E1018"/>
+
+  <rect x="-38" y="-233" width="76" height="20" rx="10" fill="#0A0C14"/>
+
+  <text x="-84" y="-178" class="mono" font-size="11" fill="#5B637A">9:41</text>
+  <circle cx="72" cy="-183" r="3" fill="#34D399"/>
+
+  <text x="-84" y="-138" class="display" font-size="19" font-weight="700" fill="#F5F7FA">Home</text>
+  <circle cx="76" cy="-142" r="12" fill="#171A28" stroke="#2A2F45" stroke-width="1"/>
+
+  <g>
+    <rect x="-84" y="-108" width="168" height="66" rx="14" fill="#141726" stroke="#242A3D" stroke-width="1"/>
+    <rect x="-70" y="-92" width="70" height="10" rx="5" fill="#3A3F55"/>
+    <rect x="-70" y="-72" width="110" height="8" rx="4" fill="#262B3C"/>
+
+    <rect x="-84" y="-30" width="168" height="66" rx="14" fill="#141726" stroke="#242A3D" stroke-width="1"/>
+    <rect x="-70" y="-14" width="70" height="10" rx="5" fill="#3A3F55"/>
+    <rect x="-70" y="6" width="90" height="8" rx="4" fill="#262B3C"/>
+
+    <rect x="-84" y="48" width="168" height="66" rx="14" fill="#141726" stroke="#242A3D" stroke-width="1"/>
+    <rect x="-70" y="64" width="70" height="10" rx="5" fill="#3A3F55"/>
+    <rect x="-70" y="84" width="100" height="8" rx="4" fill="#262B3C"/>
+  </g>
+
+  <rect x="-102" y="150" width="204" height="63" rx="0" fill="#0E1018" stroke="#1E2233" stroke-width="1"/>
+  <circle cx="-56" cy="181" r="5" fill="#22D3EE"/>
+  <rect x="-64" y="192" width="16" height="3" rx="1.5" fill="#22D3EE"/>
+  <circle cx="0" cy="181" r="5" fill="#3A3F55"/>
+  <rect x="-8" y="192" width="16" height="3" rx="1.5" fill="#3A3F55"/>
+  <circle cx="56" cy="181" r="5" fill="#3A3F55"/>
+  <rect x="48" y="192" width="16" height="3" rx="1.5" fill="#3A3F55"/>
+</g>
+</svg>

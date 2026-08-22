@@ -1,0 +1,468 @@
+---
+title: "TypeScript Best Practices & Patterns — Part 4: Strict Mode, Utility Types & Architecture"
+date: 2026-08-25
+excerpt: "Master the patterns that separate good TypeScript from great. Strict mode configuration, essential utility types, branded types for domain modeling, and architectural patterns that scale."
+tags: ["TypeScript", "Best Practices", "Strict Mode", "Utility Types", "Architecture", "Patterns"]
+readingTime: 18
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+<Callout variant="tip" title="Series Overview">
+This is Part 4 of a 5-part TypeScript series:
+1. **Fundamentals** — types, interfaces, inference
+2. **Advanced Types** — generics, conditional types, mapped types
+3. **TypeScript with React/React Native** — components, hooks, patterns
+4. **Best Practices & Patterns** (this post) — strict mode, utility types, architecture
+5. **TypeScript in Real Projects** — config, tooling, migration
+</Callout>
+
+---
+
+## Strict Mode — The Single Biggest Quality Boost
+
+Enable `"strict": true` in `tsconfig.json`. It enables all of these:
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    // Equivalent to enabling all of these individually:
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "useUnknownInCatchVariables": true
+  }
+}
+```
+
+### What Each Does
+
+| Flag | Catches |
+|------|---------|
+| `noImplicitAny` | Variables without explicit types where TS can't infer |
+| `strictNullChecks` | `null`/`undefined` not handled in unions |
+| `strictFunctionTypes` | Contravariant function parameter checking |
+| `strictPropertyInitialization` | Class properties not initialized in constructor |
+| `noImplicitThis` | `this` with implicit `any` type |
+| `useUnknownInCatchVariables` | Catch clause variables typed as `unknown` |
+
+<Callout variant="warning">
+**Never disable `strictNullChecks`**. It's the most valuable check — it forces you to handle `null`/`undefined` explicitly, eliminating a huge class of runtime errors.
+</Callout>
+
+---
+
+## Additional Recommended Flags
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,     // obj[key] returns T | undefined
+    "exactOptionalPropertyTypes": true,   // ?prop: T means prop: T | undefined, not T | undefined | missing
+    "noImplicitReturns": true,            // Functions must return on all paths
+    "noFallthroughCasesInSwitch": true,   // Switch cases must break/return
+    "noUnusedLocals": true,               // Unused local variables
+    "noUnusedParameters": true,           // Unused function parameters
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+---
+
+## Essential Utility Types
+
+### `Pick<T, K>` — Select Keys
+
+```ts
+interface User { id: string; name: string; email: string; password: string; }
+
+type PublicUser = Pick<User, "id" | "name" | "email">;
+// { id: string; name: string; email: string }
+```
+
+### `Omit<T, K>` — Remove Keys
+
+```ts
+type SafeUser = Omit<User, "password">;
+// { id: string; name: string; email: string }
+```
+
+### `Partial<T>` / `Required<T>` — Optionality
+
+```ts
+type OptionalUser = Partial<User>;  // All optional
+type RequiredUser = Required<OptionalUser>; // All required (inverse)
+```
+
+### `Readonly<T>` — Immutability
+
+```ts
+const user: Readonly<User> = { id: "1", name: "A", email: "a@b.com", password: "x" };
+// user.name = "B"; // Error: Cannot assign to 'name' because it is read-only
+
+// Deep readonly (custom)
+type DeepReadonly<T> = {
+  readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K];
+};
+```
+
+### `Record<K, T>` — Object Maps
+
+```ts
+type UserRole = "admin" | "user" | "guest";
+type Permissions = Record<UserRole, string[]>;
+// { admin: string[]; user: string[]; guest: string[] }
+
+// Also great for lookup tables
+const roleLabels: Record<UserRole, string> = {
+  admin: "Administrator",
+  user: "User",
+  guest: "Guest",
+};
+```
+
+### `Parameters<T>` / `ReturnType<T>` — Function Inspection
+
+```ts
+function fetchUser(id: string, options?: { signal?: AbortSignal }): Promise<User> { /* ... */ }
+
+type FetchUserParams = Parameters<typeof fetchUser>; // [string, { signal?: AbortSignal }?]
+type FetchUserReturn = ReturnType<typeof fetchUser>; // Promise<User>
+
+// Extract first parameter
+type FirstArg<T> = T extends (arg: infer U, ...args: any[]) => any ? U : never;
+type UserId = FirstArg<typeof fetchUser>; // string
+```
+
+### `ConstructorParameters<T>` / `InstanceType<T>` — Class Inspection
+
+```ts
+class ApiClient {
+  constructor(baseUrl: string, timeout: number = 5000) {}
+}
+
+type ClientParams = ConstructorParameters<typeof ApiClient>; // [string, number?]
+type ClientInstance = InstanceType<typeof ApiClient>; // ApiClient
+```
+
+### `NonNullable<T>` / `Awaited<T>` — Unwrapping
+
+```ts
+type MaybeUser = User | null | undefined;
+type DefiniteUser = NonNullable<MaybeUser>; // User
+
+type UserPromise = Promise<User>;
+type ResolvedUser = Awaited<UserPromise>; // User
+```
+
+---
+
+## Branded Types — Domain Modeling
+
+Prevent mixing up structurally identical types:
+
+```ts
+// Branding pattern
+type Brand<T, B> = T & { __brand: B };
+
+type UserId = Brand<string, "UserId">;
+type PostId = Brand<string, "PostId">;
+type Email = Brand<string, "Email">;
+
+// Factory functions to create branded values
+function createUserId(id: string): UserId {
+  return id as UserId;
+}
+function createEmail(email: string): Email {
+  if (!email.includes("@")) throw new Error("Invalid email");
+  return email as Email;
+}
+
+// Usage
+const userId = createUserId("123");
+const postId = createPostId("456");
+// const mixed: UserId = postId; // Error: PostId not assignable to UserId
+
+function getUser(id: UserId) { /* ... */ }
+getUser(userId);    // OK
+// getUser(postId); // Error!
+// getUser("123");  // Error: string not assignable to UserId
+```
+
+<Callout variant="info">
+**When to use branded types**: IDs, emails, currencies, measurements — any primitive that has domain meaning and shouldn't be mixed.
+</Callout>
+
+---
+
+## Discriminated Unions — Modeling State Machines
+
+```ts
+// API response states
+type ApiState<T> =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: T }
+  | { status: "error"; error: Error; retry: () => void };
+
+function handleState<T>(state: ApiState<T>) {
+  switch (state.status) {
+    case "idle":
+      return "Ready to fetch";
+    case "loading":
+      return "Loading...";
+    case "success":
+      return `Got ${JSON.stringify(state.data)}`;
+    case "error":
+      return `Error: ${state.error.message} [Retry]`;
+  }
+}
+
+// Exhaustiveness checking
+function exhaustiveCheck(state: never): never {
+  throw new Error(`Unhandled state: ${state}`);
+}
+
+function handleStateExhaustive<T>(state: ApiState<T>) {
+  switch (state.status) {
+    case "idle": return "Ready";
+    case "loading": return "Loading";
+    case "success": return "Done";
+    case "error": return "Error";
+    default: return exhaustiveCheck(state); // Error if new status added
+  }
+}
+```
+
+---
+
+## Type Guards — Runtime Type Narrowing
+
+```ts
+// User-defined type guard
+function isUser(obj: any): obj is User {
+  return obj && typeof obj.id === "string" && typeof obj.name === "string";
+}
+
+// Inline type guard
+function process(value: string | number | User) {
+  if (typeof value === "string") {
+    return value.toUpperCase();
+  }
+  if (typeof value === "number") {
+    return value.toFixed(2);
+  }
+  // value is User here
+  return value.name;
+}
+
+// Array narrowing
+function filterUsers(items: (User | string)[]): User[] {
+  return items.filter(isUser); // TypeScript knows result is User[]
+}
+```
+
+---
+
+## Architectural Patterns
+
+### Repository Pattern with Generics
+
+```tsx
+interface Repository<T, ID> {
+  findById(id: ID): Promise<T | null>;
+  findAll(): Promise<T[]>;
+  create(entity: T): Promise<T>;
+  update(id: ID, entity: Partial<T>): Promise<T>;
+  delete(id: ID): Promise<void>;
+}
+
+// Implementation for any entity
+class HttpRepository<T, ID> implements Repository<T, ID> {
+  constructor(
+    private baseUrl: string,
+    private idKey: keyof T
+  ) {}
+
+  async findById(id: ID): Promise<T | null> {
+    const res = await fetch(`${this.baseUrl}/${id}`);
+    return res.ok ? res.json() : null;
+  }
+  // ... other methods
+}
+
+// Usage
+const userRepo = new HttpRepository<User, UserId>("/api/users", "id");
+const user = await userRepo.findById(createUserId("123"));
+```
+
+### Factory Pattern with Type Safety
+
+```tsx
+interface Notification {
+  send(to: string, message: string): Promise<void>;
+}
+
+class EmailNotification implements Notification { /* ... */ }
+class PushNotification implements Notification { /* ... */ }
+class SMSNotification implements Notification { /* ... */ }
+
+type NotificationType = "email" | "push" | "sms";
+
+const factories: Record<NotificationType, () => Notification> = {
+  email: () => new EmailNotification(),
+  push: () => new PushNotification(),
+  sms: () => new SMSNotification(),
+};
+
+function createNotification(type: NotificationType): Notification {
+  return factories[type]();
+}
+
+// Fully typed!
+const notifier = createNotification("email");
+await notifier.send("user@example.com", "Hello!");
+```
+
+### Builder Pattern for Complex Objects
+
+```tsx
+class UserBuilder {
+  private data: Partial<User> = {};
+
+  withId(id: UserId): this {
+    this.data.id = id;
+    return this;
+  }
+  withName(name: string): this {
+    this.data.name = name;
+    return this;
+  }
+  withEmail(email: Email): this {
+    this.data.email = email;
+    return this;
+  }
+  build(): User {
+    if (!this.data.id || !this.data.name || !this.data.email) {
+      throw new Error("Missing required fields");
+    }
+    return this.data as User;
+  }
+}
+
+// Usage
+const user = new UserBuilder()
+  .withId(createUserId("123"))
+  .withName("Ahmed")
+  .withEmail(createEmail("ahmed@example.com"))
+  .build();
+```
+
+---
+
+## Anti-Patterns to Avoid
+
+| Anti-Pattern | Problem | Better Approach |
+|--------------|---------|-----------------|
+| `any` everywhere | Loses all type safety | Use `unknown`, generics, or proper types |
+| `// @ts-ignore` | Hides real errors | Fix the underlying type issue |
+| `as SomeType` assertions | Bypasses checks | Narrow with guards, refine types |
+| Giant interfaces | Hard to maintain, extend | Split into smaller, composable types |
+| `typeof` on values | Confuses value/type space | Use `type T = typeof value` only when needed |
+| Optional chaining everywhere | Hides missing data | Use `NonNullable`, required props, validation |
+| Mutating `readonly` via `as` | Defeats immutability | Use proper immutable patterns |
+
+---
+
+## Code Organization
+
+### Barrel Exports
+
+```ts
+// types/index.ts
+export type { User, UserId, Email } from "./user";
+export type { Post, PostId } from "./post";
+export type { ApiState, ApiError } from "./api";
+
+// Usage
+import type { User, UserId, ApiState } from "@/types";
+```
+
+### Type-Only Imports/Exports
+
+```ts
+// TypeScript 3.8+ / ES2022
+import type { User } from "./user";     // Only imported for type checking
+export type { User };                    // Only exported for type checking
+
+// At runtime, these are erased completely
+```
+
+---
+
+## Linting with ESLint + TypeScript
+
+```json
+// .eslintrc.js
+{
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json",
+    "tsconfigRootDir": __dirname
+  },
+  "plugins": ["@typescript-eslint"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/prefer-nullish-coalescing": "error",
+    "@typescript-eslint/prefer-optional-chain": "error"
+  }
+}
+```
+
+---
+
+## Key Takeaways
+
+| Practice | Why It Matters |
+|----------|----------------|
+| `"strict": true` | Catches entire classes of bugs at compile time |
+| `noUncheckedIndexedAccess` | Prevents `undefined` surprises on `obj[key]` |
+| Utility types (`Pick`, `Omit`, `Partial`) | DRY type definitions |
+| Branded types | Prevents ID/email/currency mixups |
+| Discriminated unions | Models state machines exhaustively |
+| Type guards | Runtime narrowing with compile-time safety |
+| Repository/Factory/Builder | Scalable architecture with type safety |
+| `type` imports/exports | Zero-runtime-cost type sharing |
+
+---
+
+## What's Next?
+
+In **Part 5**, we'll cover **TypeScript in Real Projects**:
+- `tsconfig.json` deep dive (project references, composite builds)
+- Build tooling (Vite, esbuild, swc, tsc)
+- Migration strategies for existing JavaScript codebases
+- Monorepo setup with TypeScript project references
+- CI/CD integration and type checking in pipelines
+
+<Callout variant="tip">
+Run `npx tsc --noEmit` in your project regularly — it's the fastest way to catch type errors without a full build.
+</Callout>
+
+---
+
+*Continue to [Part 5: TypeScript in Real Projects](/blog/typescript-real-projects) →*

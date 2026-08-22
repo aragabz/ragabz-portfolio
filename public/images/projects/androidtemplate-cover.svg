@@ -1,0 +1,127 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Android Template — Jetpack Compose starter</title>
+<desc>Dark cover image with green accents for the aragabz/androidtemplate GitHub repository, a Jetpack Compose Android template. Shows the template name, its core stack (Kotlin, Jetpack Compose, multi-module Gradle, Detekt, ktlint, Baseline Profiles, Fastlane) and a layered diagram of the app/feature/core module architecture.</desc>
+<defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+    .display { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  </style>
+
+  <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#081210"/>
+    <stop offset="55%" stop-color="#0A1614"/>
+    <stop offset="100%" stop-color="#050A09"/>
+  </linearGradient>
+
+  <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#5EEAB0"/>
+    <stop offset="55%" stop-color="#3DDC84"/>
+    <stop offset="100%" stop-color="#9FF0C8"/>
+  </linearGradient>
+
+  <linearGradient id="blockEdgeApp" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#9FF0C8"/>
+    <stop offset="100%" stop-color="#3DDC84"/>
+  </linearGradient>
+  <linearGradient id="blockEdgeFeature" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#3DDC84"/>
+    <stop offset="100%" stop-color="#1FAE68"/>
+  </linearGradient>
+  <linearGradient id="blockEdgeCore" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#1FAE68"/>
+    <stop offset="100%" stop-color="#0E7A4C"/>
+  </linearGradient>
+
+  <radialGradient id="glowGreen" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#22C589" stop-opacity="0.5"/>
+    <stop offset="100%" stop-color="#22C589" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glowMint" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#5EEAB0" stop-opacity="0.35"/>
+    <stop offset="100%" stop-color="#5EEAB0" stop-opacity="0"/>
+  </radialGradient>
+
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="30"/>
+  </filter>
+
+  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+    <circle cx="1.2" cy="1.2" r="1.2" fill="#FFFFFF" opacity="0.05"/>
+  </pattern>
+</defs>
+
+<rect width="1200" height="630" fill="url(#bgGrad)"/>
+<rect width="1200" height="630" fill="url(#dots)"/>
+
+<circle cx="120" cy="70" r="260" fill="url(#glowGreen)" filter="url(#soft)"/>
+<circle cx="1000" cy="560" r="300" fill="url(#glowMint)" filter="url(#soft)"/>
+
+<rect x="0.5" y="0.5" width="1199" height="629" fill="none" stroke="#12241E" stroke-width="1"/>
+
+<rect x="80" y="90" width="290" height="30" rx="15" fill="#0D1A16" stroke="#1E3A2E" stroke-width="1"/>
+<circle cx="98" cy="105" r="4" fill="#3DDC84"/>
+<text x="112" y="110" class="mono" font-size="13" letter-spacing="1.5" fill="#7FE7B2">JETPACK COMPOSE TEMPLATE</text>
+
+<text x="76" y="210" class="display" font-size="86" font-weight="700" fill="url(#titleGrad)">Android</text>
+<text x="76" y="292" class="display" font-size="86" font-weight="700" fill="url(#titleGrad)">Template</text>
+
+<text x="80" y="330" class="display" font-size="19" font-weight="500" fill="#9BB0A9">
+  <tspan x="80" dy="0">A multi-module Gradle starter that gets a new</tspan>
+  <tspan x="80" dy="26">Compose app from clone to running in minutes.</tspan>
+</text>
+
+<g class="mono" font-size="15" font-weight="500">
+  <rect x="80" y="396" width="90" height="42" rx="21" fill="#0D1A16" stroke="#3DDC84" stroke-width="1.2"/>
+  <text x="125" y="422" text-anchor="middle" fill="#8FE9BC">Kotlin</text>
+
+  <rect x="186" y="396" width="196" height="42" rx="21" fill="#0D1A16" stroke="#5EEAB0" stroke-width="1.2"/>
+  <text x="284" y="422" text-anchor="middle" fill="#B7F5D6">Jetpack Compose</text>
+
+  <rect x="398" y="396" width="164" height="42" rx="21" fill="#0D1A16" stroke="#1FAE68" stroke-width="1.2"/>
+  <text x="480" y="422" text-anchor="middle" fill="#7FE7B2">Multi-module</text>
+
+  <rect x="80" y="452" width="176" height="42" rx="21" fill="#0D1A16" stroke="#3DDC84" stroke-width="1.2"/>
+  <text x="168" y="478" text-anchor="middle" fill="#8FE9BC">Detekt + ktlint</text>
+
+  <rect x="272" y="452" width="184" height="42" rx="21" fill="#0D1A16" stroke="#5EEAB0" stroke-width="1.2"/>
+  <text x="364" y="478" text-anchor="middle" fill="#B7F5D6">Baseline Profiles</text>
+
+  <rect x="472" y="452" width="118" height="42" rx="21" fill="#0D1A16" stroke="#1FAE68" stroke-width="1.2"/>
+  <text x="531" y="478" text-anchor="middle" fill="#7FE7B2">Fastlane</text>
+</g>
+
+<rect x="80" y="522" width="470" height="46" rx="10" fill="#081310" stroke="#1E3A2E" stroke-width="1"/>
+<circle cx="102" cy="545" r="4" fill="#3DDC84"/>
+<text x="118" y="550" class="mono" font-size="15" fill="#C9E9D9">git clone github.com/aragabz/androidtemplate</text>
+
+<text x="80" y="600" class="mono" font-size="14" fill="#4E695E">github.com/aragabz/androidtemplate</text>
+
+<g transform="translate(915,360)">
+  <g transform="translate(-40,110)">
+    <rect x="-150" y="-30" width="300" height="60" rx="12" fill="#081310" stroke="url(#blockEdgeCore)" stroke-width="2.5"/>
+    <text x="0" y="7" text-anchor="middle" class="mono" font-size="16" font-weight="500" fill="#7FE7B2">core</text>
+  </g>
+
+  <line x1="0" y1="80" x2="0" y2="18" stroke="#1E3A2E" stroke-width="1.5"/>
+
+  <g transform="translate(-20,0)">
+    <rect x="-165" y="-32" width="330" height="64" rx="12" fill="#0A1815" stroke="url(#blockEdgeFeature)" stroke-width="2.5"/>
+    <text x="0" y="7" text-anchor="middle" class="mono" font-size="16" font-weight="500" fill="#8FE9BC">feature</text>
+  </g>
+
+  <line x1="20" y1="-32" x2="20" y2="-92" stroke="#1E3A2E" stroke-width="1.5"/>
+
+  <g transform="translate(0,-110)">
+    <rect x="-180" y="-34" width="360" height="68" rx="12" fill="#0D1E19" stroke="url(#blockEdgeApp)" stroke-width="3"/>
+    <text x="0" y="7" text-anchor="middle" class="mono" font-size="17" font-weight="600" fill="#B7F5D6">app</text>
+  </g>
+
+  <circle cx="-180" cy="-110" r="4" fill="#9FF0C8"/>
+  <circle cx="180" cy="-110" r="4" fill="#9FF0C8"/>
+  <circle cx="-165" cy="0" r="4" fill="#3DDC84"/>
+  <circle cx="165" cy="0" r="4" fill="#3DDC84"/>
+  <circle cx="-150" cy="110" r="4" fill="#1FAE68"/>
+  <circle cx="150" cy="110" r="4" fill="#1FAE68"/>
+</g>
+</svg>

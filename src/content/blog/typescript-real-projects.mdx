@@ -1,0 +1,614 @@
+---
+title: "TypeScript in Real Projects — Part 5: Config, Tooling & Migration"
+date: 2026-08-26
+excerpt: "Put TypeScript to work in production. Deep dive into tsconfig.json, build tooling (Vite/esbuild/swc), migration strategies for existing JS codebases, monorepo setup, and CI/CD integration."
+tags: ["TypeScript", "Configuration", "Build Tools", "Migration", "Monorepo", "CI/CD"]
+readingTime: 20
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+<Callout variant="tip" title="Series Overview">
+This is Part 5 of a 5-part TypeScript series:
+1. **Fundamentals** — types, interfaces, inference
+2. **Advanced Types** — generics, conditional types, mapped types
+3. **TypeScript with React/React Native** — components, hooks, patterns
+4. **Best Practices & Patterns** — strict mode, utility types, architecture
+5. **TypeScript in Real Projects** (this post) — config, tooling, migration
+</Callout>
+
+---
+
+## tsconfig.json — The Control Center
+
+### Minimal Production Config
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@utils/*": ["src/utils/*"]
+    },
+    
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*", "types/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+}
+```
+
+### Key Options Explained
+
+| Option | Purpose |
+|--------|---------|
+| `target` | Output JS version — `ES2022` for modern browsers/Node 18+ |
+| `moduleResolution: "bundler"` | Matches Vite/webpack/Rspack resolution logic |
+| `jsx: "react-jsx"` | New JSX transform (no `import React` needed) |
+| `isolatedModules` | Required for esbuild/swc — each file compiles independently |
+| `declaration` | Generates `.d.ts` files for library consumers |
+| `paths` | Path aliases — must match bundler config |
+
+---
+
+## Project References — Monorepo Superpower
+
+Split large codebases into independently buildable subprojects:
+
+```
+my-monorepo/
+├── tsconfig.base.json          # Shared config
+├── packages/
+│   ├── ui/
+│   │   ├── tsconfig.json       # extends ../../tsconfig.base.json
+│   │   └── src/index.ts
+│   ├── core/
+│   │   ├── tsconfig.json
+│   │   └── src/index.ts
+│   └── app/
+│       ├── tsconfig.json
+│       └── src/main.ts
+└── apps/
+    └── mobile/
+        ├── tsconfig.json
+        └── src/App.tsx
+```
+
+### Base Config
+
+```json
+// tsconfig.base.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "declaration": true,
+    "composite": true,           // Required for references
+    "declarationMap": true,
+    "sourceMap": true
+  }
+}
+```
+
+### Package Config
+
+```json
+// packages/ui/tsconfig.json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/ui",
+    "rootDir": "src",
+    "jsx": "react-jsx"
+  },
+  "references": [
+    { "path": "../core" }        // Depends on core
+  ],
+  "include": ["src/**/*"]
+}
+```
+
+### Build with Project References
+
+```bash
+# Build all in dependency order
+npx tsc --build
+
+# Or with turbo/nx for parallel builds
+npx turbo run build
+```
+
+<Callout variant="info">
+**Benefits**: Only rebuilds changed packages, parallelizable, catches circular dependencies, enables incremental compilation.
+</Callout>
+
+---
+
+## Build Tooling — Choose Your Speed
+
+### Vite (Recommended for Apps)
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    target: "es2022",
+    sourcemap: true,
+  },
+});
+```
+
+**Type checking**: Vite doesn't type-check by default. Run separately:
+
+```json
+// package.json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  }
+}
+```
+
+### esbuild (Fastest — No Type Checking)
+
+```bash
+# Compile only (strips types, no checking)
+npx esbuild src/main.ts --bundle --outfile=dist/main.js --platform=node --target=node18
+```
+
+Use with `tsc --noEmit` for type checking in CI.
+
+### swc (Rust-based, Fast, with TypeScript)
+
+```bash
+# .swcrc
+{
+  "jsc": {
+    "parser": { "syntax": "typescript", "tsx": true },
+    "transform": { "react": { "runtime": "automatic" } },
+    "target": "es2022"
+  },
+  "module": { "type": "es6" }
+}
+```
+
+### tsc (Official — Full Checking)
+
+```bash
+# Type check only (no emit)
+npx tsc --noEmit
+
+# Full build
+npx tsc
+
+# Watch mode
+npx tsc --watch
+```
+
+### Comparison
+
+| Tool | Speed | Type Checking | Best For |
+|------|-------|---------------|----------|
+| `tsc` | Slow | ✅ Full | Libraries, CI |
+| `esbuild` | Fastest | ❌ None | Apps, dev builds |
+| `swc` | Very Fast | ❌ None | Apps, Next.js, Vite |
+| `Vite + tsc` | Fast dev | ✅ Separate | Apps (recommended) |
+
+---
+
+## Migration Strategies — JS → TypeScript
+
+### Phase 1: Setup Without Breaking
+
+```bash
+# 1. Add TypeScript
+npm install -D typescript @types/node @types/react @types/react-dom
+
+# 2. Create tsconfig.json with relaxed settings
+# target: "ES2020", allowJs: true, strict: false
+```
+
+### Phase 2: Rename Files Incrementally
+
+```bash
+# Rename one file at a time
+mv src/utils/api.js src/utils/api.ts
+
+# Fix errors in that file only
+# Commit, test, repeat
+```
+
+### Phase 3: Enable Strict Gradually
+
+```json
+// tsconfig.json — enable one at a time
+{
+  "compilerOptions": {
+    "strict": false,
+    "noImplicitAny": true,           // 1. First
+    "strictNullChecks": true,        // 2. Then
+    "strictFunctionTypes": true,     // 3. Then
+    "strictBindCallApply": true,     // 4. Then
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true
+  }
+}
+```
+
+### Phase 4: Add Types to Dependencies
+
+```bash
+# For untyped packages
+npm install -D @types/lodash @types/express @types/jest
+
+// For packages without types, create declarations.d.ts
+declare module "untyped-package" {
+  export function doThing(options: { foo: string }): Promise<string>;
+}
+```
+
+### Phase 5: Migrate Config Files
+
+```ts
+// vite.config.js → vite.config.ts
+import { defineConfig } from "vite";
+export default defineConfig({ /* ... */ });
+
+// jest.config.js → jest.config.ts
+export default { /* ... */ };
+
+// .eslintrc.js → eslint.config.ts (flat config)
+export default [ /* ... */ ];
+```
+
+---
+
+## Type Checking in CI/CD
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/typecheck.yml
+name: Type Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+```
+
+### With Build Matrix
+
+```yaml
+jobs:
+  typecheck:
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+```
+
+### Pre-commit Hooks (Husky)
+
+```bash
+npx husky-init && npm install
+npx husky add .husky/pre-commit "npx tsc --noEmit"
+```
+
+---
+
+## Library Publishing — Dual Package Support
+
+### package.json
+
+```json
+{
+  "name": "@myorg/ui",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.cjs.json",
+    "prepack": "npm run build"
+  }
+}
+```
+
+### Dual Build Configs
+
+```json
+// tsconfig.json (ESM)
+{
+  "compilerOptions": { "module": "ESNext", "outDir": "dist" }
+}
+
+// tsconfig.cjs.json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "module": "CommonJS", "outDir": "dist" }
+}
+```
+
+---
+
+## Monorepo Tools Comparison
+
+| Tool | TypeScript Support | Best For |
+|------|-------------------|----------|
+| **Turborepo** | Excellent (caching, parallel) | Most projects |
+| **Nx** | Excellent (affected graphs, generators) | Large enterprises |
+| **pnpm workspaces** | Good (native) | Simple setups |
+| **Yarn workspaces** | Good | Yarn users |
+
+### Turborepo Pipeline
+
+```json
+// turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": [],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"]
+    },
+    "lint": {}
+  }
+}
+```
+
+---
+
+## IDE Setup — VS Code
+
+### settings.json
+
+```json
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.quoteStyle": "single"
+}
+```
+
+### Recommended Extensions
+
+- TypeScript Hero (organize imports, missing imports)
+- Error Lens (inline errors)
+- TypeScript God (navigation, refactoring)
+
+---
+
+## Performance Tips
+
+### Speed Up Type Checking
+
+```json
+{
+  "compilerOptions": {
+    "skipLibCheck": true,           // Skip .d.ts checking
+    "incremental": true,            // Cache .tsbuildinfo
+    "tsBuildInfoFile": ".tsbuildinfo"
+  }
+}
+```
+
+### Incremental Builds
+
+```bash
+# Uses .tsbuildinfo cache
+npx tsc --incremental
+
+# For project references
+npx tsc --build --incremental
+```
+
+### Skip Type Checking in Dev
+
+```json
+// vite.config.ts
+export default defineConfig({
+  plugins: [react()],
+  // Only transpile, don't type-check in dev
+  esbuild: { logOverride: { "this-is-undefined-in-esm": "silent" } },
+});
+```
+
+Run `tsc --noEmit` separately (in terminal or CI).
+
+---
+
+## Debugging Types
+
+### TypeScript Playground
+
+Visit [typescriptlang.org/play](https://typescriptlang.org/play) — test types instantly.
+
+### VS Code Hover + Go to Definition
+
+- Hover any symbol → see inferred type
+- `F12` / `Cmd+Click` → jump to definition
+- `Ctrl+Shift+P` → "TypeScript: Restart TS Server" if stuck
+
+### Declaration Files Inspection
+
+```bash
+# View generated .d.ts
+cat dist/index.d.ts
+
+# Or in VS Code: Ctrl+Click import → opens .d.ts
+```
+
+### `tsc --traceResolution`
+
+```bash
+# Debug module resolution
+npx tsc --traceResolution 2>&1 | grep "my-module"
+```
+
+---
+
+## Common Production Issues
+
+### "Cannot find module" with Path Aliases
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  }
+}
+
+// vite.config.ts / webpack.config.js / jest.config.ts
+// MUST have matching alias config!
+```
+
+### Types Work in IDE But Fail in CI
+
+- Different TypeScript versions → lock `typescript` in `package.json`
+- Missing `@types/*` packages → install in CI
+- `skipLibCheck` differences → align config
+
+### Circular Dependencies
+
+```bash
+# Detect with madge
+npx madge --circular --extensions ts src/
+```
+
+Fix: Extract shared types to separate package, use interfaces, or lazy imports.
+
+---
+
+## Key Takeaways
+
+| Area | Recommendation |
+|------|----------------|
+| **Config** | Start with strict template, add project references for monorepos |
+| **Build** | Vite + `tsc --noEmit` for apps; `tsc` for libraries |
+| **Migration** | Incremental: rename → fix → strict flags → config files |
+| **CI** | `tsc --noEmit` on every PR; pre-commit hooks for fast feedback |
+| **Monorepo** | Turborepo + project references = fast, correct builds |
+| **Publishing** | Dual ESM/CJS with proper `exports` map |
+| **Performance** | `skipLibCheck`, `incremental`, separate type-check from dev build |
+
+---
+
+## Series Complete! 🎉
+
+You've now covered the full TypeScript spectrum:
+
+1. **Fundamentals** — Types, interfaces, inference
+2. **Advanced Types** — Generics, conditionals, mapped types
+3. **React/React Native** — Components, hooks, forms, navigation
+4. **Best Practices** — Strict mode, utilities, branded types, patterns
+5. **Real Projects** — Config, tooling, migration, monorepos, CI/CD
+
+<Callout variant="tip" title="Next Steps">
+- Pick a real project and enable `"strict": true`
+- Set up `tsc --noEmit` in your CI pipeline
+- Try project references in a monorepo
+- Contribute types to DefinitelyTyped for a library you use
+- Explore `tsc --traceResolution` when debugging imports
+</Callout>
+
+---
+
+## Resources
+
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
+- [TSConfig Reference](https://www.typescriptlang.org/tsconfig)
+- [TypeScript Deep Dive](https://basarat.gitbook.io/typescript/)
+- [Effective TypeScript](https://effectivetypescript.com/) (book by Dan Vanderkam)
+- [Matt Pocock's TypeScript Tutorials](https://www.totaltypescript.com/)
+
+---
+
+*Thanks for following the series! Questions? [Open an issue](https://github.com/aragabz/portfolio/issues) or connect on [GitHub](https://github.com/aragabz).*

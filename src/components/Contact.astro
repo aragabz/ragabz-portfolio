@@ -19,8 +19,6 @@ const socialLinks = [
   },
 ];
 
-// Get Formspree ID from environment variable
-const formspreeId = import.meta.env.PUBLIC_FORMSPREE_ID;
 ---
 
 <section id="contact" class="py-section px-6">
@@ -33,7 +31,7 @@ const formspreeId = import.meta.env.PUBLIC_FORMSPREE_ID;
     </div>
     
     <div class="fade-in fade-in-delay-1">
-      <ContactForm formspreeId={formspreeId} client:visible />
+      <ContactForm client:visible />
     </div>
     
     <!-- Social Links -->

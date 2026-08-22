@@ -1,0 +1,393 @@
+---
+title: "Advanced TypeScript Types — Part 2: Generics, Conditionals & Mapped Types"
+date: 2026-08-23
+excerpt: "Level up your TypeScript with generics for reusable code, conditional types for type-level logic, and mapped types for transforming shapes. The tools that make TS feel like a programming language."
+tags: ["TypeScript", "Advanced Types", "Generics", "Conditional Types", "Mapped Types"]
+readingTime: 20
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+<Callout variant="tip" title="Series Overview">
+This is Part 2 of a 5-part TypeScript series:
+1. **Fundamentals** — types, interfaces, inference
+2. **Advanced Types** (this post) — generics, conditional types, mapped types
+3. **TypeScript with React/React Native** — components, hooks, patterns
+4. **Best Practices & Patterns** — strict mode, utility types, architecture
+5. **TypeScript in Real Projects** — config, tooling, migration
+</Callout>
+
+---
+
+## Generics — Write Once, Type Safely Everywhere
+
+Generics let you write code that works with *any* type while preserving type information. Think of them as "type parameters."
+
+### Basic Generic Functions
+
+```ts
+// Without generics — lose type info
+function firstElement(arr: any[]): any {
+  return arr[0];
+}
+const n = firstElement([1, 2, 3]); // n is any 😞
+
+// With generics — preserve type info
+function firstElement<T>(arr: T[]): T | undefined {
+  return arr[0];
+}
+const n = firstElement([1, 2, 3]);     // n is number ✅
+const s = firstElement(["a", "b"]);    // s is string ✅
+const u = firstElement([]);            // u is undefined ✅
+```
+
+**Read `<T>` as "for some type T provided by the caller."**
+
+### Multiple Type Parameters
+
+```ts
+function pair<T, U>(first: T, second: U): [T, U] {
+  return [first, second];
+}
+
+const p1 = pair("hello", 42);      // [string, number]
+const p2 = pair(true, { x: 1 });   // [boolean, { x: number }]
+```
+
+### Generic Constraints — Require Certain Properties
+
+```ts
+interface HasLength {
+  length: number;
+}
+
+// T must have a length property
+function logLength<T extends HasLength>(value: T): void {
+  console.log(value.length);
+}
+
+logLength("hello");        // OK: string has length
+logLength([1, 2, 3]);      // OK: array has length
+logLength({ length: 10 }); // OK: object has length
+// logLength(42);          // Error: number has no length
+```
+
+### Default Type Parameters
+
+```ts
+// Default to string if not specified
+function createContainer<T = string>(value: T) {
+  return { value, createdAt: new Date() };
+}
+
+const c1 = createContainer("hello");   // T = string
+const c2 = createContainer(42);        // T = number
+const c3 = createContainer();          // T = string (default)
+```
+
+---
+
+## Generic Interfaces and Types
+
+```ts
+// Generic interface
+interface ApiResponse<T> {
+  data: T;
+  status: number;
+  error?: string;
+}
+
+// Usage
+type UserResponse = ApiResponse<{ name: string; email: string }>;
+type PostsResponse = ApiResponse<Array<{ title: string }>>;
+
+// Generic type alias
+type Result<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; error: E };
+
+function fetchUser(id: string): Promise<Result<User>> {
+  // ...
+}
+```
+
+---
+
+## Conditional Types — Type-Level If/Else
+
+Conditional types let you express "if type A extends type B, then X else Y":
+
+```ts
+// Basic syntax: T extends U ? X : Y
+type IsString<T> = T extends string ? true : false;
+
+type A = IsString<string>;  // true
+type B = IsString<number>;  // false
+type C = IsString<string | number>; // true | false (distributed!)
+```
+
+### Distribution Over Unions
+
+**Key behavior**: When a conditional type's checked type is a union, it **distributes** over each member:
+
+```ts
+type ToArray<T> = T extends any ? T[] : never;
+
+type StringOrNumberArray = ToArray<string | number>;
+// string[] | number[]  (NOT (string | number)[])
+```
+
+<Callout variant="info">
+This distribution is why conditional types are powerful for transforming union members individually.
+</Callout>
+
+### Practical Example: NonNullable
+
+```ts
+// Remove null/undefined from a type
+type NonNullable<T> = T extends null | undefined ? never : T;
+
+type T1 = NonNullable<string | null | undefined>; // string
+type T2 = NonNullable<number[]>;                  // number[] (unchanged)
+```
+
+---
+
+## Infer — Extract Types from Patterns
+
+The `infer` keyword lets you "capture" a type from within a conditional:
+
+```ts
+// Extract the return type of a function
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+
+function greet() { return "hello"; }
+type GreetReturn = ReturnType<typeof greet>; // string
+
+// Extract array element type
+type ElementType<T> = T extends (infer U)[] ? U : never;
+
+type StringArrayElement = ElementType<string[]>; // string
+type NumberArrayElement = ElementType<number[]>; // number
+
+// Extract promise resolution type
+type Awaited<T> = T extends Promise<infer U> ? U : T;
+
+type UserPromise = Promise<{ name: string }>;
+type User = Awaited<UserPromise>; // { name: string }
+```
+
+---
+
+## Mapped Types — Transform Object Shapes
+
+Mapped types iterate over keys of a type to create a new type:
+
+```ts
+// Basic syntax: { [K in keyof T]: NewType }
+type MakeOptional<T> = {
+  [K in keyof T]?: T[K];
+};
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+type PartialUser = MakeOptional<User>;
+// { id?: string; name?: string; email?: string; }
+```
+
+### Built-in Mapped Types
+
+TypeScript provides several utility types:
+
+```ts
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string; // sensitive!
+}
+
+// Partial — all properties optional
+type PartialUser = Partial<User>;
+
+// Required — all properties required (opposite of Partial)
+type RequiredUser = Required<PartialUser>;
+
+// Pick — select specific keys
+type PublicUser = Pick<User, "id" | "name" | "email">;
+// { id: string; name: string; email: string }
+
+// Omit — remove specific keys
+type SafeUser = Omit<User, "password">;
+// { id: string; name: string; email: string }
+
+// Record — create object type with specific keys and value type
+type UserRoles = Record<"admin" | "user" | "guest", string[]>;
+// { admin: string[]; user: string[]; guest: string[] }
+
+// Exclude/Extract — filter union types
+type NoPassword = Exclude<keyof User, "password">; // "id" | "name" | "email"
+type OnlyId = Extract<keyof User, "id">;           // "id"
+```
+
+---
+
+## Template Literal Types — String Manipulation at Type Level
+
+```ts
+// Create event names automatically
+type EventName<T extends string> = `on${Capitalize<T>}`;
+
+type ClickEvent = EventName<"click">;     // "onClick"
+type HoverEvent = EventName<"hover">;     // "onHover"
+
+// Combine with unions
+type Actions = "create" | "read" | "update" | "delete";
+type ActionEvents = EventName<Actions>;
+// "onCreate" | "onRead" | "onUpdate" | "onDelete"
+
+// CSS-in-JS style props
+type CSSProperties = {
+  [K in `margin${"" | "Top" | "Right" | "Bottom" | "Left"}`]?: string | number;
+};
+// margin | marginTop | marginRight | marginBottom | marginLeft
+```
+
+---
+
+## Advanced Generics Patterns
+
+### Generic Constraints with Multiple Bounds
+
+```ts
+function merge<T extends object, U extends object>(obj1: T, obj2: U): T & U {
+  return { ...obj1, ...obj2 };
+}
+
+const merged = merge({ a: 1 }, { b: "hello" }); // { a: number; b: string }
+```
+
+### Generic Classes
+
+```ts
+class DataStore<T> {
+  private items: T[] = [];
+  
+  add(item: T): void {
+    this.items.push(item);
+  }
+  
+  getAll(): T[] {
+    return [...this.items];
+  }
+  
+  find(predicate: (item: T) => boolean): T | undefined {
+    return this.items.find(predicate);
+  }
+}
+
+const userStore = new DataStore<{ id: string; name: string }>();
+userStore.add({ id: "1", name: "Ahmed" });
+```
+
+### Generic Factory Functions
+
+```ts
+function createStateManager<T>(initial: T) {
+  let state = initial;
+  
+  return {
+    getState: () => state,
+    setState: (newState: T | ((prev: T) => T)) => {
+      state = typeof newState === "function" 
+        ? (newState as (prev: T) => T)(state) 
+        : newState;
+    }
+  };
+}
+
+const counter = createStateManager(0);
+counter.setState(c => c + 1);
+console.log(counter.getState()); // 1
+```
+
+---
+
+## Real-World Pattern: Type-Safe Event Emitter
+
+```ts
+type EventMap = {
+  login: { user: User };
+  logout: void;
+  error: { message: string; code: number };
+};
+
+type EventListener<T> = (payload: T) => void;
+
+class EventEmitter<E extends Record<string, any>> {
+  private listeners: { [K in keyof E]?: EventListener<E[K]>[] } = {};
+  
+  on<K extends keyof E>(event: K, listener: EventListener<E[K]>): void {
+    (this.listeners[event] ??= []).push(listener);
+  }
+  
+  emit<K extends keyof E>(event: K, payload: E[K]): void {
+    this.listeners[event]?.forEach(l => l(payload));
+  }
+}
+
+const events = new EventEmitter<EventMap>();
+
+events.on("login", ({ user }) => console.log(user.name));    // ✅ typed
+events.on("error", ({ message, code }) => console.error(code, message)); // ✅ typed
+// events.on("login", ({ code }) => {});                     // ❌ code doesn't exist on login
+
+events.emit("login", { user: { id: "1", name: "Ahmed", email: "a@b.com" } });
+```
+
+---
+
+## Key Takeaways
+
+| Feature | Purpose | Example |
+|---------|---------|---------|
+| **Generics** | Reusable, type-safe code | `function first<T>(arr: T[]): T` |
+| **Constraints** | Require specific properties | `<T extends HasLength>` |
+| **Conditional Types** | Type-level logic | `T extends string ? true : false` |
+| **`infer`** | Extract types from patterns | `T extends Promise<infer U> ? U : never` |
+| **Mapped Types** | Transform object shapes | `{ [K in keyof T]?: T[K] }` |
+| **Template Literals** | String manipulation | `` `type Event = \`on\${Capitalize<T>}\`` `` |
+| **Utility Types** | Common transformations | `Partial`, `Pick`, `Omit`, `Record` |
+
+---
+
+## Practice Exercises
+
+1. **Implement `DeepPartial<T>`** — makes all properties (including nested) optional
+2. **Create `AsyncState<T>`** — a union type for loading/success/error states
+3. **Build a type-safe `useLocalStorage` hook** (for Part 3) with generic value type
+4. **Write `TupleToUnion<T>`** — converts `[string, number]` to `string | number`
+
+---
+
+## What's Next?
+
+In **Part 3**, we'll apply these advanced types to **React/React Native**:
+- Typing component props with generics
+- Custom hooks with proper inference
+- Context and state management patterns
+- Form handling with type-safe validation
+- Navigation types for React Navigation / Expo Router
+
+<Callout variant="tip">
+Open `node_modules/typescript/lib/lib.es5.d.ts` and search for `type Partial` — you'll see the actual TypeScript source for built-in utilities. Great way to learn patterns!
+</Callout>
+
+---
+
+*Continue to [Part 3: TypeScript with React/React Native](/blog/typescript-react) →*

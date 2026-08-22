@@ -10,5 +10,5 @@ tech:
 live: "https://www.npmjs.com/package/react-native-template-ultimacode"
 category: "Open Source"
 featured: true
-image: "/images/projects/ui-library.jpg"
+image: "/images/projects/ultimacode-cover.svg"
 order: 1

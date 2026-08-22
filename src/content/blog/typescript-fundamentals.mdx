@@ -1,0 +1,409 @@
+---
+title: "TypeScript Fundamentals — Part 1: Types, Interfaces & Inference"
+date: 2026-08-22
+excerpt: "Start your TypeScript journey with a solid foundation. Learn how types work, when to use interfaces vs types, and how TypeScript's powerful inference system saves you from writing annotations everywhere."
+tags: ["TypeScript", "JavaScript", "Type System", "Programming Fundamentals"]
+readingTime: 15
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+TypeScript isn't just "JavaScript with types" — it's a **type system** that runs at compile time and disappears at runtime. Understanding how it thinks is the key to writing code that's both safe and readable.
+
+<Callout variant="tip" title="Series Overview">
+This is Part 1 of a 5-part TypeScript series:
+1. **Fundamentals** (this post) — types, interfaces, inference
+2. **Advanced Types** — generics, conditional types, mapped types
+3. **TypeScript with React/React Native** — components, hooks, patterns
+4. **Best Practices & Patterns** — strict mode, utility types, architecture
+5. **TypeScript in Real Projects** — config, tooling, migration
+</Callout>
+
+---
+
+## Why TypeScript?
+
+JavaScript is dynamically typed — variables can hold anything, and the interpreter figures it out at runtime. That flexibility speeds up prototyping but causes bugs that only appear in production:
+
+```js
+// JavaScript — crashes at runtime
+const user = { name: "Ahmed", age: 30 };
+console.log(user.nmae); // undefined — typo goes unnoticed
+user.age.toFixed(2);    // TypeError: age.toFixed is not a function (if age was a string)
+```
+
+TypeScript catches these at **compile time**:
+
+```ts
+// TypeScript — error before you run
+const user = { name: "Ahmed", age: 30 };
+console.log(user.nmae);     // Error: Property 'nmae' does not exist
+user.age.toFixed(2);        // OK: age is number
+user.name.toFixed(2);       // Error: Property 'toFixed' does not exist on type 'string'
+```
+
+---
+
+## The Type System Basics
+
+### Primitive Types
+
+```ts
+let isActive: boolean = true;
+let count: number = 42;
+let name: string = "TypeScript";
+let nothing: null = null;
+let notDefined: undefined = undefined;
+// symbol, bigint also exist
+```
+
+### Arrays and Tuples
+
+```ts
+// Array of strings — two equivalent syntaxes
+let tags: string[] = ["typescript", "react"];
+let scores: Array<number> = [100, 95, 98];
+
+// Tuple — fixed length, known types at each position
+let userInfo: [string, number, boolean] = ["Ahmed", 30, true];
+// userInfo[0] is string, userInfo[1] is number, etc.
+```
+
+### Objects — Type vs Interface
+
+This is the first decision point for many developers:
+
+```ts
+// type alias
+type User = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+// interface
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+```
+
+**Which to use?** For object shapes, **prefer `interface`**:
+
+| Feature | `interface` | `type` |
+|---------|-------------|--------|
+| Extending | `extends` keyword | `&` intersection |
+| Declaration merging | ✅ Yes | ❌ No |
+| Union types | ❌ No | ✅ Yes |
+| Primitive aliases | ❌ No | ✅ Yes |
+| Tuple types | ❌ No | ✅ Yes |
+
+```ts
+// Interface — great for extensible object shapes
+interface Animal {
+  name: string;
+}
+interface Dog extends Animal {
+  breed: string;
+}
+
+// Type — required for unions, primitives, tuples
+type Status = "loading" | "success" | "error";
+type UserId = string & { readonly brand: unique symbol }; // branded type
+type Coordinates = [number, number];
+```
+
+<Callout variant="info">
+**Rule of thumb**: Use `interface` for object types that might be extended. Use `type` for everything else (unions, primitives, tuples, complex mapped types).
+</Callout>
+
+---
+
+## Type Inference — TypeScript's Superpower
+
+You don't need to annotate everything. TypeScript infers types from context:
+
+```ts
+// No annotations needed — TS knows these types
+const message = "Hello";        // string
+const count = 42;               // number
+const flags = [true, false];    // boolean[]
+const user = { name: "A", age: 30 }; // { name: string; age: number }
+
+// Function return types inferred
+function add(a: number, b: number) {
+  return a + b;  // inferred as number
+}
+
+// Arrow functions too
+const multiply = (x: number, y: number) => x * y; // number
+```
+
+### When You *Do* Need Annotations
+
+1. **Function parameters** (except in callbacks with contextual typing)
+2. **Recursive functions**
+3. **Complex object literals** where inference might be too broad
+4. **Public API boundaries** (library exports)
+
+```ts
+// ❌ Unnecessary — inferred
+const name: string = "Ahmed";
+
+// ✅ Required — parameter types
+function greet(name: string): string {
+  return `Hello, ${name}`;
+}
+
+// ✅ Required — recursive function return type
+function factorial(n: number): number {
+  return n <= 1 ? 1 : n * factorial(n - 1);
+}
+
+// ✅ Helpful — explicit object shape for documentation
+interface Config {
+  apiUrl: string;
+  timeout: number;
+  retries: number;
+}
+const config: Config = { apiUrl: "/api", timeout: 5000, retries: 3 };
+```
+
+---
+
+## Functions — The Heart of TypeScript
+
+### Parameter Types
+
+```ts
+// Required parameters
+function greet(name: string, age: number): string {
+  return `${name} is ${age}`;
+}
+
+// Optional parameters (must come last)
+function greet(name: string, age?: number): string {
+  return age ? `${name} is ${age}` : `Hello ${name}`;
+}
+
+// Default parameters (also optional)
+function greet(name: string, greeting = "Hello"): string {
+  return `${greeting}, ${name}`;
+}
+
+// Rest parameters
+function sum(...numbers: number[]): number {
+  return numbers.reduce((a, b) => a + b, 0);
+}
+```
+
+### Function Types as Variables
+
+```ts
+// Function type expression
+type MathOp = (a: number, b: number) => number;
+
+const add: MathOp = (a, b) => a + b;
+const subtract: MathOp = (a, b) => a - b;
+
+// Call signatures (for objects that are also callable)
+interface Calculator {
+  (a: number, b: number): number;
+  version: string;
+}
+
+const calc: Calculator = Object.assign(
+  (a: number, b: number) => a + b,
+  { version: "1.0" }
+);
+```
+
+---
+
+## Union and Intersection Types
+
+### Unions — "One of These"
+
+```ts
+type Status = "idle" | "loading" | "success" | "error";
+
+function handleStatus(status: Status) {
+  switch (status) {
+    case "idle": return "Waiting...";
+    case "loading": return "Loading...";
+    case "success": return "Done!";
+    case "error": return "Failed!";
+  }
+}
+
+// Narrowing with typeof
+function process(input: string | number) {
+  if (typeof input === "string") {
+    return input.toUpperCase(); // TS knows it's string here
+  }
+  return input.toFixed(2);      // TS knows it's number here
+}
+```
+
+### Intersections — "All of These"
+
+```ts
+interface HasName { name: string; }
+interface HasAge { age: number; }
+
+// Person has BOTH name AND age
+type Person = HasName & HasAge;
+
+const user: Person = { name: "Ahmed", age: 30 }; // Must have both
+```
+
+---
+
+## Narrowing — Proving Types at Runtime
+
+TypeScript follows your runtime checks to narrow types:
+
+```ts
+function format(value: string | number | Date) {
+  // typeof narrowing
+  if (typeof value === "string") {
+    return value.toUpperCase();
+  }
+  if (typeof value === "number") {
+    return value.toLocaleString();
+  }
+  // instanceof narrowing
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  // Exhaustiveness check — never type
+  const exhaustive: never = value;
+  return exhaustive;
+}
+```
+
+### The `never` Type
+
+`never` represents "this code should never run". Use it for exhaustive matching:
+
+```ts
+type Shape = { kind: "circle"; radius: number } | { kind: "square"; side: number };
+
+function area(shape: Shape): number {
+  switch (shape.kind) {
+    case "circle": return Math.PI * shape.radius ** 2;
+    case "square": return shape.side ** 2;
+    default:
+      // If you add a new shape but forget a case, TS errors here
+      const _exhaustive: never = shape;
+      return _exhaustive;
+  }
+}
+```
+
+---
+
+## Literal Types
+
+Specific values as types — great for state machines and configs:
+
+```ts
+type Direction = "north" | "south" | "east" | "west";
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+type DiceRoll = 1 | 2 | 3 | 4 | 5 | 6;
+
+function move(dir: Direction) { /* ... */ }
+move("north"); // OK
+move("up");    // Error: not assignable
+```
+
+---
+
+## Type Assertions — "Trust Me, I Know Better"
+
+Sometimes you know more than TypeScript. Use sparingly:
+
+```ts
+// Angle bracket syntax (JSX conflicts in .tsx)
+const length = (<string>someValue).length;
+
+// as syntax (preferred in .tsx)
+const length = (someValue as string).length;
+
+// Non-null assertion — "this isn't null/undefined"
+const element = document.getElementById("my-input")!;
+element.value = "Hello"; // TS trusts it exists
+```
+
+<Callout variant="warning">
+**Avoid assertions when possible**. They tell TS to stop checking. Prefer narrowing, guards, or better types.
+</Callout>
+
+---
+
+## Practical Example: Typed API Response
+
+```ts
+// Define the shape once
+interface ApiResponse<T> {
+  data: T;
+  meta: {
+    timestamp: string;
+    requestId: string;
+  };
+  success: boolean;
+}
+
+// Use with different payloads
+type User = { id: string; name: string; email: string };
+type Post = { id: string; title: string; content: string };
+
+async function fetchUser(id: string): Promise<ApiResponse<User>> {
+  const res = await fetch(`/api/users/${id}`);
+  return res.json(); // TS validates the response shape
+}
+
+async function fetchPosts(): Promise<ApiResponse<Post[]>> {
+  const res = await fetch("/api/posts");
+  return res.json();
+}
+```
+
+---
+
+## Key Takeaways
+
+| Concept | When to Use |
+|---------|-------------|
+| `interface` | Object shapes that extend |
+| `type` | Unions, primitives, tuples, complex types |
+| Inference | Everywhere possible — let TS do the work |
+| Explicit annotations | Function params, public APIs, recursive functions |
+| Unions | "One of" scenarios — status, variants, options |
+| Intersections | Combining multiple object shapes |
+| Narrowing | Runtime checks that prove types |
+| `never` | Exhaustiveness checking in switches |
+| Literals | Exact values — directions, HTTP methods, config keys |
+
+---
+
+## What's Next?
+
+In **Part 2**, we'll dive into **Advanced Types**:
+- **Generics** — reusable, type-safe components and functions
+- **Conditional Types** — type-level if/else
+- **Mapped Types** — transforming object shapes
+- **Template Literal Types** — string manipulation at the type level
+- **Utility Types** — `Pick`, `Omit`, `Partial`, `Record`, and more
+
+These are the tools that make TypeScript feel like a programming language *within* your type system.
+
+<Callout variant="tip">
+Try converting a small JavaScript file to TypeScript. Add `// @ts-check` at the top of a `.js` file in VS Code to get TypeScript checking without a full migration.
+</Callout>
+
+---
+
+*Questions or suggestions for the series? [Open an issue](https://github.com/aragabz/portfolio/issues) or reach out on [GitHub](https://github.com/aragabz).*
