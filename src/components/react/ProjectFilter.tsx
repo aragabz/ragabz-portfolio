@@ -20,6 +20,8 @@ interface Props {
 
 export default function ProjectFilter({ projects }: Props) {
   const [activeFilter, setActiveFilter] = useState<string>('All');
+  const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+  const withBase = (path: string) => (path.startsWith('/') ? `${base}${path.slice(1)}` : path);
   
   const categories = ['All', 'Frontend', 'Backend', 'Full-Stack', 'Open Source'];
   
@@ -70,7 +72,7 @@ export default function ProjectFilter({ projects }: Props) {
               style={{ backgroundColor: 'var(--color-brand-gray-light)' }}
             >
               <img
-                src={project.data.image}
+                src={withBase(project.data.image)}
                 alt={project.data.title}
                 className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                 loading="lazy"

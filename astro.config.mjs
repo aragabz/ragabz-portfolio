@@ -35,7 +35,7 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: '/favicon.svg',
+            src: `${base}/favicon.svg`,
             sizes: '512x512',
             type: 'image/svg+xml',
             purpose: 'any maskable',
