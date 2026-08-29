@@ -141,7 +141,7 @@ export default function BlogFilter({ posts, base }: BlogFilterProps) {
       {/* Blog Cards Grid */}
       {filteredPosts.length > 0 ? (
         <>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 gap-8">
             {paginatedPosts.map((post) => (
               <article
                 key={post.id}
