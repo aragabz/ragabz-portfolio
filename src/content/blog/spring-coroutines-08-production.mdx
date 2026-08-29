@@ -1,0 +1,167 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #8 — The Production Checklist"
+date: 2026-12-26
+excerpt: "Series finale: observability that survives thread hops, MVC vs WebFlux vs virtual threads, dispatcher and pool tuning, graceful shutdown, and a complete go-live checklist for coroutine services."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Production", "Observability"]
+readingTime: 14
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Seven posts of building — endpoints, fan-outs, transactions, streams, tests, defenses. This finale covers what separates a demo from a service: **seeing inside it in production**, choosing the right runtime model deliberately, and shutting down without dropping requests.
+
+<Callout variant="tip" title="Series recap">
+1. [Why coroutines](/blog/spring-coroutines-01-getting-started) · 2. [Suspend internals](/blog/spring-coroutines-02-suspend-internals) · 3. [Parallel calls](/blog/spring-coroutines-03-parallel-calls) · 4. [Transactions & context](/blog/spring-coroutines-04-transactions) · 5. [Flow streaming](/blog/spring-coroutines-05-flow-streaming) · 6. [Testing](/blog/spring-coroutines-06-testing) · 7. [Resilience](/blog/spring-coroutines-07-resilience) · **8. Production** ← you are here
+</Callout>
+
+## Observability Across Thread Hops
+
+Thread-per-request debugging assumed "one thread = one request." Coroutines broke that contract ([post #2](/blog/spring-coroutines-02-suspend-internals)) — so your tooling must follow *context*, not threads.
+
+### Logging: MDC everywhere
+
+Wire `MDCContext()` ([post #4](/blog/spring-coroutines-04-transactions)) into every launch point so `requestId` survives suspension:
+
+```kotlin
+// One place to rule them all — a scope factory bean:
+@Singleton
+class AppScope : CoroutineScope by CoroutineScope(
+    SupervisorJob() +
+    Dispatchers.Default +
+    CoroutineName("app") +
+    MDCContext()          // snapshot at launch time
+)
+```
+
+Better still, set the request ID where the request enters and rely on the bridge thereafter:
+
+```kotlin
+@Component
+class RequestIdFilter : OncePerRequestFilter() {
+    override fun doFilterInternal(req: HttpServletRequest, res: HttpServletResponse, chain: FilterChain) {
+        val requestId = req.getHeader("X-Request-ID") ?: UUID.randomUUID().toString()
+        MDC.put("requestId", requestId)
+        res.setHeader("X-Request-ID", requestId)
+        try { chain.doFilter(req, res) } finally { MDC.remove("requestId") }
+    }
+}
+```
+
+### Metrics: timers understand suspension
+
+Micrometer's timer records *elapsed wall time* including suspended waits — exactly what an SLA cares about:
+
+```kotlin
+suspend fun quote(symbol: String): Quote =
+    meterRegistry.timer("pricing.quote", "symbol", symbol).recordCallable {
+        pricingGateway.quote(symbol)
+    }!!
+```
+
+Watch three metrics above all others:
+
+| Metric | Coroutine-specific meaning |
+|--------|---------------------------|
+| `executor.queued` / custom semaphore wait times | Backpressure building ([post #7](/blog/spring-coroutines-07-resilience)) |
+| HTTP server latency p99 | End-user reality |
+| Downstream call durations per dependency | Where budgets go |
+
+### Tracing
+
+OpenTelemetry/Micrometer Tracing propagates trace context through Reactor's context, which `kotlinx-coroutines-reactor` bridges into `coroutineContext` automatically — spans continue correctly across hops *if* you go through bridged clients. Hand-rolled HTTP calls must forward the trace headers explicitly.
+
+## Choosing Your Runtime Model
+
+Three viable stacks now exist on the JVM. Choose with eyes open:
+
+| | MVC + coroutines | WebFlux + coroutines | MVC + virtual threads |
+|--|------------------|----------------------|------------------------|
+| Mental model | Sequential suspend code | Event loops + suspend | Plain blocking code, cheap threads |
+| JDK requirement | Any | Any | JDK 21+ (`spring.threads.virtual.enabled=true`) |
+| Blocking libraries | Wrap in `Dispatchers.IO` | Must isolate or rewrite | Just call them |
+| Streaming/SSE scale | Good | Best | Good |
+| Ecosystem fit | Existing Spring Data JPA world | R2DBC/reactive clients | Legacy-friendly |
+| Debugging | Familiar-ish | New skills needed | Most familiar |
+
+Honest guidance:
+
+- **Greenfield, streaming-heavy, team invested in reactive data** → WebFlux + coroutines
+- **Typical business services with JPA** → MVC + coroutines (this series' stack), wrapping blocking edges
+- **JDK 21+ shop wanting minimal change** → virtual threads solve thread starvation too — but without cancellation propagation, structured fan-out, or Flow. They're complementary, not competing: coroutines remain better for orchestration patterns like [post #3](/blog/spring-coroutines-03-parallel-calls)
+
+## Tuning Dispatchers and Pools
+
+Defaults are sane; know when they're not:
+
+1. **`Dispatchers.Default`** = CPU cores. Don't run blocking work here — that's what IO is for.
+2. **`Dispatchers.IO`** allows 64 blocked threads. If your JDBC pool is 20 connections, blocking beyond pool capacity just queues anyway — size bulkheads to match real downstream limits.
+3. **Connection pools ≤ downstream capacity**: a 50-connection Hikari pool against a database accepting 25 concurrent queries builds queueing invisibly. Set pool max to what the dependency can actually serve, and let coroutines queue *before* touching it.
+4. **Named coroutines**: add `CoroutineName("pricing-fanout")` — it shows up in profilers and makes flame graphs meaningful.
+
+```yaml
+# Example alignment
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 25   # matches what the DB truly serves
+resilience4j.bulkhead.instances.db-max-concurrent: 25
+```
+
+## Graceful Shutdown
+
+Coroutines make shutdown semantics explicit: cancel the application scope, await completion, then stop taking traffic. If you expose long-lived streams or background workers, give them one owned `ApplicationCoroutineScope`:
+
+```kotlin
+@Component
+class ApplicationCoroutineScope : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default), DisposableBean {
+
+    override fun destroy() {
+        // cancels all app-level coroutines; in-flight work observes CancellationException
+        cancel()
+        // optionally: runBlocking { correlationJob.join() } for drain windows
+    }
+}
+```
+
+Combine with container-level settings (connection drain, readiness probes flipping first) — the full playbook lives in my [graceful shutdown guide](/blog/graceful-shutdown-microservices); the coroutine addition is simply: *everything cancellable hangs off one scope you control*.
+
+## The Go-Live Checklist
+
+Print this. Tape it somewhere.
+
+**Code**
+- ✅ Every remote call wrapped in a timeout budget ([#7](/blog/spring-coroutines-07-resilience))
+- ✅ Blocking dependencies quarantined behind `Dispatchers.IO` adapters ([#2](/blog/spring-coroutines-02-suspend-internals))
+- ✅ No suspension points inside platform-transaction boundaries ([#4](/blog/spring-coroutines-04-transactions))
+- ✅ Fan-outs capped with semaphores; optional branches degrade via fallbacks ([#3](/blog/spring-coroutines-03-parallel-calls))
+- ✅ Retries idempotent-only, jittered, low-attempt ([#7](/blog/spring-coroutines-07-resilience))
+- ✅ Streams use buffer/conflate deliberately; client disconnects tested ([#5](/blog/spring-coroutines-05-flow-streaming))
+
+**Tests**
+- ✅ Unit coverage via `runTest` virtual time; integration via `runBlocking` + Testcontainers ([#6](/blog/spring-coroutines-06-testing))
+- ✅ Failure-path tests: sibling cancellation, breaker trips, backpressure queueing
+
+**Operations**
+- ✅ MDC/tracing verified across suspension points in real logs
+- ✅ Pool sizes aligned with downstream truth; bulkhead metrics exported
+- ✅ Async request timeouts configured (`spring.mvc.async.request-timeout`)
+- ✅ Shutdown drain validated under load
+
+## Where to Go From Here
+
+You've completed the arc from [why coroutines](/blog/spring-coroutines-01-getting-started) to running them in production. Natural next steps:
+
+- **Kafka/Rabbit listeners** as coroutine consumers — same context-propagation rules apply
+- **Ktor** if you want the framework built coroutine-first from day one
+- **Kotlin Multiplatform**: share these service patterns client-side with KMP
+- Deepen the language foundation anytime with [Zero to Hero](/blog/kotlin-series-01-getting-started) and the [version evolution series](/blog/kotlin-versions-k2-era)
+
+Build something that suspends gracefully. 🚀
+
+## Resources
+
+- [Spring Framework docs — Kotlin coroutines support](https://docs.spring.io/spring-framework/reference/languages/kotlin/coroutines.html)
+- [kotlinx.coroutines guide](https://kotlinlang.org/docs/coroutines-guide.html)
+- [Resilience4j documentation](https://resilience4j.readme.io)
+- [Virtual Threads and Spring Boot](https://spring.io/blog/2024/10/21/embracing-virtual-threads-spring-boot-3-2)

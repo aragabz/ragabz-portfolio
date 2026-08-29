@@ -1,7 +1,5 @@
 ---
 // Hero Section Component
-import TechStackMarquee from './react/TechStackMarquee';
-import { defaultTechStack } from './react/TechStackMarquee';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 ---
@@ -50,15 +48,5 @@ const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL :
         </svg>
       </a>
     </div>
-  </div>
-  
-  <!-- Tech Stack Marquee -->
-  <div class="w-full max-w-7xl mx-auto fade-in fade-in-delay-4">
-    <TechStackMarquee 
-      items={defaultTechStack} 
-      speed={50}
-      pauseOnHover={true}
-      client:visible
-    />
   </div>
 </section>

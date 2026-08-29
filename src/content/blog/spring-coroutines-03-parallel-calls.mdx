@@ -1,0 +1,214 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #3 — Parallel Service Calls Without the Callback Soup"
+date: 2026-11-21
+excerpt: "Turn request waterfalls into fan-outs: async/await with structured concurrency, what happens when one branch fails, limiting concurrency with Semaphore, and composing timeouts — all with readable sequential code."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Concurrency"]
+readingTime: 13
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+This is where coroutines pay their rent. [Post #1](/blog/spring-coroutines-01-getting-started) ended with a dashboard taking the **sum** of three downstream latencies (600ms). Today we make it take roughly the **max** (~250ms) — while keeping code that reads top-to-bottom and fails safely.
+
+<Callout variant="tip" title="What you'll learn">
+- `async`/`await` fan-out inside `coroutineScope`
+- Failure semantics: why one failed branch cancels its siblings (and when that's good)
+- `supervisorScope` for independent widgets that degrade gracefully
+- Capping concurrency with `Semaphore` so fan-out doesn't nuke your dependencies
+</Callout>
+
+## The Waterfall
+
+```kotlin
+suspend fun getDashboard(userId: Long): Dashboard {
+    val user = userClient.get(userId)             // ~150ms
+    val orders = orderClient.recent(userId)       // ~200ms
+    val recommendations = recClient.forUser(userId) // ~250ms
+    return Dashboard(user, orders, recommendations)
+}
+// Total: ~600ms
+```
+
+The three calls are independent — they only *read* `userId`. Waiting for them sequentially is pure waste.
+
+## Fan-Out With `async`
+
+```kotlin
+suspend fun getDashboard(userId: Long): Dashboard = coroutineScope {
+    val user = async { userClient.get(userId) }
+    val orders = async { orderClient.recent(userId) }
+    val recommendations = async { recClient.forUser(userId) }
+
+    Dashboard(
+        user = user.await(),
+        orders = orders.await(),
+        recommendations = recommendations.await(),
+    )
+}
+// Total: ~max(150, 200, 250) ≈ 250–300ms
+```
+
+Anatomy:
+
+1. `coroutineScope { }` creates a child scope bound to the caller's lifetime
+2. Each `async` starts its branch **immediately**, concurrently
+3. `await()` collects results — by which time most have already finished
+4. Latency drops from sum → max
+
+Reads like sequential code because it is structured: launch all, then join all.
+
+## Why `coroutineScope` Is Not Optional
+
+What if you skipped it and used a broader scope? Consider:
+
+```kotlin
+// ❌ WRONG — do not do this
+suspend fun getDashboard(userId: Long): Dashboard {
+    val scope = CoroutineScope(Dispatchers.IO)
+    val user = scope.async { userClient.get(userId) }   // fire and forget!
+    ...
+}
+```
+
+Problems:
+
+- The function returns before branches complete — `await()` on a leaked scope races the response
+- If the HTTP request is cancelled (client disconnected), branches keep running as zombies
+- A failed branch throws into nowhere; nobody's there to handle it
+
+Structured concurrency ([Kotlin series #7](/blog/kotlin-series-07-coroutines)) exists precisely to prevent this. Inside `coroutineScope`:
+
+- **Parent waits for all children** — no orphans, ever
+- **Cancellation propagates down** — client disconnects cancel in-flight downstream calls automatically, freeing connections
+- **Failure propagates up** — an exception in any branch fails the whole operation promptly
+
+### That last point deserves a demo
+
+```kotlin
+coroutineScope {
+    val orders = async { orderClient.recent(userId) }     // takes 2000ms
+    val recs = async { recClient.forUser(userId) }        // fails at 100ms!
+
+    recs.await()   // throws here...
+}
+// ...and `orders` is cancelled mid-flight — its connection released.
+```
+
+Is "one failure kills everything" right? For a single logical result (this dashboard), yes: partial data you can't render is waste, and failing fast frees resources. But sometimes you want independence...
+
+## Graceful Degradation With `supervisorScope`
+
+Recommendations are nice-to-have; orders and user info are essential. Model that explicitly:
+
+```kotlin
+suspend fun getDashboard(userId: Long): Dashboard = coroutineScope {
+    val user = async { userClient.get(userId) }
+    val orders = async { orderClient.recent(userId) }
+
+    // Recommendations may fail without killing the page:
+    val recommendations = supervisorScope {
+        async { recClient.forUser(userId) }
+    }.runCatching { await() }.getOrDefault(emptyList())
+
+    Dashboard(user.await(), orders.await(), recommendations)
+}
+```
+
+`supervisorScope` detaches failure propagation for its children; wrapping with `runCatching` turns "recommendations unavailable" into an empty list. Essential path still fails fast together.
+
+<Callout variant="tip">
+Decide per-dependency: *essential* → share the parent scope (fail fast); *optional* → isolate via `supervisorScope` + default value. Write that decision in code, not in tribal knowledge.
+</Callout>
+
+## Don't DDoS Your Own Dependencies
+
+Fan-out multiplies load: one request → N downstream calls. Ten thousand concurrent users × 3 calls each... your recommendation service sees traffic spikes it never agreed to. Cap parallelism with a `Semaphore`:
+
+```kotlin
+@Service
+class RecommendationService(
+    private val recClient: RecClient,
+) {
+    private val maxConcurrent = Semaphore(20)   // permits, not threads
+
+    suspend fun forUser(userId: Long): List<Rec> =
+        maxConcurrent.withPermit {
+            recClient.forUser(userId)
+        }
+}
+```
+
+The 21st concurrent call suspends until a permit frees — backpressure instead of meltdown. This pairs beautifully with circuit breakers ([post #7](/blog/spring-coroutines-07-resilience)).
+
+## Composing With Timeouts
+
+A fan-out is only as fast as its slowest essential branch. Bound them:
+
+```kotlin
+suspend fun getDashboard(userId: Long): Dashboard = coroutineScope {
+    val user = async { userClient.get(userId) }
+    val orders = withTimeoutOrNull(1500) { orderClient.recent(userId) }
+
+    Dashboard(
+        user = user.await(),
+        orders = orders ?: OrderSection.empty(),   // degraded but responsive
+        recommendations = loadRecommendations(userId),
+    )
+}
+```
+
+`withTimeoutOrNull` returns `null` on expiry and cancels the inner work — the slow branch stops consuming resources rather than hanging the response. We'll build a full resilience toolkit in [post #7](/blog/spring-coroutines-07-resilience).
+
+## A Complete Example: Search Aggregator
+
+Tying it together — three providers, capped, timeout-bounded, degradable:
+
+```kotlin
+@Service
+class SearchAggregator(
+    private val providers: List<SearchProvider>,
+) {
+    suspend fun search(query: String): SearchResults = coroutineScope {
+        val deferreds = providers.map { provider ->
+            async {
+                runCatching {
+                    withTimeoutOrNull(800) { provider.search(query) }
+                }.getOrNull()
+            }
+        }
+        val results = deferreds.awaitAll().filterNotNull()
+        SearchResults(results, missing = providers.size - results.size)
+    }
+}
+
+interface SearchProvider {
+    val name: String
+    suspend fun search(query: String): ProviderHits
+}
+```
+
+Every provider gets equal budget, failures become absences, and total latency ≤ 800ms regardless of how many providers misbehave.
+
+<Callout variant="warning">
+Common mistake: calling `async` and immediately `await()`ing in sequence —
+
+```kotlin
+val a = async { f() }; val x = a.await()
+val b = async { g() }; val y = b.await()   // ❌ still sequential!
+```
+Launch ALL first, then await. Better yet, extract the whole fan-out into a helper returning a combined type.
+</Callout>
+
+## Exercises
+
+1. Take any endpoint making 2+ sequential remote calls and fan it out. Measure p95 before/after.
+2. Make one branch deliberately fail after 50ms; verify siblings get cancelled (log thread + timing).
+3. Add `Semaphore(2)` to a provider service and observe queueing under load.
+4. Rewrite the aggregator so *at least two* providers must succeed or the whole search fails.
+
+## What's Next
+
+Parallel calls multiply the places where state can go wrong — especially transactions and request-scoped context. [Post #4](/blog/spring-coroutines-04-transactions) covers the scariest topic in coroutine adoption: `@Transactional`, thread-bound connections, MDC, and security context across suspension points.
+
+Happy coding! 🚀

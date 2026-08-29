@@ -1,11 +1,12 @@
 ---
-import { getCollection, render } from 'astro:content';
+import { render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Navbar from '../../components/Navbar.astro';
 import RelatedPosts from '../../components/RelatedPosts.astro';
+import { getVisibleBlogPosts } from '../../utils/blog';
 
 export async function getStaticPaths() {
-  const blogPosts = await getCollection('blog');
+  const blogPosts = await getVisibleBlogPosts();
   return blogPosts.map(post => ({
     params: { slug: post.id },
     props: { post },
@@ -99,6 +100,11 @@ function formatDate(date: Date) {
           </time>
           <span aria-hidden="true">·</span>
           <span>{post.data.readingTime || 5} min read</span>
+          {post.data.author && (
+            <span style={{ marginLeft: '1rem', color: 'var(--color-text-tertiary)' }}>
+              by {post.data.author}
+            </span>
+          )}
         </div>
 
         <div class="flex flex-wrap gap-2 mt-6">
@@ -189,6 +195,17 @@ function formatDate(date: Date) {
                 Copy link
               </button>
             </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button 
+              onclick="window.print()"
+              class="share-btn"
+              style={{ padding: '0.5rem 1rem', fontSize: '0.8125rem' }}
+              aria-label="Print this article"
+            >
+              Print →
+            </button>
           </div>
 
           <a 

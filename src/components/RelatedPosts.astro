@@ -1,5 +1,5 @@
 ---
-import { getCollection } from 'astro:content';
+import { getVisibleBlogPosts } from '../utils/blog';
 
 interface Props {
   currentSlug: string;
@@ -10,7 +10,7 @@ interface Props {
 const { currentSlug, currentTags, limit = 3 } = Astro.props;
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 
-const allPosts = await getCollection('blog');
+const allPosts = await getVisibleBlogPosts();
 
 // Find related posts by matching tags
 const relatedPosts = allPosts

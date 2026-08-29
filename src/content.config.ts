@@ -13,6 +13,10 @@ const projects = defineCollection({
     featured: z.boolean().default(false),
     image: z.string(),
     order: z.number().default(0),
+    year: z.number().optional(),
+    status: z.string().optional(),
+    overview: z.string().optional(),
+    features: z.array(z.string()).optional(),
   }),
 });
 
@@ -25,6 +29,7 @@ const blog = defineCollection({
     tags: z.array(z.string()),
     readingTime: z.number().optional(),
     draft: z.boolean().default(false),
+    author: z.string().optional(),
   }),
 });
 

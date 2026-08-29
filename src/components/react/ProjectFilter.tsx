@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 interface Project {
-  slug: string;
+  id: string;
   data: {
     title: string;
     description: string;
@@ -11,6 +11,10 @@ interface Project {
     category: string;
     featured: boolean;
     image: string;
+    year?: number;
+    status?: string;
+    overview?: string;
+    features?: string[];
   };
 }
 
@@ -59,39 +63,75 @@ export default function ProjectFilter({ projects }: Props) {
       </div>
 
       {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {filteredProjects.map(project => (
           <div
-            key={project.slug}
-            className="bg-[var(--color-bg-secondary)] border rounded-lg overflow-hidden card-hover"
+            key={project.id}
+            className="group bg-[var(--color-bg-secondary)] border rounded-xl overflow-hidden card-hover flex flex-col"
             style={{ borderColor: 'var(--color-brand-gray-light)' }}
           >
-            {/* Project Image */}
-            <div
-              className="aspect-video overflow-hidden"
+            {/* Project Image (clickable) */}
+            <a
+              href={withBase(`/projects/${project.id}`)}
+              aria-label={`View ${project.data.title}`}
+              className="relative block aspect-video overflow-hidden"
               style={{ backgroundColor: 'var(--color-brand-gray-light)' }}
             >
               <img
                 src={withBase(project.data.image)}
                 alt={project.data.title}
-                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 loading="lazy"
+                fetchPriority={project.data.featured ? 'high' : 'low'}
               />
-            </div>
-            
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+              {/* Category badge */}
+              <span
+                className="absolute top-3 left-3 text-xs font-semibold px-3 py-1 rounded-full shadow-sm"
+                style={{ backgroundColor: 'var(--color-brand-black)', color: 'var(--color-brand-white)' }}
+              >
+                {project.data.category}
+              </span>
+
+              {/* Featured / Year */}
+              <span
+                className="absolute top-3 right-3 text-xs font-medium px-3 py-1 rounded-full"
+                style={{
+                  backgroundColor: project.data.featured ? 'var(--color-accent)' : 'var(--color-brand-gray-light)',
+                  color: project.data.featured ? '#ffffff' : 'var(--color-brand-gray-dark)',
+                }}
+              >
+                {project.data.year ? project.data.year : (project.data.featured ? 'Featured' : 'Project')}
+              </span>
+            </a>
+
             {/* Project Content */}
-            <div className="p-6">
-              <h3 className="text-xl font-semibold mb-2">{project.data.title}</h3>
+            <div className="p-6 flex flex-col flex-1">
+              {project.data.status && (
+                <p
+                  className="mb-1 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: 'var(--color-accent)' }}
+                >
+                  {project.data.status}
+                </p>
+              )}
+              <h3
+                className="text-xl font-semibold mb-2 transition-colors group-hover:text-brand-orange"
+                style={{ color: 'var(--color-text)' }}
+              >
+                {project.data.title}
+              </h3>
               <p
-                className="mb-4 text-sm leading-relaxed-custom"
+                className="mb-4 text-sm leading-relaxed-custom line-clamp-4"
                 style={{ color: 'var(--color-brand-gray-dark)' }}
               >
                 {project.data.description}
               </p>
-              
+
               {/* Tech Stack */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {project.data.tech.slice(0, 4).map(tech => (
+              <div className="flex flex-wrap gap-2 mb-5">
+                {project.data.tech.slice(0, 4).map((tech: string) => (
                   <span
                     key={tech}
                     className="text-xs px-3 py-1 rounded-full"
@@ -104,18 +144,27 @@ export default function ProjectFilter({ projects }: Props) {
                   </span>
                 ))}
               </div>
-              
+
               {/* Links */}
-              <div className="flex gap-4">
+              <div className="flex items-center gap-5 border-t pt-4 mt-auto" style={{ borderColor: 'var(--color-brand-gray-light)' }}>
+                <a
+                  href={withBase(`/projects/${project.id}`)}
+                  className="font-medium transition-colors hover:text-brand-orange"
+                  style={{ color: 'var(--color-text)' }}
+                >
+                  View Details →
+                </a>
+                <span className="flex-1" />
                 {project.data.github && (
                   <a
                     href={project.data.github}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={`${project.data.title} on GitHub`}
                     className="text-sm hover-text-brand-orange font-medium"
-                    style={{ color: 'var(--color-brand-black)' }}
+                    style={{ color: 'var(--color-brand-gray-dark)' }}
                   >
-                    GitHub →
+                    GitHub
                   </a>
                 )}
                 {project.data.live && (
@@ -123,10 +172,11 @@ export default function ProjectFilter({ projects }: Props) {
                     href={project.data.live}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={`${project.data.title} live demo`}
                     className="text-sm hover-text-brand-orange font-medium"
-                    style={{ color: 'var(--color-brand-black)' }}
+                    style={{ color: 'var(--color-brand-gray-dark)' }}
                   >
-                    Live Demo →
+                    Live
                   </a>
                 )}
               </div>

@@ -1,0 +1,220 @@
+---
+title: "Kotlin from Zero to Hero #7 — Coroutines: Concurrency Without Tears"
+date: 2026-10-03
+excerpt: "Kotlin's flagship feature explained from scratch: suspending functions, launch vs async, structured concurrency, cancellation, dispatchers, and a first look at Flow."
+tags: ["Kotlin", "Kotlin Series", "Coroutines", "Concurrency"]
+readingTime: 14
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Threads are expensive — thousands of them exhaust memory and schedulers, and callback-based asynchrony turns code into unreadable pyramids. **Coroutines** are Kotlin's answer: lightweight concurrency that lets you write asynchronous code that reads exactly like sequential code. This is the most conceptually dense post of the series, so we'll build up step by step.
+
+<Callout variant="tip" title="What you'll learn">
+- What suspension means and how `suspend` functions work
+- Builders: `launch`, `async`/`await`, `runBlocking`
+- Why *structured concurrency* prevents leaked work
+- Cancellation, timeouts, and dispatchers (`Default`, `IO`, `Main`)
+- A first taste of `Flow` for streams of async values
+</Callout>
+
+## The Problem with Threads
+
+```java
+new Thread(() -> fetchUser()).start();   // ~1MB stack reserved upfront
+```
+
+- Threads block while waiting on I/O; blocked threads waste OS resources
+- Thread-per-request servers collapse under load (the C10K problem)
+- Callbacks avoid blocking but nest horribly ("callback hell")
+
+A coroutine, by contrast, is a computation that can **suspend** — pause without blocking its thread — and resume later. Millions can coexist on a handful of threads.
+
+## Suspending Functions
+
+Add `suspend` to a function and it gains a superpower: it may pause itself and free its thread while waiting:
+
+```kotlin
+suspend fun fetchUser(id: Int): User {
+    val profile = api.getProfile(id)      // suspends during network call...
+    val settings = api.getSettings(id)    // ...thread serves others meanwhile
+    return User(profile, settings)
+}
+```
+
+This looks like blocking sequential code — but nothing blocks. While `fetchUser` waits on the network, the thread runs other coroutines. That's the entire value proposition: **asynchronous efficiency with synchronous readability**.
+
+<Callout variant="warning">
+`suspend` functions can only be called from other `suspend` functions or inside coroutines. The compiler enforces this — suspension points must be tracked so the runtime knows where pausing is safe.
+</Callout>
+
+## Launching Coroutines: The Builders
+
+### `launch`: fire-and-forget (returns no result)
+
+```kotlin
+import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    launch {
+        delay(1000L)                  // non-blocking sleep
+        println("World!")
+    }
+    println("Hello,")                 // printed FIRST
+}
+// Hello,
+// World!  (after 1s)
+```
+
+`delay` is the cooperative cousin of `Thread.sleep` — it suspends instead of blocking.
+
+### `async`: parallel work with results
+
+```kotlin
+suspend fun loadDashboard(): Dashboard = coroutineScope {
+    val userDeferred = async { api.getUser() }       // starts now
+    val postsDeferred = async { api.getPosts() }     // starts in parallel
+    
+    Dashboard(
+        user = userDeferred.await(),     // wait only here
+        posts = postsDeferred.await(),
+    )
+}
+```
+
+Both requests run concurrently; total time is max(a, b), not a + b. This one pattern often justifies adopting coroutines at all.
+
+### `runBlocking`: the bridge
+
+`runBlocking` blocks the current thread until its coroutine completes — used mainly in `main()` and tests to bridge the non-suspend world. Never call it inside real application code on UI or request threads.
+
+## Structured Concurrency
+
+Here's Kotlin's killer design decision: **every coroutine lives inside a scope**, forming a parent-child tree with strict rules:
+
+1. A parent doesn't complete until all children complete
+2. Cancelling a parent cancels all children
+3. A child's failure propagates up (with default settings) and cancels siblings
+
+```kotlin
+fun main() = runBlocking {                 // root scope
+    launch {                               // child 1
+        delay(500)
+        println("child 1 done")
+    }
+    launch {                               // child 2
+        delay(300)
+        println("child 2 done")
+    }
+}                                          // waits for BOTH before exiting
+```
+
+No orphaned background jobs, no forgotten cleanup — the classic "where did my thread pool leak?" bug is structurally impossible.
+
+### Scoping your own work
+
+Inside suspend functions, wrap parallel children in `coroutineScope { }` (as in the `async` example). It creates a child scope that rethrows failures properly — unlike `GlobalScope.launch`, which escapes structure entirely and should be avoided outside app-lifetime singletons.
+
+## Dispatchers: Where Code Runs
+
+Dispatchers decide which threads execute your coroutines:
+
+| Dispatcher | Use for |
+|------------|---------|
+| `Dispatchers.Default` | CPU-bound work: parsing, sorting, algorithms |
+| `Dispatchers.IO` | Blocking I/O: files, JDBC, network |
+| `Dispatchers.Main` | UI thread (Android/Swing/Compose) |
+| `Dispatchers.Unconfined` | Advanced/testing — rarely needed |
+
+Switch context explicitly and locally:
+
+```kotlin
+suspend fun loadReport(): Report = withContext(Dispatchers.IO) {
+    val raw = File("report.json").readText()      // blocking OK on IO dispatcher
+    parse(raw)                                    // continues wherever appropriate
+}
+```
+
+`withContext` also serializes access when given a single-threaded context — a modern replacement for much synchronization.
+
+## Cancellation and Timeouts
+
+Cancellation is **cooperative**: coroutines check for it at suspension points (and via `ensureActive()` in tight loops):
+
+```kotlin
+val job = launch {
+    repeat(1000) { i ->
+        delay(100)              // each delay checks cancellation
+        println("working $i")
+    }
+}
+
+delay(350)
+job.cancel()                    // politely stops the coroutine
+job.join()                      // wait for it to finish stopping
+```
+
+Timeouts become one-liners:
+
+```kotlin
+withTimeoutOrNull(2_000) {
+    fetchSlowResource()
+} ?: CachedResult               // null if timed out — handle gracefully
+```
+
+## Exceptions
+
+Failures propagate up the coroutine hierarchy. Guard subtrees with `supervisorScope` when children should fail independently (e.g., loading multiple dashboard widgets), and use `CoroutineExceptionHandler` for top-level logging:
+
+```kotlin
+supervisorScope {
+    launch { widgetA.load() }   // failure here does NOT kill widget B
+    launch { widgetB.load() }
+}
+```
+
+## Flow: Streams of Async Values
+
+`suspend` returns one value; `Flow` returns many, asynchronously and lazily — Kotlin's counterpart to RxJava's Observable / Java's Stream, but simpler:
+
+```kotlin
+fun temperatureReadings(): Flow<Int> = flow {
+    repeat(5) {
+        emit(sensor.readCelsius())    // emit values over time
+        delay(1000)
+    }
+}
+
+// collect (consume)
+temperatureReadings()
+    .filter { it > 25 }
+    .map { "Warm: $it°C" }
+    .collect { println(it) }
+```
+
+Flows are cold (nothing runs until collected), support rich operators, and integrate with structured concurrency automatically. For shared state across collectors there's `StateFlow`/`SharedFlow` — worth their own deep dive; start by getting comfortable with plain `flow {}`.
+
+<Callout variant="note">
+In Spring Boot, controller methods returning `Flow<T>` stream responses naturally; Ktor was designed around coroutines from day one. Your [Spring Boot + Kotlin setup](/blog/spring-boot-kotlin) pairs perfectly with everything above.
+</Callout>
+
+## Common Pitfalls
+
+1. **Calling suspend from `runBlocking` inside production code** — blocks precious threads
+2. **Using `GlobalScope`** — breaks structured concurrency; leaks unless manually managed
+3. **Heavy loops without cooperation** — insert `yield()` or `ensureActive()` so cancellation lands
+4. **Parallel decomposition with `launch` + shared mutable state** — prefer `async`, immutability, or `Mutex`
+
+## Exercises
+
+1. Fetch three simulated APIs concurrently with `async` and print total elapsed time.
+2. Write a suspend function that retries a flaky operation up to 3 times with backoff using `delay`.
+3. Make an infinite ticker coroutine and cancel it after 5 seconds.
+4. Build a `Flow<Int>` of random numbers that emits every 500ms and stops after emitting a value > 90.
+
+## What's Next
+
+The finale of the learning arc: **testing** — JUnit 5 and Kotest, `runTest` for virtual-time coroutine testing, MockK — plus a capstone recap of idiomatic Kotlin practices. See you in [post #8](/blog/kotlin-series-08-testing-best-practices).
+
+Happy coding! 🚀

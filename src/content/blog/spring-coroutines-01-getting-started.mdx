@@ -1,0 +1,219 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #1 — Why Coroutines and Your First Suspend Endpoint"
+date: 2026-11-07
+excerpt: "Kick off the series: the throughput math behind thread-per-request servers, how coroutines change it, project setup with Spring Boot 3, and your first suspend controller endpoint."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Series", "Backend"]
+readingTime: 11
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Welcome to a new series! In [Zero to Hero](/blog/kotlin-series-01-getting-started) we learned the language; now we put its flagship feature to work in the most common backend stack on the JVM: **Spring Boot + Kotlin + coroutines**. By the end of these eight posts you'll run production-grade suspend-based services — with correct transactions, streaming endpoints, resilience patterns, tests, and an operations checklist.
+
+<Callout variant="tip" title="Series roadmap">
+1. **Why coroutines & getting started** ← you are here
+2. [How Spring runs your suspend functions](/blog/spring-coroutines-02-suspend-internals)
+3. [Parallel calls in the service layer](/blog/spring-coroutines-03-parallel-calls)
+4. [Transactions & context propagation](/blog/spring-coroutines-04-transactions)
+5. [Streaming with Flow](/blog/spring-coroutines-05-flow-streaming)
+6. [Testing coroutine code](/blog/spring-coroutines-06-testing)
+7. [Resilience: timeouts, retries, circuit breakers](/blog/spring-coroutines-07-resilience)
+8. [Production checklist](/blog/spring-coroutines-08-production)
+
+Prerequisites: [coroutines basics](/blog/kotlin-series-07-coroutines) and ideally the [Spring Boot + Kotlin setup guide](/blog/spring-boot-kotlin) for project structure conventions.
+</Callout>
+
+## The Problem: Blocked Threads Doing Nothing
+
+A traditional Spring MVC app handles each request on one servlet thread (Tomcat default: **200 threads**). Consider a dashboard endpoint aggregating three downstream services:
+
+```kotlin
+@GetMapping("/dashboard/{userId}")
+fun dashboard(@PathVariable userId: Long): Dashboard {
+    val user = userClient.get(userId)            // waits ~150ms doing NOTHING
+    val orders = orderClient.getForUser(userId)  // waits ~200ms doing NOTHING
+    val recs = recClient.get(userId)             // waits ~250ms doing NOTHING
+    return Dashboard(user, orders, recs)
+}
+```
+
+Total latency: **600ms** — and for all 600ms, this request's thread sits parked while holding memory (~1MB stack each). Do the math at load:
+
+- 200 threads × ~1.6 requests/sec each ≈ 320 RPS ceiling per instance
+- One slow downstream → threads pile up → *every* endpoint starves (thread-pool exhaustion is contagious)
+
+Classic fixes each hurt:
+
+| Fix | Cost |
+|-----|------|
+| More threads | More memory, more context-switching, same ceiling eventually |
+| `CompletableFuture` chains | Callback-style composition, unreadable error handling |
+| Full WebFlux/Reactor | Powerful but a paradigm shift for the whole team |
+
+Coroutines give you the fourth option: **write sequential-looking code that suspends instead of blocks**.
+
+## What Changes With `suspend`
+
+The same endpoint, coroutine style (parallelism comes in post #3):
+
+```kotlin
+@GetMapping("/dashboard/{userId}")
+suspend fun dashboard(@PathVariable userId: Long): Dashboard {
+    val user = userClient.get(userId)            // suspends — thread released
+    val orders = orderClient.getForUser(userId)  // suspends again
+    val recs = recClient.get(userId)             // suspends again
+    return Dashboard(user, orders, recs)
+}
+```
+
+While `userClient.get` waits on the network, **the thread goes back to the pool** and serves other requests. Latency is still 600ms (sequential), but those 600ms no longer consume a thread. Threads become workers that never idle — capacity scales with actual CPU work, not waiting.
+
+That's the whole value proposition. Everything else in this series is learning where the sharp edges are.
+
+## Project Setup
+
+Starting from [the standard structure](/blog/spring-boot-kotlin), add coroutines support to `build.gradle.kts`:
+
+```kotlin
+plugins {
+    kotlin("jvm") version "2.2.20"
+    kotlin("plugin.spring") version "2.2.20"
+    id("org.springframework.boot") version "4.0.0"
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+
+    // Coroutines — versions managed by Spring Boot's BOM
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j")
+}
+```
+
+What each does:
+
+- **`kotlinx-coroutines-core`** — `launch`, `async`, builders, dispatchers
+- **`kotlinx-coroutines-reactor`** — bridges Reactor types (`Mono`/`Flux`) ↔ coroutines (`awaitSingle()`, `asFlow()`); also lets Spring bridge contexts
+- **`kotlinx-coroutines-slf4j`** — MDC propagation across suspension points ([post #4](/blog/spring-coroutines-04-transactions))
+
+<Callout variant="note">
+Using WebFlux instead of `starter-web`? Everything in this series works there too — often even more naturally. The choice between them gets a full treatment in [post #8](/blog/spring-coroutines-08-production).
+</Callout>
+
+## Your First Suspend Endpoint
+
+Domain model first:
+
+```kotlin
+data class UserResponse(
+    val id: Long,
+    val name: String,
+    val email: String,
+)
+
+interface UserGateway {
+    suspend fun getUser(id: Long): UserResponse
+}
+```
+
+Controller — notice only two differences from blocking code:
+
+```kotlin
+@RestController
+@RequestMapping("/api/users")
+class UserController(private val userService: UserService) {
+
+    @GetMapping("/{id}")
+    suspend fun getById(@PathVariable id: Long): UserResponse =
+        userService.getById(id)
+}
+```
+
+Service delegating to a gateway that actually suspends (simulated here):
+
+```kotlin
+@Service
+class UserService(private val userGateway: UserGateway) {
+
+    suspend fun getById(id: Long): UserResponse =
+        userGateway.getUser(id)
+}
+
+@Component
+class FakeUserGateway : UserGateway {
+    override suspend fun getUser(id: Long): UserResponse {
+        delay(150)   // simulates network I/O — suspends, does NOT block
+        return UserResponse(id, "Ahmed Ragab", "ahmed@example.com")
+    }
+}
+```
+
+Start the app and call it:
+
+```bash
+curl http://localhost:8080/api/users/42
+# {"id":42,"name":"Ahmed Ragab","email":"ahmed@example.com"}
+```
+
+It works identically from the client's perspective. The difference is inside: during those 150ms, Tomcat's request thread was free.
+
+### Mixing sync and suspend
+
+Suspend functions can freely call regular functions; regular functions cannot call suspend ones without entering a coroutine (`runBlocking` at boundaries only). Within Spring beans, keep the chain suspend end-to-end: controller → service → gateway/client.
+
+## Proving Threads Are Released
+
+Here's the experiment that makes it click. An endpoint that delays 500ms, logging thread names:
+
+```kotlin
+@RestController
+class DemoController {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+    @GetMapping("/demo")
+    suspend fun demo(): Map<String, String> {
+        logger.info("start  on {}", Thread.currentThread().name)
+        delay(500)
+        logger.info("finish on {}", Thread.currentThread().name)
+        return mapOf("status" to "done")
+    }
+}
+```
+
+Fire 100 concurrent requests:
+
+```bash
+seq 100 | xargs -P 100 -I{} curl -s http://localhost:8080/demo > /dev/null
+```
+
+All 100 complete in roughly **one delay window** (~600ms total), not 100 × 500ms. A 200-thread pool just served 100 concurrent slow requests without breaking a sweat — because threads were returned between suspension points. Try the same with `Thread.sleep(500)` instead of `delay(500)` and watch serialization begin.
+
+<Callout variant="warning">
+That comparison hides the most important rule of this entire series: `delay` suspends, `Thread.sleep` blocks. Every blocking API you call inside a suspend function (classic JDBC, `RestClient`, file I/O) reintroduces the original problem. [Post #2](/blog/spring-coroutines-02-suspend-internals) covers exactly what to do about it.
+</Callout>
+
+## When Should You Adopt This?
+
+Honest answers:
+
+- ✅ **High-fan-out services** — APIs aggregating multiple downstreams (huge wins, see post #3)
+- ✅ **I/O-heavy microservices** — gateways, orchestrators, BFFs
+- ✅ **New services** — greenfield adoption is nearly free
+- ⚠️ **Existing JPA-heavy CRUD apps** — benefits shrink when every DB call is thread-bound JDBC; you'll need `Dispatchers.IO` wrapping or R2DBC migration ([posts #2](/blog/spring-coroutines-02-suspend-internals) and [#4](/blog/spring-coroutines-04-transactions))
+- ❌ **CPU-bound workloads** — coroutines help waiting, not computing
+
+## Exercises
+
+1. Build the `/demo` endpoint above and reproduce both experiments (delay vs Thread.sleep). Compare wall-clock times.
+2. Convert one existing controller method to `suspend`. Does everything compile? If not, follow the errors up the call chain — they teach you where suspension enters your code.
+3. Load-test `/demo` with 500 concurrent requests using `xargs -P 500`. Watch logs to see thread reuse.
+
+## What's Next
+
+You have working suspend endpoints — but do you know which threads they run on, or what Spring quietly does behind `@GetMapping`? [Post #2](/blog/spring-coroutines-02-suspend-internals) opens the hood: async dispatch, dispatchers, and the golden rule for mixing blocking libraries into coroutine code.
+
+Happy coding! 🚀

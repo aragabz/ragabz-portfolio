@@ -1,0 +1,284 @@
+---
+title: "Kotlin from Zero to Hero #5 — Classes, Data Classes & Modern OOP"
+date: 2026-09-19
+excerpt: "Kotlin rethinks object-oriented programming: primary constructors, data classes with one-line value types, sealed hierarchies for exhaustive modeling, singletons without design patterns, and delegation with 'by'."
+tags: ["Kotlin", "Kotlin Series", "OOP", "Data Classes"]
+readingTime: 13
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Null safety keeps programs from crashing; **good type modeling** keeps them from being wrong. Kotlin's take on OOP removes ceremony (no more 50-line constructors) and adds first-class tools for modeling domains: `data`, `sealed`, `object`, and delegation. This is the post where domain-driven design starts feeling natural in Kotlin.
+
+<Callout variant="tip" title="What you'll learn">
+- Primary vs secondary constructors and property declarations
+- Custom getters/setters and backing fields
+- `data class`: equals, hashCode, copy, destructuring
+- `sealed` hierarchies + exhaustive `when`
+- `object` singletons, `companion objects`, enums
+- Interface default methods and class delegation with `by`
+</Callout>
+
+## Classes and Constructors
+
+A minimal class needs no body at all:
+
+```kotlin
+class Point(val x: Int, val y: Int)
+```
+
+That parenthesized list after the name is the **primary constructor**. Declaring parameters as `val`/`var` simultaneously creates properties:
+
+```kotlin
+val p = Point(3, 4)
+println(p.x)          // 3 — a real property, no getX() ceremony needed
+```
+
+Compare the Java equivalent: field declaration, constructor assignment, accessors — roughly 20 lines reduced to one.
+
+### Constructor bodies: `init` blocks
+
+Primary constructors can't contain code, so initialization logic goes into `init` blocks:
+
+```kotlin
+class User(val email: String) {
+    val normalizedEmail: String
+
+    init {
+        require("@" in email) { "Invalid email" }
+        normalizedEmail = email.lowercase()
+        println("User created")
+    }
+}
+```
+
+### Secondary constructors
+
+Rarely needed thanks to default arguments (post #3), but supported:
+
+```kotlin
+class Person(val name: String) {
+    var age: Int = 0
+
+    constructor(name: String, age: Int) : this(name) {
+        this.age = age
+    }
+}
+```
+
+Every secondary constructor must delegate to the primary one (`: this(...)`).
+
+## Properties with Custom Accessors
+
+Properties aren't just fields — they can compute values on access:
+
+```kotlin
+class Rectangle(val width: Double, val height: Double) {
+    val area: Double
+        get() = width * height              // computed every access
+
+    val perimeter get() = 2 * (width + height)
+
+    var score: Int = 0
+        set(value) {
+            field = value.coerceIn(0, 100)  // validate via backing field
+        }
+}
+```
+
+Inside a custom setter, `field` refers to the implicit **backing field**. Callers still write `rect.area` or `rect.score = 150` (which silently clamps to 100) while you keep full control of access logic.
+
+<Callout variant="note">
+Looking ahead: Kotlin 2.3 introduced **explicit backing fields** as a language feature (stabilized in 2.4), letting you expose a property backed by a separately-typed private field. We'll cover it in the version-diff posts.
+</Callout>
+
+## Data Classes
+
+Classes whose main job is *holding data* deserve special treatment. Add one modifier and the compiler generates `equals()`, `hashCode()`, `toString()`, `copy()`, and destructuring support:
+
+```kotlin
+data class Money(val amount: Long, val currency: String)
+```
+
+```kotlin
+val price = Money(1999, "USD")
+
+price.toString()                    // Money(amount=1999, currency=USD)
+price == Money(1999, "USD")         // true — structural equality
+```
+
+### `copy`: immutable updates
+
+Data classes shine for immutability. Instead of mutating, create modified copies:
+
+```kotlin
+data class Order(
+    val id: String,
+    val items: List<String>,
+    val status: String = "NEW",
+)
+
+val order = Order(id = "#1", items = listOf("coffee"))
+val shipped = order.copy(status = "SHIPPED")   // new object; original untouched
+
+println(order.status)    // NEW
+println(shipped.status)  // SHIPPED
+```
+
+This pattern pairs perfectly with null-safe, thread-friendly code — and it's exactly how Redux-style state management works.
+
+### Destructuring
+
+Data classes can be unpacked positionally:
+
+```kotlin
+val (id, items, status) = order
+
+// also powers loops and lambdas
+orders.map { (id, _) -> id }
+```
+
+You can add destructuring to any class by defining `component1()`, `component2()`, ... operators — but data classes generate them automatically.
+
+<Callout variant="warning">
+Beware of `copy()` with reference-typed properties: it copies the *reference*, not the contents. A copied `Order` shares its `items` list unless that's immutable too.
+</Callout>
+
+## Sealed Hierarchies: Modeling Alternatives
+
+`sealed` restricts inheritance to a known, fixed set of subtypes declared in the same package/module. Combined with exhaustive `when`, it gives compiler-checked state machines:
+
+```kotlin
+sealed interface UiState {
+    data object Loading : UiState
+    data class Success(val items: List<String>) : UiState
+    data class Error(val message: String) : UiState
+}
+
+fun render(state: UiState): String = when (state) {
+    is UiState.Loading -> "Loading…"
+    is UiState.Success -> "Loaded ${state.items.size} items"
+    is UiState.Error -> "Failed: ${state.message}"
+}
+```
+
+No `else` needed: the compiler verifies every case. Add an `Empty` state next month, and every incomplete `when` in your codebase becomes a compile error instead of a silent bug.
+
+`data object` (stable since Kotlin 1.9) prints nicely in logs — prefer it over plain `object` inside sealed hierarchies.
+
+This pattern replaces the "Result/Either" wrapper debate: model outcomes directly.
+
+```kotlin
+sealed interface Result<out T> {
+    data class Ok<T>(val value: T) : Result<T>
+    data class Failure(val error: Throwable) : Result<Nothing>
+}
+```
+
+(`out T` will make sense after [post #6](/blog/kotlin-series-06-collections-generics).)
+
+## Object Declarations & Companion Objects
+
+### Singletons, language-level
+
+Kotlin has no `static`. For one shared instance, use `object`:
+
+```kotlin
+object IdGenerator {
+    private var counter = 0L
+    fun next(): Long = ++counter
+}
+
+IdGenerator.next()   // called directly, no getInstance()
+```
+
+Thread-safety and lazy creation are handled for you.
+
+### Companion: per-class statics
+
+When you need "static-like" members tied to a class, attach a companion:
+
+```kotlin
+class Temperature private constructor(private val celsius: Double) {
+    companion object {
+        fun fromFahrenheit(f: Double) = Temperature((f - 32) * 5 / 9)
+        fun absoluteZero() = Temperature(-273.15)
+    }
+}
+
+val t = Temperature.fromFahrenheit(98.6)   // factory methods!
+```
+
+The private constructor plus companion factories here enforce the invariant "a temperature below absolute zero cannot exist".
+
+## Enums
+
+For a fixed set of constant values, enums are simpler than sealed classes:
+
+```kotlin
+enum class Direction(val degrees: Int) {
+    NORTH(0), EAST(90), SOUTH(180), WEST(270);
+
+    fun opposite(): Direction = entries.first { it.degrees == (degrees + 180) % 360 }
+}
+
+Direction.NORTH.opposite()   // SOUTH
+Direction.entries            // modern replacement for values()
+```
+
+Rule of thumb: **enums** for closed sets of *values*; **sealed classes** for closed sets of *types carrying different data*.
+
+## Interfaces and Delegation
+
+Interfaces support default implementations, like Java 8+:
+
+```kotlin
+interface Repository<T> {
+    fun findAll(): List<T>
+    fun isEmpty(): Boolean = findAll().isEmpty()
+}
+```
+
+And Kotlin takes composition further with **delegation via `by`** — implement an interface by forwarding to an object in one line:
+
+```kotlin
+interface Logger { fun log(msg: String) }
+
+class ConsoleLogger : Logger {
+    override fun log(msg: String) = println("[LOG] $msg")
+}
+
+class TimedLogger(private val inner: Logger) : Logger by inner {
+    // only override what changes; log() delegates automatically
+    override fun log(msg: String) = inner.log("${System.nanoTime()} $msg")
+}
+```
+
+Without `by`, you'd hand-write every delegated method. This is the Decorator pattern, built into the language.
+
+## Visibility Modifiers
+
+Kotlin defaults to `public` and offers four levels:
+
+| Modifier | Visible to |
+|----------|-----------|
+| `public` *(default)* | everyone |
+| `private` | inside the declaring class/file |
+| `protected` | class + subclasses (not top-level) |
+| `internal` | anywhere in the same module |
+
+`internal` is the notable addition over Java — perfect for hiding implementation details across module boundaries.
+
+## Exercises
+
+1. Model a `Vehicle` hierarchy with a sealed interface and three subtypes, then write an exhaustive `when` computing insurance cost.
+2. Create an immutable `Account` data class and implement `deposit(amount)` returning a new account.
+3. Build a `ConfigLoader` object exposing `fun load(path: String): Map<String, String>`.
+4. Write an interface `Cache` and a decorator using `by` that counts hits.
+
+## What's Next
+
+We can now model data and behavior. Next we make those models *scale*: collections, functional operations, lazy sequences, and generics — the workhorses of real codebases — in [post #6](/blog/kotlin-series-06-collections-generics).
+
+Happy coding! 🚀

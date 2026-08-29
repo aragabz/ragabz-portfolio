@@ -1,0 +1,240 @@
+---
+title: "Kotlin from Zero to Hero #6 — Collections, Functional Operations & Generics"
+date: 2026-09-26
+excerpt: "The workhorses of real Kotlin code: read-only vs mutable collections, map/filter/groupBy pipelines, lazy sequences with asSequence, and generics — variance (in/out), constraints, and reified type parameters."
+tags: ["Kotlin", "Kotlin Series", "Collections", "Generics"]
+readingTime: 14
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Every non-trivial program transforms data: fetch a list, filter it, group it, aggregate it. Kotlin makes these transformations so fluent that loops become the exception — and its collection types are designed (unlike Java's) to make immutability the *easy* choice. Then we'll unlock generics, including the `in`/`out` keywords you've seen in signatures like `Result<out T>`.
+
+<Callout variant="tip" title="What you'll learn">
+- The three core collection types and their read-only vs mutable split
+- Essential operations: `map`, `filter`, `groupBy`, `associateBy`, `fold`
+- When `asSequence` turns pipelines from O(n) passes into lazy streams
+- Generics: type parameters, upper bounds, covariance/contravariance
+- `reified` — keeping generic types at runtime
+</Callout>
+
+## The Collection Family
+
+Three core types, each in two flavors:
+
+| Type | Read-only | Mutable |
+|------|-----------|---------|
+| Ordered elements | `List<T>` | `MutableList<T>` |
+| Unique elements | `Set<T>` | `MutableSet<T>` |
+| Key-value pairs | `Map<K, V>` | `MutableMap<K, V>` |
+
+Creation helpers:
+
+```kotlin
+val list = listOf("a", "b", "c")          // read-only List
+val mlist = mutableListOf(1, 2)           // MutableList
+val set = setOf(1, 2, 2, 3)               // Set {1, 2, 3}
+val map = mapOf("k1" to 1, "k2" to 2)     // Map — note the infix `to`
+```
+
+<Callout variant="warning">
+Read-only ≠ immutable! A read-only interface may still *view* a mutable underlying list (`mutableListOf` assigned to `List`). True immutability comes from persistent data structures (e.g., kotlinx.collections.immutable). Read-only is nonetheless a powerful API contract: the compiler prevents *you* from modifying.
+</Callout>
+
+Note that `map["k1"]` returns `V?` — a missing key yields `null`, not an exception:
+
+```kotlin
+val ages = mapOf("Ali" to 30)
+ages["Ali"]              // 30
+ages["Sara"]             // null — compile-forced null handling
+ages.getValue("Sara")    // throws NoSuchElementException — opt into strictness
+ages.getOrDefault("Sara", 0)
+```
+
+## Transforming Data: The Core Pipeline
+
+```kotlin
+data class Product(val name: String, val price: Double, val category: String)
+
+val products = listOf(
+    Product("Laptop", 1200.0, "Electronics"),
+    Product("Mouse", 25.0, "Electronics"),
+    Product("Desk", 300.0, "Furniture"),
+    Product("Chair", 150.0, "Furniture"),
+)
+```
+
+### `map` / `filter` / `flatMap`
+
+```kotlin
+products.map { it.name }                       // [Laptop, Mouse, Desk, Chair]
+products.filter { it.price < 400 }             // Mouse, Desk, Chair
+products.map { it.category }.distinct()        // [Electronics, Furniture]
+```
+
+`flatMap` flattens nested results — one-to-many transformations:
+
+```kotlin
+orders.flatMap { it.items }     // List<Order> -> List<Item>
+```
+
+### Grouping & association
+
+```kotlin
+val byCategory = products.groupBy { it.category }
+// Map<String, List<Product>>
+
+val avgPrice = products.groupBy({ it.category }) { it.price }
+//   .mapValues { (_, prices) -> prices.average() }
+
+val byName = products.associateBy { it.name }          // Map<String, Product>
+val priceByName = products.associate { it.name to it.price }
+```
+
+Choose deliberately: `groupBy` keeps duplicates per key; `associateBy` keeps one value per key.
+
+### Slicing & reshaping
+
+```kotlin
+list.take(3)            // first n
+list.drop(1)            // skip n
+products.partition { it.price > 100 }   // Pair(over100, rest)
+numbers.chunked(2)      // [[1,2],[3,4],[5]]
+list.zip(other)         // [(a,x),(b,y)] — pairs until shorter ends
+```
+
+## Aggregation
+
+```kotlin
+products.sumOf { it.price }                     // Double sum
+products.maxByOrNull { it.price }               // Product? — null-safe!
+products.count { it.category == "Furniture" }   // 2
+products.any { it.price > 1000 }                // true
+products.all { it.price > 10 }                  // true
+```
+
+Prefer the `...OrNull` variants over exceptions when absence is normal.
+
+### `fold` and `reduce`
+
+Both collapse a collection to one value; `fold` takes an initial accumulator (and can change type):
+
+```kotlin
+val total = listOf(1, 2, 3, 4).reduce { acc, n -> acc + n }        // 10
+val labeled = listOf(1, 2, 3).fold("") { acc, n -> "$acc$n" }      // "123"
+```
+
+## Sorting
+
+```kotlin
+products.sortedBy { it.price }                          // ascending
+products.sortedByDescending { it.price }
+users.sortedWith(compareBy({ it.lastName }, { it.firstName }))   // multi-key
+```
+
+All return **new** lists — originals are never touched.
+
+## Lazy Sequences
+
+Each list operator above processes the whole list eagerly. Chain many steps on big data and you allocate intermediate lists repeatedly:
+
+```kotlin
+(1..1_000_000).toList()
+    .filter { it % 2 == 0 }     // allocates 500k-element list
+    .map { it * 2 }             // allocates again...
+    .take(5)                    // only now do we need just 5 items!
+```
+
+Convert with `asSequence()` to make evaluation lazy, element-at-a-time:
+
+```kotlin
+(1..1_000_000).asSequence()
+    .filter { it % 2 == 0 }
+    .map { it * 2 }
+    .take(5)
+    .toList()                   // computes ONLY what take needs
+```
+
+Rules of thumb:
+
+- **Lists**: few chained steps, need multiple passes or random access → eager is fine
+- **Sequences**: large inputs, expensive steps, short-circuiting (`take`/`first`) → go lazy
+
+`generateSequence` even gives you infinite streams:
+
+```kotlin
+generateSequence(1) { it * 2 }.take(10).toList()   // powers of two
+```
+
+## Generics
+
+Generic functions declare type parameters in angle brackets before the function name:
+
+```kotlin
+fun <T> firstOrNull(items: List<T>): T? = items.firstOrNull()
+
+fun <T : Comparable<T>> maxOf(a: T, b: T): T =
+    if (a >= b) a else b       // upper bound: T must be Comparable<T>
+```
+
+`T : Comparable<T>` is a constraint — the compiler now knows `T` supports comparison.
+
+Generic classes work the same way:
+
+```kotlin
+class Box<T>(private val value: T) {
+    fun get(): T = value
+}
+```
+
+### Variance: `out` and `in`
+
+Why can't you assign `List<Dog>` to `List<Animal>`, like Java arrays famously allow (unsafely)? Kotlin answers explicitly:
+
+```kotlin
+interface Producer<out T> {      // covariant: only PRODUCES T
+    fun next(): T
+}
+
+interface Consumer<in T> {       // contravariant: only CONSUMES T
+    fun consume(item: T)
+}
+```
+
+- **`out T`** (covariance): `Producer<Dog>` can be used as `Producer<Animal>` — safe because T never enters, only exits. That's why `List<out E>` allows `List<String>` where `List<Any>` is expected.
+- **`in T`** (contravariance): `Consumer<Animal>` works wherever a `Consumer<Dog>` is needed — safe because T only goes in.
+
+Mnemonic: **PECS** — Producer `out`, Consumer `in`. If your class both produces and consumes `T`, leave it invariant (no keyword).
+
+Star projection `List<*>` means "some unknown element type" — you can read elements as `Any?` but not write.
+
+### `reified`: generics at runtime
+
+Normally the JVM erases generic type info at runtime. But for `inline` functions (whose bodies are copied into call sites), `reified` preserves it:
+
+```kotlin
+inline fun <reified T : Any> String.toOrNull(): T? = when (T::class) {
+    Int::class -> trim().toIntOrNull() as T?
+    Long::class -> trim().toLongOrNull() as T?
+    else -> error("Unsupported")
+}
+
+"42".toOrNull<Int>()     // 42
+"x".toOrNull<Int>()      // null — no ClassCastException tricks needed
+```
+
+You've been benefiting already: `filterIsInstance<Int>()`, `checkNotNull`, and Ktor/Spring's `body<T>()` all use reified generics for clean APIs without passing `Class<T>` around.
+
+## Exercises
+
+1. From a list of sentences, produce a `Map<Char, Int>` counting word-initial letters.
+2. Compute the average price per category using `groupBy` + `mapValues`.
+3. Rewrite a 4-step list pipeline with `asSequence` and explain which step benefits most.
+4. Write `fun <T> List<T>.second(): T?`, then constrain a generic `merge` function to comparable types.
+
+## What's Next
+
+Everything so far runs sequentially. Real systems juggle network calls, databases, and UI updates concurrently — and Kotlin's answer is **coroutines**, arguably its flagship feature. Deep dive in [post #7](/blog/kotlin-series-07-coroutines).
+
+Happy coding! 🚀

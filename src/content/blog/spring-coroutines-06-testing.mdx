@@ -1,0 +1,243 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #6 — Testing Coroutine Code That Actually Works"
+date: 2026-12-12
+excerpt: "runTest and virtual time, mocking suspend collaborators with MockK, testing Flows with Turbine, integration tests without flakes, and design patterns that make async code deterministic."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Testing"]
+readingTime: 13
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Async code has a reputation for untestability — races, sleeps-in-tests, suites that flake on CI only. Kotlin coroutines + the right tools dissolve most of that: **virtual time** makes delays instant yet deterministic, and structured concurrency makes cancellation observable. This post builds your full testing toolkit for everything from [posts #1–5](/blog/spring-coroutines-01-getting-started).
+
+<Callout variant="tip" title="What you'll learn">
+- `runTest`: virtual time, `advanceTimeBy`, and when to use `runBlocking` instead
+- Mocking suspend functions and Flows with MockK
+- Asserting stream behavior with Turbine
+- Integration tests over MockMvc/Testcontainers that stay green
+- The design patterns that make all of this possible
+</Callout>
+
+## Setup
+
+```kotlin
+dependencies {
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
+    testImplementation("io.mockk:mockk")                 // mocking
+    testImplementation("app.cash.turbine:turbine")       // Flow assertions
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+```
+
+## `runTest` and Virtual Time
+
+The workhorse for unit-testing suspend functions:
+
+```kotlin
+class PriceAggregatorTest {
+
+    private val feed = mockk<MarketFeed>()
+
+    @Test
+    fun `aggregates ticks until window closes`() = runTest {
+        // given
+        every { feed.stream(any()) } returns flow {
+            emit(tick(100))
+            delay(300)
+            emit(tick(110))
+            delay(300)
+            emit(tick(105))
+        }
+
+        // when
+        val result = aggregator.latestPrice("AAPL")
+
+        // then — total 600ms of delay completed INSTANTLY
+        assertEquals(105, result.price)
+    }
+}
+```
+
+`runTest` replaces the delay machinery with a **virtual scheduler**: `delay(600)` doesn't wait 600ms — it advances a clock. Tests involving timeouts, retries, and debounces run in milliseconds while exercising their real timing logic.
+
+Manipulate that clock directly when needed:
+
+```kotlin
+@Test
+fun `circuit opens after threshold failures`() = runTest {
+    val job = launch { breaker.monitored(callFailing()) }
+
+    advanceTimeBy(5_000)      // fast-forward 5 seconds of retry attempts
+    runCurrent()              // flush tasks scheduled exactly "now"
+
+    assertTrue(breaker.isOpen)
+    job.cancel()
+}
+```
+
+| API | Effect |
+|-----|--------|
+| `advanceTimeBy(ms)` | Jump the virtual clock forward |
+| `runCurrent()` | Run tasks due at the current instant |
+| `advanceUntilIdle()` | Run everything pending |
+
+### When NOT to use `runTest`
+
+Virtual time only governs *coroutine* delays. Real network sockets, databases, and containers don't consult your virtual clock — so in **integration tests** (`@SpringBootTest`, Testcontainers), use plain `runBlocking` semantics:
+
+```kotlin
+@SpringBootTest
+@AutoConfigureMockMvc
+class UserControllerIntegrationTest(
+    @Autowired val mockMvc: MockMvc,
+) {
+    @Test
+    fun `returns user`() = runBlocking {          // NOT runTest here
+        mockMvc.get("/api/users/42").andExpect {
+            status { isOk() }
+            jsonPath("$.name") { value("Ahmed Ragab") }
+        }
+    }
+}
+```
+
+Mixing them up produces the classic symptom: an integration test that hangs forever because `runTest` considers its job complete while real I/O is still pending.
+
+## Mocking Suspend Functions: MockK
+
+MockK is coroutine-native — mirror-image APIs for suspend members:
+
+```kotlin
+private val userGateway = mockk<UserGateway>()
+private val service = UserService(userGateway)
+
+@Test
+fun `propagates gateway failure`() = runTest {
+    coEvery { userGateway.getUser(42) } throws GatewayException("down")
+
+    val ex = assertFailsWith<GatewayException> {
+        service.getById(42)                    // suspend call under test
+    }
+    assertEquals("down", ex.message)
+
+    coVerify(exactly = 1) { userGateway.getUser(42) }
+}
+```
+
+Handy variants:
+
+```kotlin
+coEvery { gateway.getUser(any()) } returnsMany listOf(alice, bob)   // sequences
+coEvery { gateway.streamEvents(any()) } returns flow { emit(e1); emit(e2) }
+coEvery { notifier.notify(any(), any()) } just runs                  // Unit-returning
+```
+
+Prefer hand-rolled fakes when a collaborator interface is tiny — they document behavior instead of pinning call graphs:
+
+```kotlin
+class FakeUserGateway : UserGateway {
+    var next: Result<UserResponse> = Result.success(stubUser)
+    override suspend fun getUser(id: Long): UserResponse = next.getOrThrow()
+}
+```
+
+## Asserting Streams with Turbine
+
+Testing `Flow` means asserting *what arrives, in what order, when*. Turbine turns streams into inspectable channels:
+
+```kotlin
+@Test
+fun `emits prices then completes`() = runTest {
+    every { feed.stream("AAPL") } returns flowOf(tick(1), tick(2))
+
+    feed.stream("AAPL").test {
+        assertEquals(tick(1), awaitItem())
+        assertEquals(tick(2), awaitItem())
+        awaitComplete()
+    }
+}
+
+@Test
+fun `no emission before subscription`() = runTest {
+    coldSource.test {
+        advanceTimeBy(500)
+        expectNoEvents()               // proves laziness/coldness
+        cancelAndIgnoreRemainingEvents()
+    }
+}
+```
+
+For error cases, `awaitError()` asserts the exact exception type surfaces through the stream — crucial after [post #3](/blog/spring-coroutines-03-parallel-calls)'s fan-out semantics.
+
+## Making Code Testable: Three Injection Rules
+
+Most async test pain traces back to hardwired infrastructure. Fix it at design time:
+
+**1. Inject dispatchers, never reference them deep inside logic:**
+
+```kotlin
+@Service
+class ReportService(
+    private val repo: ReportRepository,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    suspend fun generate(): Path = withContext(ioDispatcher) { ... }
+}
+
+// In tests:
+ReportService(fakeRepo, ioDispatcher = UnconfinedTestDispatcher())
+```
+
+(Spring Boot wires this via a qualifier bean; tests swap it wholesale.)
+
+**2. Inject clocks** (`java.time.Clock`) so anything time-based is deterministic.
+
+**3. Own your scopes at the boundary.** Application-level scopes belong in a bean (`ApplicationCoroutineScope`), not scattered `GlobalScope.launch` calls you can't await in tests.
+
+## Integration Testing Streams
+
+SSE/NDJSON endpoints deserve end-to-end coverage too:
+
+```kotlin
+@Autowired lateinit var webTestClient: WebTestClient
+
+@Test
+fun `streams three events then completes`() = runBlocking {
+    webTestClient.get().uri("/api/prices/AAPL")
+        .accept(MediaType.TEXT_EVENT_STREAM)
+        .exchange()
+        .expectStatus().isOk
+        .returnResult(String::class.java)
+        .responseBody
+        .take(3)                       // bounded consumption
+        .collectList()
+        .block()!!
+        .let { assertEquals(3, it.size) }
+}
+```
+
+With [Testcontainers](https://testcontainers.com) backing real dependencies, these tests catch the integration bugs unit tests can't see — thread-hopping context loss, pool exhaustion under parallel branches ([post #4](/spring-coroutines-04-transactions)).
+
+## A Pragmatic Test Matrix
+
+| What | How |
+|------|-----|
+| Service logic with delays/timeouts | `runTest` + virtual time + MockK/fakes |
+| Flow pipelines & operators | Turbine inside `runTest` |
+| Fan-out failure semantics | Fake collaborators throwing; assert sibling cancellation |
+| Controllers/end-to-end | `runBlocking` + MockMvc/WebTestClient (+ Testcontainers) |
+| Concurrency limits | Load a `Semaphore` path with N+ concurrent fakes; assert queueing |
+
+## Exercises
+
+1. Write `runTest` coverage for a retry-with-backoff helper; verify attempt count and elapsed *virtual* time.
+2. Replace one Mockito-style mock of a suspend dependency with MockK, then with a fake; compare readability.
+3. Add a Turbine test proving your price endpoint conflates bursts into the latest tick.
+4. Find one `Dispatchers.IO` buried mid-service; extract it behind constructor injection and re-test.
+
+## What's Next
+
+Correct and tested isn't the finish line — production traffic brings timeouts, cascading failures, and noisy neighbors. [Post #7](/blog/spring-coroutines-07-resilience) builds the defensive layer: timeout budgets, retries with jitter, circuit breakers, and bulkheads.
+
+Happy coding! 🚀

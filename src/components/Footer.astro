@@ -1,0 +1,69 @@
+---
+const currentYear = new Date().getFullYear();
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
+
+const footerLinks = [
+  { href: `${base}`, label: 'Home' },
+  { href: `${base}about`, label: 'About' },
+  { href: `${base}blog`, label: 'Blog' },
+  { href: `${base}contact`, label: 'Contact' },
+  { href: `${base}rss.xml`, label: 'RSS Feed' },
+];
+
+const socialLinks = [
+  { href: 'https://github.com/aragabz', label: 'GitHub', icon: 'mdi:github' },
+  { href: 'https://linkedin.com/in/aragabz', label: 'LinkedIn', icon: 'mdi:linkedin' },
+  { href: 'https://twitter.com/aragabz', label: 'Twitter', icon: 'mdi:twitter' },
+];
+---
+
+<footer class="bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] py-16 px-6 mt-20">
+  <div class="max-w-container mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+      <!-- Left: Brand -->
+      <div>
+        <h2 class="text-2xl font-bold mb-4" style="color: var(--color-accent);">AR</h2>
+        <p class="text-[var(--color-text-secondary)] max-w-md">
+          Software Engineering Technical Lead focused on building high-performance, 
+          user-centric applications across mobile and web platforms.
+        </p>
+      </div>
+
+      <!-- Right: Links -->
+      <div class="grid grid-cols-2 gap-8">
+        <div>
+          <h3 class="font-bold mb-4">Quick Links</h3>
+          <ul class="space-y-2 list-none p-0">
+            {footerLinks.map(link => (
+              <li>
+                <a href={link.href} class="text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3 class="font-bold mb-4">Connect</h3>
+          <ul class="space-y-2 list-none p-0">
+            {socialLinks.map(link => (
+              <li>
+                <a href={link.href} target="_blank" rel="noopener noreferrer" class="text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-8 border-t border-[var(--color-border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[var(--color-text-tertiary)] text-sm">
+      <p>© {currentYear} Ahmed Ragab. All rights reserved.</p>
+      <div class="flex gap-6">
+        <a href={`${base}rss.xml`} class="hover:text-[var(--color-accent)] transition-colors">RSS Feed</a>
+        <p>Made with Astro 7</p>
+      </div>
+    </div>
+  </div>
+</footer>

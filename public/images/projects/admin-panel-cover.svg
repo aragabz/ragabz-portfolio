@@ -1,0 +1,135 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>React Admin Panel — dashboard template</title>
+<desc>Dark cover image with violet and indigo accents for the aragabz/react-admin-panel repository, a React admin dashboard template. Shows the project name, its stack (React, Redux Toolkit, TypeScript, Tailwind, React Router, Lucide) and a data-table + filter sidebar mockup.</desc>
+<defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+    .display { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  </style>
+
+  <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#0E0A16"/>
+    <stop offset="55%" stop-color="#110D1B"/>
+    <stop offset="100%" stop-color="#080610"/>
+  </linearGradient>
+
+  <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#A78BFA"/>
+    <stop offset="55%" stop-color="#818CF8"/>
+    <stop offset="100%" stop-color="#C084FC"/>
+  </linearGradient>
+
+  <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#8B5CF6"/>
+    <stop offset="100%" stop-color="#6366F1"/>
+  </linearGradient>
+
+  <radialGradient id="glowViolet" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.5"/>
+    <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glowIndigo" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#6366F1" stop-opacity="0.4"/>
+    <stop offset="100%" stop-color="#6366F1" stop-opacity="0"/>
+  </radialGradient>
+
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="30"/>
+  </filter>
+
+  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+    <circle cx="1.2" cy="1.2" r="1.2" fill="#FFFFFF" opacity="0.05"/>
+  </pattern>
+</defs>
+
+<rect width="1200" height="630" fill="url(#bgGrad)"/>
+<rect width="1200" height="630" fill="url(#dots)"/>
+
+<circle cx="130" cy="80" r="260" fill="url(#glowViolet)" filter="url(#soft)"/>
+<circle cx="990" cy="560" r="280" fill="url(#glowIndigo)" filter="url(#soft)"/>
+
+<rect x="0.5" y="0.5" width="1199" height="629" fill="none" stroke="#282048" stroke-width="1"/>
+
+<rect x="80" y="90" width="276" height="30" rx="15" fill="#171025" stroke="#33275C" stroke-width="1"/>
+<circle cx="98" cy="105" r="4" fill="#A78BFA"/>
+<text x="112" y="110" class="mono" font-size="13" letter-spacing="1.5" fill="#C4B5FD">ADMIN DASHBOARD TEMPLATE</text>
+
+<text x="76" y="210" class="display" font-size="86" font-weight="700" fill="url(#titleGrad)">React Admin</text>
+<text x="76" y="292" class="display" font-size="86" font-weight="700" fill="url(#titleGrad)">Panel</text>
+
+<text x="80" y="330" class="display" font-size="19" font-weight="500" fill="#A79BC4">
+  <tspan x="80" dy="0">Auth, role-based access, and a library of polished</tspan>
+  <tspan x="80" dy="26">UI components — ready for your internal tools.</tspan>
+</text>
+
+<g class="mono" font-size="15" font-weight="500">
+  <rect x="80" y="396" width="100" height="42" rx="21" fill="#171025" stroke="#8B5CF6" stroke-width="1.2"/>
+  <text x="130" y="422" text-anchor="middle" fill="#C4B5FD">React</text>
+
+  <rect x="196" y="396" width="178" height="42" rx="21" fill="#171025" stroke="#818CF8" stroke-width="1.2"/>
+  <text x="285" y="422" text-anchor="middle" fill="#A5B4FC">Redux Toolkit</text>
+
+  <rect x="390" y="396" width="118" height="42" rx="21" fill="#171025" stroke="#A78BFA" stroke-width="1.2"/>
+  <text x="449" y="422" text-anchor="middle" fill="#C4B5FD">TypeScript</text>
+
+  <rect x="80" y="452" width="122" height="42" rx="21" fill="#171025" stroke="#8B5CF6" stroke-width="1.2"/>
+  <text x="141" y="478" text-anchor="middle" fill="#C4B5FD">Tailwind</text>
+
+  <rect x="218" y="452" width="162" height="42" rx="21" fill="#171025" stroke="#818CF8" stroke-width="1.2"/>
+  <text x="299" y="478" text-anchor="middle" fill="#A5B4FC">React Router</text>
+
+  <rect x="396" y="452" width="112" height="42" rx="21" fill="#171025" stroke="#C084FC" stroke-width="1.2"/>
+  <text x="452" y="478" text-anchor="middle" fill="#D8B4FE">Lucide</text>
+</g>
+
+<rect x="80" y="522" width="478" height="46" rx="10" fill="#0D0A16" stroke="#20193A" stroke-width="1"/>
+<circle cx="102" cy="545" r="4" fill="#34D399"/>
+<text x="118" y="550" class="mono" font-size="15" fill="#D2CCE8">git clone github.com/aragabz/react-admin-panel</text>
+
+<text x="80" y="600" class="mono" font-size="14" fill="#5B5180">github.com/aragabz/react-admin-panel</text>
+
+<!-- Admin layout mockup on the right -->
+<g transform="translate(990,330)">
+  <rect x="-185" y="-195" width="370" height="390" rx="16" fill="#100C1E" stroke="#251E40" stroke-width="1.5"/>
+  <circle cx="-161" cy="-171" r="5" fill="#F87171"/>
+  <circle cx="-141" cy="-171" r="5" fill="#FBBF24"/>
+  <circle cx="-121" cy="-171" r="5" fill="#34D399"/>
+
+  <!-- Sidebar -->
+  <rect x="-185" y="-145" width="56" height="340" fill="#120D22" stroke="#221B3D" stroke-width="1"/>
+  <rect x="-164" y="-130" width="14" height="14" rx="4" fill="url(#badgeGrad)"/>
+  <rect x="-164" y="-106" width="10" height="10" rx="3" fill="#3A3361"/>
+  <rect x="-164" y="-86" width="10" height="10" rx="3" fill="#3A3361"/>
+  <rect x="-164" y="-66" width="10" height="10" rx="3" fill="#3A3361"/>
+  <rect x="-164" y="-46" width="10" height="10" rx="3" fill="#8B5CF6"/>
+  <rect x="-164" y="-26" width="10" height="10" rx="3" fill="#3A3361"/>
+
+  <!-- Header -->
+  <rect x="-121" y="-145" width="298" height="30" fill="#140F26" stroke="#241D40" stroke-width="1"/>
+  <rect x="-104" y="-136" width="90" height="12" rx="5" fill="#37305F"/>
+  <rect x="150" y="-137" width="14" height="14" rx="7" fill="url(#badgeGrad)"/>
+
+  <!-- Data table -->
+  <rect x="-121" y="-108" width="298" height="150" rx="10" fill="#140F26" stroke="#241D40" stroke-width="1"/>
+  <rect x="-108" y="-94" width="130" height="10" rx="5" fill="#38315E"/>
+  <rect x="-108" y="-76" width="180" height="8" rx="4" fill="#251E40"/>
+  <rect x="-108" y="-60" width="180" height="8" rx="4" fill="#251E40"/>
+  <rect x="-108" y="-44" width="180" height="8" rx="4" fill="#251E40"/>
+  <rect x="-108" y="-28" width="180" height="8" rx="4" fill="#251E40"/>
+  <rect x="100" y="-94" width="34" height="14" rx="7" fill="#2C2451"/>
+  <rect x="100" y="-94" width="34" height="14" rx="7" fill="#3A3169" opacity="0.5"/>
+  <rect x="142" y="-94" width="34" height="14" rx="7" fill="#8B5CF6"/>
+
+  <!-- Role access card -->
+  <rect x="-121" y="54" width="144" height="84" rx="10" fill="#140F26" stroke="#241D40" stroke-width="1"/>
+  <circle cx="-96" cy="78" r="8" fill="#3A3169"/>
+  <rect x="-82" y="72" width="60" height="8" rx="4" fill="#38315E"/>
+  <rect x="-82" y="86" width="40" height="8" rx="4" fill="#2A2350"/>
+
+  <rect x="33" y="54" width="144" height="84" rx="10" fill="#140F26" stroke="#241D40" stroke-width="1"/>
+  <circle cx="58" cy="78" r="8" fill="#8B5CF6"/>
+  <rect x="72" y="72" width="60" height="8" rx="4" fill="#38315E"/>
+  <rect x="72" y="86" width="40" height="8" rx="4" fill="#2A2350"/>
+</g>
+</svg>

@@ -1,0 +1,88 @@
+---
+title: "CI/CD for Kotlin Multiplatform: GitHub Actions for Android, iOS, and Web"
+date: 2026-08-23
+excerpt: "Build matrix, test matrices, signing configs, and publishing to Google Play, App Store, and npm from a single workflow."
+tags: ["CI/CD", "GitHub Actions", "Kotlin Multiplatform", "DevOps"]
+readingTime: 9
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+One workflow to rule them all — from unit tests on iOS simulators to publishing APKs and npm packages.
+
+<Callout variant="tip" title="What you'll learn">
+- How to set up a `matrix` strategy for Android API levels, iOS versions, and web targets
+- Signing your Android App Bundle and Apple IPA without storing keys in plain text
+- Publishing to Maven Central, Google Play, and npm from a single CI run
+</Callout>
+
+### High‑level workflow structure
+
+```yaml
+name: "KMP CI/CD"
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: macos-latest   # needed for iOS simulators
+    strategy:
+      matrix:
+        target: [android, ios, desktop, web]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Set up Kotlin
+        uses: Kotlin/kotlin-actions/setup@v1
+        with:
+          kotlin-version: '1.9.20'
+      - name: Cache Gradle modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Run tests for ${{ matrix.target }}
+        run: ./gradlew :common:test
+        # Additional target‑specific test tasks can be added below
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate release notes
+        run: ./gradlew :common:generateReleaseNotes
+      - name: Publish Android AAB
+        if: matrix.target == 'android'
+        env:
+          GOOGLE_PLAY_JSON_KEY: ${{ secrets.GOOGLE_PLAY_JSON_KEY }}
+        run: |
+          ./gradlew :androidApp:bundleRelease
+          ./gradlew appstore-upload --release-file app/build/outputs/bundle/release/app-release.aab
+      - name: Publish iOS IPA
+        if: matrix.target == 'ios'
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive -archivePath build/ios_app.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios_app.ipa
+      - name: Publish to npm (web)
+        if: matrix.target == 'web'
+        run: |
+          npm run build
+          npm publish --access public

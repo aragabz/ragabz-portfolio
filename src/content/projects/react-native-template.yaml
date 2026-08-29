@@ -1,5 +1,14 @@
 title: "React Native Template Ultimacode"
 description: "A comprehensive Expo and React Native template focused on clean architecture, TypeScript, Zustand, TanStack Query, MMKV storage, and localization (English/Arabic) with RTL support."
+overview: "An open-source React Native starter built on Expo that wires up navigation, state management, server caching, and native storage from the very first commit. It is fully localized with English and Arabic (RTL) support, so teams can ship a consistent, accessible mobile app without reinventing the foundation."
+status: "Maintained"
+year: 2025
+features:
+  - "Clean-architecture folder structure with feature modules"
+  - "Zustand for client state + TanStack Query for server cache"
+  - "MMKV for high-performance native key-value storage"
+  - "Localization with i18next, English + Arabic (RTL) ready"
+  - "Axios client and typed API services out of the box"
 tech:
   - React Native
   - Expo

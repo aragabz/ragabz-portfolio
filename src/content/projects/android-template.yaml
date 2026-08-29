@@ -1,5 +1,14 @@
 title: "Android Clean Architecture Template"
 description: "A modern, modular Android template using Jetpack Compose, Kotlin, Detekt/Ktlint static analysis, Fastlane CI/CD automation, and custom Gradle build-logic to accelerate app development."
+overview: "A reusable, production-oriented Android starter kit that packages the patterns I rely on most. It ships with a clean multi-module architecture, baseline profiles for launch performance, static analysis wired into the build, and a Fastlane pipeline so a new app can go from clone to a signed CI/CD release in minutes."
+status: "Maintained"
+year: 2025
+features:
+  - "Multi-module Gradle build with custom build-logic and version catalogs"
+  - "Jetpack Compose UI scaffolded with Material 3 theming"
+  - "Detekt + ktlint static analysis enforced on every build"
+  - "Baseline Profiles for faster cold-start performance"
+  - "Fastlane automation for screenshots and Play Store release"
 tech:
   - Kotlin
   - Jetpack Compose

@@ -1,0 +1,164 @@
+---
+title: "Building Reusable Compose UI Libraries: Theming, Dark Mode, and Sharing Across Apps"
+date: 2026-08-23
+excerpt: "Design‑system composables, `MaterialTheme`, custom `Brush`, and publishing to a Gradle component library used by multiple projects."
+tags: ["Jetpack Compose", "Design System", "Reusability"]
+readingTime: 7
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Extract your design system into a Gradle component library so it lives in one place and spreads everywhere.
+
+<Callout variant="tip" title="What you'll learn">
+- How to structure a `compose-ui-lib` subproject
+- Publishing themed `Color`, `Typography`, and `Shape` to consuming apps
+- Dark‑mode switching without rebuilding the host app
+</Callout>
+
+### Library module layout
+
+```text
+compose‑ui‑lib/
+├─ src/
+│  ├─ commonMain/
+│  │  ├─ composeUi/          # Compose UI code (no Android resources)
+│  │  ├─ theme/              # Color, Typography, Shape, modifiers
+│  │  └─ resources/          # Optional: static assets, vector icons
+│  ├─ androidMain/           # Android‑specific resources (drawables, styles)
+│  └─ iosMain/               # iOS bridge (if targeting CMP)
+```
+
+### Core theme skeleton (commonMain)
+
+```kotlin
+// Color.kt
+val LightColorPalette = lightColorScheme(
+    primary = Color(0xFF6750A4),
+    secondary = Color(0xFFFFC107),
+    surface = Color(0xFFFFFFFF),
+    background = Color(0xFFF5F5F5),
+    onPrimary = Color.WHITE,
+    onSurface = Color.BLACK
+)
+
+val DarkColorPalette = darkColorScheme(
+    primary = Color(0xFFBB86FC),
+    secondary = Color(0xFFFFC107),
+    surface = Color(0xFF212121),
+    background = Color(0xFF121212),
+    onPrimary = Color.BLACK,
+    onSurface = Color.WHITE
+)
+
+// Typography.kt
+val Display1 = TextStyle(
+    fontFamily = "Roboto",
+    fontWeight = FontWeight.W300,
+    fontSize = 57.sp,
+    lineHeight = 64.sp
+)
+
+// Shape.kt
+val Rounded = RoundedCornerShape(16.dp)
+
+// Theme.kt — composable that consumed apps call once at root
+@Composable
+fun UiTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    MaterialTheme(
+        colors = if (darkTheme) DarkColorPalette else LightColorPalette,
+        typography = Typography(Display1, /* …other text styles */ ),
+        shapes = Rounded,
+        content = content
+    )
+}
+```
+
+### Consuming the library in an host app
+
+```kotlin
+// androidApp — root composable
+@Composable
+fun App() {
+    // CALL THIS ONCE, at the top of your Composition
+    UiTheme { // default dark/light auto‑detection
+        MaterialTheme { /* …your app screens… */ }
+    }
+}
+```
+
+Because `UiTheme` lives in the library, **any change to the color palette or typography propagates instantly** to all apps that depend on the published version—no Gradle sync required beyond bumping the version.
+
+### Dark‑mode handling without rebuild
+
+```kotlin
+// Inside the library's UiTheme
+remember {
+    System.getProperty("os.name").lowerCase().contains("mac") // placeholder
+    // In production, use your own ConfigLayer or SettingsRepository
+    // that reads a shared preference or system flag.
+    isSystemInDarkTheme()
+}
+
+// The MaterialTheme colors are recomputed on every composition,
+// so toggling the flag in Settings instantly refreshes the UI.
+```
+
+### Publishing the library to Maven Central
+
+1. **Add signing configuration** in `build.gradle.kts` of the library module:
+   ```kotlin
+   signing {
+       useGroovy(
+           file(" signing.gradle")
+       ) // keep key out of VCS
+   }
+   ```
+2. **Publish plugin** in `settings.gradle.kts`:
+   ```kotlin
+   pluginManagement {
+       repositories { mavenCentral() }
+       plugins {
+           id("maven-publish")
+       }
+   }
+   ```
+3. **`build.gradle.kts` publish task**:
+   ```kotlin
+   plugins {
+       `maven-publish`
+   }
+   purchase {
+       publications {
+           composeUiLib(MavenPublication) {
+               from(components["composeUiLib"])
+               group = "com.example"
+               artifactId = "compose-ui-lib"
+               version = "0.1.0"
+           }
+       }
+   }
+   ```
+4. **Consume from any project**:
+   ```kotlin
+   dependencies {
+       implementation("com.example:compose-ui-lib:0.1.0")
+   }
+   ```
+
+### Checklist for library authors
+
+- [ ] All UI kits use **`MaterialTheme`** props (colors/typography) rather than hard‑coded `Color(0xFF…)`.
+- [ ] `UiTheme` composable is **`@Composable`** and lives in `commonMain` — no Android resources inside the shared module.
+- [ ] **Semantic naming**: `SecondaryColor`, `BodyText1`, `CardShape` — avoids collisions when multiple libraries are used together.
+- [ ] **Test across versions**: publish a `0.1.0` → consume in a sample app, change the library version to `0.2.0` in the sample’s `build.gradle.kts`, sync, and verify the UI updates without a clean/rebuild of the host’s source set.
+
+## Resources
+
+- [Design system guidelines — Material](https://material.io/design/color/the-color-system.html)
+- [Compose multi‑module setup — Android Devs](https://developer.android.com/topic/modularization)
+- [Publishing Gradle plugins — Guide](https://docs.gradle.org/current/userguide/publishing_gradle_plugins.html)

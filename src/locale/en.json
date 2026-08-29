@@ -1,0 +1,37 @@
+{
+  "siteName": "Ahmed Ragab - Portfolio",
+  "navigation": {
+    "home": "Home",
+    "about": "About",
+    "projects": "Projects",
+    "blog": "Blog",
+    "contact": "Contact"
+  },
+  "hero": {
+    "title": "Ahmed Ragab",
+    "subtitle": "Software Engineering Technical Lead",
+    "cta": "Get in Touch"
+  },
+  "about": {
+    "title": "About Me",
+    "description": "Software Engineering Technical Lead with 9+ years of experience delivering end-to-end solutions across mobile and back-end systems.",
+    "stats": {
+      "experience": "9+ Years Experience",
+      "companies": "7+ Companies",
+      "projects": "10+ Projects"
+    }
+  },
+  "contact": {
+    "title": "Get In Touch",
+    "description": "Have a project in mind? Let's work together to create something amazing.",
+    "name": "Name",
+    "email": "Email",
+    "subject": "Subject",
+    "message": "Message",
+    "send": "Send Message"
+  },
+  "footer": {
+    "copyright": "© 2026 Ahmed Ragab. All rights reserved.",
+    "madeWith": "Made with Astro"
+  }
+}

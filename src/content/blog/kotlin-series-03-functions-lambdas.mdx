@@ -1,0 +1,268 @@
+---
+title: "Kotlin from Zero to Hero #3 — Functions, Lambdas & Extension Functions"
+date: 2026-09-05
+excerpt: "Kotlin functions go beyond Java methods: default and named arguments, single-expression bodies, extension functions, lambdas, higher-order functions, and the scope functions that define idiomatic Kotlin."
+tags: ["Kotlin", "Kotlin Series", "Functions", "Lambdas"]
+readingTime: 12
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+So far we've seen *what* Kotlin code looks like; now let's look at how it's organized. Functions are where Kotlin's design philosophy — concise, safe, expressive — really shows. This post covers everything from basic declarations to the lambdas and scope functions you'll use every single day.
+
+<Callout variant="tip" title="What you'll learn">
+- Function syntax: parameters, defaults, named arguments
+- Single-expression functions and `Unit`
+- Extension functions — adding behavior to existing types
+- Lambdas and higher-order functions, including trailing-lambda syntax
+- The five scope functions: `let`, `run`, `apply`, `also`, `with`
+</Callout>
+
+## Declaring Functions
+
+```kotlin
+fun greet(name: String): String {
+    return "Hello, $name!"
+}
+```
+
+Anatomy: `fun` keyword → name → parameter list (each `name: Type`) → optional return type → body.
+
+### Single-expression functions
+
+If a function returns the result of a single expression, drop the braces and `return` entirely:
+
+```kotlin
+fun greet(name: String): String = "Hello, $name!"
+
+// return type can often be inferred
+fun double(x: Int) = x * 2
+```
+
+This isn't just cosmetic — it makes small utility functions read like definitions in math.
+
+### `Unit`: the absence of a meaningful value
+
+Functions that don't return anything have return type `Unit` (like Java's `void`, but an actual type). You rarely write it:
+
+```kotlin
+fun log(message: String): Unit {   // : Unit is redundant
+    println("[LOG] $message")
+}
+```
+
+`Unit` being a real type has a pleasant consequence: generic code can treat "returns nothing" uniformly with "returns something".
+
+## Default and Named Arguments
+
+Two features that eliminate most builder-pattern and overload boilerplate from Java:
+
+```kotlin
+fun connect(
+    host: String,
+    port: Int = 5432,
+    timeoutMs: Long = 3_000,
+    ssl: Boolean = false,
+) {
+    println("Connecting to $host:$port (ssl=$ssl)")
+}
+```
+
+Callers supply only what differs from the defaults:
+
+```kotlin
+connect("db.example.com")                              // all defaults
+connect("db.example.com", port = 5433)                 // one override
+connect(host = "db.example.com", ssl = true)           // skip middle params!
+```
+
+That third call is the key trick: **named arguments** let you skip any parameter and improve readability at call sites for boolean flags especially. Compare `connect("db", false)` — false for what? — with `connect("db", ssl = false)`.
+
+<Callout variant="note">
+Java code calling your Kotlin functions can't use default arguments directly. Add `@JvmOverloads` to generate the traditional overload chain automatically.
+</Callout>
+
+## Top-Level, Local, and Member Functions
+
+Kotlin gives you more placement options than Java:
+
+```kotlin
+// top-level — no containing class needed
+fun isValidEmail(s: String) = s.contains("@")
+
+fun process(input: String) {
+    // local function — scoped inside another function
+    fun normalize(s: String) = s.trim().lowercase()
+
+    val clean = normalize(input)
+    if (!isValidEmail(clean)) error("invalid email")
+}
+```
+
+Use local functions to name a concept used only once without polluting class or file scope.
+
+## Extension Functions
+
+The signature Kotlin feature of this post. Extensions let you **add new functions to existing types** — even types you don't own like `String` or `Int` — without inheritance or wrappers:
+
+```kotlin
+fun String.truncate(max: Int): String =
+    if (length <= max) this else take(max) + "…"
+
+println("Kotlin is fantastic".truncate(9))  // "Kotlin is…"
+```
+
+Inside the extension, `this` refers to the receiver (the object being extended). With a single parameter it's conventionally written as an implicit receiver, exactly like member access above (`length`, `take`).
+
+They're also how much of the standard library feels built-in:
+
+```kotlin
+fun List<Int>.secondOrNull(): Int? = getOrNull(1)
+
+val nums = listOf(10, 20, 30)
+println(nums.secondOrNull())  // 20
+```
+
+<Callout variant="warning">
+Extensions are resolved **statically** — they don't actually modify the class, so they don't participate in runtime polymorphism. If a member function and an extension have identical signatures, the member always wins.
+</Callout>
+
+We'll meet *extension properties* and *infix functions* along the way; they follow the same idea.
+
+## Lambdas
+
+A lambda is an anonymous function you pass around as a value:
+
+```kotlin
+val sum: (Int, Int) -> Int = { a, b -> a + b }
+val shout = { s: String -> s.uppercase() + "!" }
+
+println(sum(2, 3))       // 5
+println(shout("hey"))    // HEY!
+```
+
+`(Int, Int) -> Int` is a **function type** — inputs on the left, return type on the right. Functions are first-class citizens: store them in variables, pass them, return them.
+
+### Higher-order functions
+
+A higher-order function takes or returns functions. Here's a minimal example plus the standard library equivalent:
+
+```kotlin
+fun operate(x: Int, y: Int, op: (Int, Int) -> Int): Int = op(x, y)
+
+operate(4, 5) { a, b -> a * b }        // 20
+operate(4, 5, ::sumOf)                  // method reference syntax
+```
+
+Note `{ a, b -> ... }` placed *after* the closing parenthesis — if the lambda is the last argument, it moves outside the parens. That's the **trailing lambda** convention, and it's why Kotlin DSLs look so clean.
+
+When the lambda has exactly one parameter you can skip naming it and use the implicit `it`:
+
+```kotlin
+val names = listOf("Ali", "Omar", "Sara")
+
+val lengths = names.map { it.length }          // [3, 4, 4]
+val longOnes = names.filter { it.length > 3 }  // [Omar]
+```
+
+Chained together, this is the fluent collection style you saw teased in post #1:
+
+```kotlin
+val result = (1..100)
+    .filter { it % 3 == 0 }
+    .map { it * it }
+    .take(3)                    // [9, 36, 81]
+```
+
+### Returning from lambdas
+
+By default, `return` inside a lambda passed to an inline function (like `forEach`) returns from the *enclosing function* — usually not what you want. Use a label:
+
+```kotlin
+fun findFirstEven(nums: List<Int>): Int? {
+    nums.forEach { n ->
+        if (n % 2 == 0) return n     // returns from findFirstEven — fine here
+    }
+    return null
+}
+
+listOf(1, 2, 3).forEach label@{ n ->
+    if (n == 2) return@label         // exits only this iteration... 
+    println(n)
+}
+// cleaner: just use `return@forEach`
+```
+
+Rule of thumb: prefer `filter`/`firstOrNull`/etc. over clever lambda-returns — intent beats mechanism.
+
+## Scope Functions
+
+Five standard-library higher-order functions that execute a block within an object's scope. They differ in two dimensions: **what the block receives** (`it` vs `this`) and **what they return** (the object vs the block's result).
+
+| Function | Block receiver | Returns | Typical use |
+|----------|---------------|---------|-------------|
+| `let` | `it` | block result | transform a (nullable) value |
+| `run` | `this` | block result | compute something from an object |
+| `with` | `this` (argument) | block result | group calls on an object |
+| `apply` | `this` | the object | configure/initialize an object |
+| `also` | `it` | the object | side effects: logging, validation |
+
+### `apply` — configure an object, return it
+
+```kotlin
+val server = Server().apply {
+    port = 8080
+    host = "0.0.0.0"
+    start()
+}   // server, fully configured
+```
+
+Because the block uses `this`, you access members directly — reads like a configuration script.
+
+### `let` — transform, especially after null checks
+
+```kotlin
+user?.email?.let { email ->
+    sendWelcome(email)
+}
+```
+
+Only runs when `email` is non-null — we'll build heavily on this in [post #4](/blog/kotlin-series-04-null-safety).
+
+### `also` — peek with side effects
+
+```kotlin
+val order = createOrder()
+    .also { logger.info("Created order ${it.id}") }
+    .also { validate(it) }
+```
+
+### `with` / `run` — grouped computation
+
+```kotlin
+val header = with(request) {
+    "$method $path HTTP/1.1"      // last expression is the result
+}
+
+val size = File(path).run {
+    if (exists()) length() else -1
+}
+```
+
+<Callout variant="tip">
+Don't memorize the table — internalize the pattern: *configure* → `apply`, *transform/null-check* → `let`, *side-effect* → `also`, *compute* → `run`/`with`. Overuse of scope functions hurts readability; reach for them when they remove repetition.
+</Callout>
+
+## Exercises
+
+1. Write a function `formatPrice(amount: Double, currency: String = "USD")` using a single-expression body.
+2. Create `fun Int.squared()`, then use it inside a `map` over `1..10`.
+3. Write `repeat(times: Int, action: (Int) -> Unit)` yourself, then compare with the stdlib version.
+4. Take any object construction in your own code and refactor it with `apply`.
+
+## What's Next
+
+You now hold Kotlin's everyday toolbox. Next up is the feature that gives Kotlin its safety reputation: **null safety** — nullable types, safe calls, the Elvis operator, and smart casts. See you in [post #4](/blog/kotlin-series-04-null-safety).
+
+Happy coding! 🚀

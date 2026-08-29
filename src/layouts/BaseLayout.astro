@@ -1,5 +1,47 @@
 ---
 import '../styles/global.css';
+import Footer from '../components/Footer.astro';
+import { ClientRouter } from 'astro:transitions';
+
+const locales = {
+  en: {
+    siteName: 'Ahmed Ragab - Portfolio',
+    navigation: {
+      home: 'Home',
+      about: 'About',
+      projects: 'Projects',
+      blog: 'Blog',
+      contact: 'Contact'
+    },
+    hero: {
+      title: 'Ahmed Ragab',
+      subtitle: 'Software Engineering Technical Lead',
+      cta: 'Get in Touch'
+    },
+    about: {
+      title: 'About Me',
+      description: 'Software Engineering Technical Lead with 9+ years of experience delivering end-to-end solutions across mobile and back-end systems.',
+      stats: {
+        experience: '9+ Years Experience',
+        companies: '7+ Companies',
+        projects: '10+ Projects'
+      }
+    },
+contact: {
+      title: 'Get In Touch',
+      description: "Have a project in mind? Let's work together to create something amazing.",
+      name: 'Name',
+      email: 'Email',
+      subject: 'Subject',
+      message: 'Message',
+      send: 'Send Message'
+    },
+    footer: {
+      copyright: '© 2026 Ahmed Ragab. All rights reserved.',
+      madeWith: 'Made with Astro'
+    }
+  }
+};
 
 export interface Props {
   title?: string;
@@ -10,17 +52,30 @@ export interface Props {
 }
 
 const {
-  title = 'Ahmed Ragab - Software Engineering Technical Lead',
-  description = 'Software Engineering Technical Lead and Full-Stack Engineer with 9+ years of experience delivering end-to-end solutions across mobile and back-end systems. Expert in Java, Kotlin, React Native, and modern architectural patterns.',
+  title = locales.en.siteName,
+  description = locales.en.about.description,
   image = '/og-image.jpg',
   type = 'website',
-  keywords = ['Software Engineer', 'Technical Lead', 'Full-Stack Engineer', 'Android', 'React Native', 'Kotlin', 'Java', 'Mobile Developer'],
+  keywords = [
+    'Software Engineer',
+    'Technical Lead',
+    'Full-Stack Engineer',
+    'Android',
+    'React Native',
+    'Kotlin',
+    'Java',
+    'Mobile Developer',
+    'Web Development',
+    'TypeScript',
+    'React',
+    'Swift'
+  ],
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const socialImageURL = new URL(image.startsWith('/') && base !== '/' ? `${base}${image.slice(1)}` : image, Astro.site);
-const siteName = 'Ahmed Ragab - Portfolio';
+const siteName = locales.en.siteName;
 ---
 
 <!doctype html>
@@ -59,6 +114,8 @@ const siteName = 'Ahmed Ragab - Portfolio';
     <meta name="author" content="Ahmed Ragab" />
     <link rel="canonical" href={canonicalURL} />
     
+    <ClientRouter />
+    
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canonicalURL} />
@@ -81,7 +138,7 @@ const siteName = 'Ahmed Ragab - Portfolio';
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
-      "@type": "Person",
+      "@type": ["Person", "Organization"],
       "name": "Ahmed Ragab",
       "url": Astro.site?.toString(),
       "image": socialImageURL.toString(),
@@ -92,9 +149,31 @@ const siteName = 'Ahmed Ragab - Portfolio';
         "https://www.linkedin.com/in/aragabz/"
       ],
       "knowsAbout": keywords,
+      "founder": "Ahmed Ragab",
+      "founded": "2015",
+      "location": "Remote"
     })} />
     
-    <!-- Additional Structured Data for Website -->
+    {type === 'article' && (
+      <script type="application/ld+json" set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": title,
+        "url": canonicalURL.toString(),
+        "author": {
+          "@type": "Person",
+          "name": "Ahmed Ragab"
+        },
+        "image": socialImageURL.toString(),
+        "datePublished": new Date().toISOString(),
+        "dateModified": new Date().toISOString(),
+        "description": description,
+        "mainEntityOfPage": canonicalURL.toString(),
+        "keywords": keywords.join(', ')
+      })} />
+    )}
+    
+    <!-- Website Schema -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -124,6 +203,8 @@ href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=sw
   </head>
   <body>
     <slot />
+    
+    <Footer />
     
     <!-- Analytics -->
     <script>

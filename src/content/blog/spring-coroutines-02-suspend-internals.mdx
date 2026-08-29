@@ -1,0 +1,164 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #2 — How Spring Actually Runs Your Suspend Functions"
+date: 2026-11-14
+excerpt: "Under the hood of suspend endpoints: async dispatch in MVC, which dispatcher runs your code, why ThreadLocal-based tools break at suspension points, and the golden rule for calling blocking libraries."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Internals"]
+readingTime: 12
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+[Last time](/blog/spring-coroutines-01-getting-started) you shipped your first `suspend` endpoint and saw threads get released during waits. But *which* thread resumed your code? What happens to request-scoped state when execution hops threads? And what's the correct way to call that legacy JDBC repository from a coroutine? This post answers all three.
+
+<Callout variant="tip" title="What you'll learn">
+- The async dispatch lifecycle in Spring MVC (and how WebFlux differs)
+- Which dispatcher executes your controller code — and the `Unconfined` surprise
+- Why `ThreadLocal`s (MDC, SecurityContext) break across suspension points
+- The Golden Rule for mixing blocking libraries into coroutine code
+</Callout>
+
+## The Lifecycle of a Suspend Request
+
+When a client hits your suspend endpoint on **Spring MVC**, this is what actually happens:
+
+```
+1. Tomcat accepts connection on servlet thread T1
+2. DispatcherServlet routes to handler method
+3. Handler sees `suspend` modifier → invokes it passing a Continuation,
+   wrapped as an async request (AsyncWebRequest starts)
+4. Your code runs until first suspension point → returns to T1
+5. T1 goes back to the pool; servlet container holds the connection open
+6. ... network response arrives later ...
+7. Continuation resumes — possibly on thread T7
+8. Result written via async dispatch; container completes the response
+9. MVC performs a second dispatch cycle so filters complete cleanly
+```
+
+Key consequences:
+
+- **One request ≠ one thread anymore.** Logs will show different thread names before and after suspension points. If you grep logs assuming thread-per-request correlation, you'll be confused — use request IDs instead ([post #4](/blog/spring-coroutines-04-transactions)).
+- Filters and interceptors still run — twice-ish, via the async dispatch mechanism (`asyncDispatch`), so security headers etc. still apply.
+- Timeouts: the container-level async timeout still applies (`spring.mvc.async.request-timeout`), important since your endpoint can now outlive any single thread.
+
+**WebFlux** skips the servlet machinery entirely: requests flow through Reactor Netty event loops, and suspend handlers integrate natively into the reactive chain. Same mental model for your code, different runtime underneath.
+
+## Which Thread Runs Your Code?
+
+Spring invokes your suspend function with a specific `CoroutineDispatcher`. Know what you're getting:
+
+| Stack | Default execution |
+|-------|-------------------|
+| Spring MVC | The servlet thread that received the request (via an adapter around async processing); resumption after I/O typically lands on whatever thread completed the operation |
+| WebFlux | A small number of Reactor Netty event-loop threads (≈ CPU cores); resumptions land on event loops |
+
+Neither default gives your code a dedicated `Dispatchers.IO`-style pool. That matters because of one rule...
+
+## The Golden Rule: Never Block a Shared Thread
+
+Suspension only helps if waiting is expressed as *suspension*. Blocking calls — classic JDBC, `RestClient`, `Files.readAllBytes`, `Thread.sleep` — pin their thread regardless:
+
+```kotlin
+@GetMapping("/{id}")
+suspend fun getUser(@PathVariable id: Long): UserResponse {
+    // ❌ blocks its thread for ~50ms — on MVC it starves the servlet pool;
+    //    on WebFlux it FREEZES AN EVENT LOOP and stalls MANY requests
+    return jdbcUserRepository.findById(id)
+}
+```
+
+On WebFlux this is catastrophic: freeze the event loop and every request multiplexed on it stalls together. On MVC it quietly erodes back toward the old thread-per-request ceiling.
+
+### The fix: quarantine blocking work
+
+Wrap blocking calls in a dispatcher designed for them:
+
+```kotlin
+suspend fun findById(id: Long): UserResponse =
+    withContext(Dispatchers.IO) {          // elastic pool sized for blocking
+        jdbcUserRepository.findById(id)    // blocks a worker here, fine
+    }
+```
+
+`Dispatchers.IO` shares threads with `Dispatchers.Default` but allows up to 64 (configurable) concurrently *blocked* threads. Blocking becomes contained, not eliminated.
+
+<Callout variant="tip">
+Centralize the wrapping: expose blocking repositories behind suspend gateway interfaces that apply `withContext(Dispatchers.IO)` internally. Callers then live in a purely non-blocking world and never need to know.
+</Callout>
+
+```kotlin
+interface UserRepository {
+    suspend fun findById(id: Long): User?
+}
+
+@Repository
+class JpaUserRepository(
+    private val jpa: SpringDataUserRepository,   // plain JPA underneath
+) : UserRepository {
+    override suspend fun findById(id: Long): User? =
+        withContext(Dispatchers.IO) { jpa.findById(id).orElse(null) }
+}
+```
+
+This adapter pattern is the single most valuable refactoring for adopting coroutines incrementally in existing apps.
+
+## Where ThreadLocals Break
+
+Many JVM tools store per-request state in `ThreadLocal`s:
+
+- **SLF4J MDC** — log fields like `requestId`, `userId`
+- **SecurityContextHolder** — the authenticated principal (servlet stack)
+- **Transaction synchronization** — connection binding ([post #4](/blog/spring-coroutines-04-transactions))
+- **Request attributes** accessed via `RequestContextHolder`
+
+After a suspension point, your code may resume on a different thread — **with none of those ThreadLocals set**:
+
+```kotlin
+@GetMapping("/orders")
+suspend fun orders(): List<Order> {
+    log.info("user={}", MDC.get("userId"))   // present ✓ (same thread so far)
+    val result = orderClient.fetchAll()       // ← suspends & hops threads
+    log.info("user={} done", MDC.get("userId")) // null! 😱
+    return result
+}
+```
+
+Coroutines replace implicit ThreadLocals with explicit **context propagation**: values travel inside the `CoroutineContext`, not the thread. The standard library and ecosystem provide bridge elements:
+
+```kotlin
+// MDC: kotlinx-coroutines-slf4j
+withContext(MDCContext()) {
+    log.info("userId={}", MDC.get("userId"))   // propagated ✓
+}
+
+// Security (WebFlux): context flows through the Reactor bridge automatically
+val auth = coroutineContext[ReactorContext]?.context?.get(Authentication::class.java)
+```
+
+Full treatment — including the "pass it explicitly" school of thought — lands in [post #4](/blog/spring-coroutines-04-transactions).
+
+## MVC or WebFlux?
+
+With coroutines, application code looks identical either way. Choose by infrastructure reality:
+
+| Consider | Spring MVC + coroutines | WebFlux + coroutines |
+|----------|------------------------|----------------------|
+| Team experience | Servlet knowledge transfers | New runtime model to learn |
+| Existing libraries | JDBC/JPA/legacy filters keep working (wrapped) | Prefer R2DBC/reactive clients |
+| Streaming/SSE at scale | Good | Excellent (event-loop native) |
+| Memory under extreme concurrency | Good | Best |
+| Debugging thread dumps | Familiar | Different (fewer threads, more callbacks-in-waiting) |
+
+Pragmatic default used by most teams: **start with MVC + coroutines**, wrap blocking dependencies properly, and reach for WebFlux when you need its streaming profile or are going R2DBC-native anyway ([post #5](/blog/spring-coroutines-05-flow-streaming)).
+
+## Exercises
+
+1. Add the thread-name logging demo to both endpoints in your app — one blocking, one suspend — and compare logs under load.
+2. Create the `JpaUserRepository` adapter pattern over any Spring Data repo you have. Verify no caller mentions `Dispatchers.IO`.
+3. Set an MDC value in a filter, print it before and after a `delay()` in an endpoint, and observe the breakage. Fix it with `MDCContext()`.
+
+## What's Next
+
+Sequential suspension already removes thread starvation — but your dashboard endpoint still takes the *sum* of downstream latencies. In [post #3](/blog/spring-coroutines-03-parallel-calls) we fan out with `async`/`await` and make latency the *max* instead — plus the error semantics nobody warns you about.
+
+Happy coding! 🚀

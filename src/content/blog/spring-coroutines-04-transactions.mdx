@@ -1,0 +1,176 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #4 — Transactions and Context Across Suspension Points"
+date: 2026-11-28
+excerpt: "The sharpest edges of coroutine adoption: how @Transactional behaves on suspend functions, why thread-bound connections break under dispatcher hops, and how to keep MDC and security context flowing."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Transactions"]
+readingTime: 14
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Everything so far assumed happy paths. Now we address the questions that decide whether coroutine adoption succeeds in production: **does `@Transactional` still protect my data when functions suspend?** And **what happens to my logs and security principal when execution changes threads?** Get these wrong and you ship data corruption or silent auth failures; get them right and they're just engineering.
+
+<Callout variant="tip" title="What you'll learn">
+- What `@Transactional` really does on a suspend function (two different worlds: JDBC vs R2DBC)
+- Safe patterns for JPA apps — and the one rule you can't break
+- Programmatic transactions with `TransactionTemplate` and `TransactionalOperator`
+- Propagating MDC log fields and security principals across suspension points
+</Callout>
+
+## Two Transaction Worlds
+
+Spring supports `@Transactional` on suspend functions (Framework 6+, so any Boot 3.x app). But *how* it protects you depends on which transaction manager sits underneath:
+
+| Stack | Manager | State lives in | Survives thread hops? |
+|-------|---------|----------------|----------------------|
+| JDBC / JPA | Platform (`DataSource`/`Jpa`) | **ThreadLocal** on the executing thread | ❌ No |
+| R2DBC | Reactive | **Coroutine/Reactor context** | ✅ Yes |
+
+That single row explains nearly every "my transaction disappeared" bug report in Kotlin Spring projects.
+
+## World 1: JPA/JDBC — The One Rule
+
+A platform-managed transaction is bound to a thread via ThreadLocal. Your suspend method starts on some thread; the connection joins it there. If execution **hops threads mid-transaction** — via `withContext(Dispatchers.IO)`, an internal client that resumes elsewhere, even a `delay()` — subsequent statements run on a thread with *no bound connection*. Depending on setup you get exceptions, new auto-commit connections, or worse: silently uncommitted writes at rollback time.
+
+**The rule: inside a platform-transaction boundary, never actually suspend.**
+
+### Pattern A — suspend shell, synchronous core (simple & safe)
+
+```kotlin
+@Service
+class OrderService(
+    private val orderRepository: OrderRepository,   // plain Spring Data JPA
+    private val inventoryClient: InventoryClient,
+) {
+    // DB work below contains no suspension points → single-thread transaction ✓
+    @Transactional
+    suspend fun placeOrder(cmd: PlaceOrderCommand): Order {
+        val order = orderRepository.save(Order(...))     // non-suspend JPA call
+        orderRepository.flush()
+        return order
+    }
+
+    // Remote calls stay OUTSIDE the transaction:
+    suspend fun reserveAndPlace(cmd: PlaceOrderCommand): Order {
+        inventoryClient.reserve(cmd.skus)                // network I/O here...
+        return placeOrder(cmd)                           // ...not inside tx
+    }
+}
+```
+
+Why this works: `suspend` doesn't move threads by itself — only suspension points do. Plain JPA calls between entry and return run on the calling thread, exactly like Java code. You get coroutine-friendly signatures *and* correct transactions.
+
+<Callout variant="warning">
+Never put remote calls or `delay()` inside a `@Transactional` method anyway — coroutine aside, holding a pooled DB connection open across a 200ms HTTP call starves the pool under load. That was true in Java too; coroutines just make fan-outs tempting enough to expose it.
+</Callout>
+
+### Pattern B — programmatic transaction inside one IO block
+
+When you need several blocking operations plus explicit control, pin everything to a single thread and manage the transaction yourself:
+
+```kotlin
+@Service
+class TransferService(
+    private val accounts: AccountRepository,
+    private val ledger: LedgerEntryRepository,
+    private val transactionTemplate: TransactionTemplate,
+) {
+    suspend fun transfer(cmd: TransferCommand): Unit =
+        withContext(Dispatchers.IO) {              // one thread for the whole unit
+            transactionTemplate.execute {
+                accounts.debit(cmd.from, cmd.amount)
+                accounts.credit(cmd.to, cmd.amount)
+                ledger.record(cmd.toLedgerEntry())
+            }
+        }
+}
+```
+
+No suspension inside `execute {}`, so ThreadLocal binding holds throughout. This is the workhorse pattern for legacy-JPA services adopting coroutines incrementally.
+
+### Pitfalls that apply regardless of language
+
+- **Self-invocation skips the proxy**: calling `this.placeOrder(...)` inside the same bean bypasses `@Transactional` — same as Java. Extract to another bean or inject self-proxy.
+- **Swallowed exceptions prevent rollback**: catching and not rethrowing inside the boundary means the proxy never sees failure.
+- **Public methods only** for annotation-driven proxying.
+
+## World 2: R2DBC — Transactions That Travel
+
+With R2DBC and a `ReactiveTransactionManager`, transaction state lives in the coroutine context itself — it follows your code across threads correctly:
+
+```kotlin
+@Service
+class TransferService(
+    private val db: DatabaseClient,
+    private val operator: TransactionalOperator,
+) {
+    suspend fun transfer(cmd: TransferCommand): Unit =
+        operator.executeAndAwait { _ ->           // tx state flows in context
+            db.sql("""UPDATE accounts SET balance = balance - :amt WHERE id = :from""")
+                .bind("amt", cmd.amount).bind("from", cmd.from)
+                .await()
+
+            db.sql("""UPDATE accounts SET balance = balance + :amt WHERE id = :to""")
+                .bind("amt", cmd.amount).bind("to", cmd.to)
+                .await()
+        }
+    // Commits when the lambda completes; rolls back on exception — even across hops.
+}
+```
+
+`executeAndAwait` ([since Framework 6](https://docs.spring.io/spring-framework/reference/data-access/transaction/operator.html)) is the idiomatic coroutine API for `TransactionalOperator`. Combined with R2DBC repositories returning `Flow`/suspend lookups, your entire persistence stack becomes genuinely non-blocking — the endgame of adoption.
+
+## Context Propagation: Logs, Security, Observability
+
+### MDC — structured logging that survives suspension
+
+Without help, `MDC.get("requestId")` returns `null` after any suspension point (see [post #2](/blog/spring-coroutines-02-suspend-internals)). The fix is `kotlinx-coroutines-slf4j`:
+
+```kotlin
+// Capture current MDC into the coroutine context:
+withContext(MDCContext()) {
+    log.info("processing orderId={}", MDC.get("requestId"))   // present ✓
+    val result = paymentGateway.charge(order)                  // hops threads...
+    log.info("charged, requestId={}", MDC.get("requestId"))   // ...still present ✓
+}
+```
+
+For framework-level consistency, register a `CoroutineContext` element globally (e.g., via a custom executor bean wrapping `MDCContext()`) so every launched coroutine inherits it — then your JSON log pipeline keeps correlating requests end-to-end.
+
+### Security — pass it explicitly
+
+On the servlet stack, `SecurityContextHolder` is ThreadLocal; assume it's gone after suspension. Two sane strategies:
+
+```kotlin
+// 1) Explicit parameter passing (recommended — visible in signatures):
+suspend fun ordersFor(principal: Authentication): List<Order> =
+    orderRepository.findByUserId(principal.name)
+
+// 2) WebFlux/reactive stack: security rides the Reactor context,
+//    which kotlinx-coroutines-reactor bridges into coroutineContext automatically.
+```
+
+Explicit passing costs nothing, reads clearly, and makes authorization decisions testable — consistent with [our token-handling conventions](/blog/authorization-tokens).
+
+## A Decision Cheat-Sheet
+
+| Situation | Use |
+|-----------|-----|
+| Simple JPA CRUD behind suspend endpoints | Pattern A: `@Transactional` + non-suspend repos inside |
+| Multi-step blocking workflow, legacy stack | Pattern B: `withContext(Dispatchers.IO)` + `TransactionTemplate` |
+| R2DBC / fully reactive persistence | `TransactionalOperator.executeAndAwait` or `@Transactional` |
+| Remote calls near DB writes | Move them outside the transaction; compensate explicitly |
+| Need MDC/logs across hops | `MDCContext()` element |
+
+## Exercises
+
+1. Write a test proving Pattern A commits correctly, then add a `delay(10)` inside the transaction and observe what breaks on your stack.
+2. Refactor a fat `@Transactional` Java-style service: extract remote calls outside boundaries using the reserve-then-persist shape.
+3. Wire `MDCContext()` into your logging filter and verify request IDs appear in logs emitted after suspension points.
+
+## What's Next
+
+Single values handled — but modern endpoints increasingly *stream*: live feeds, AI token streams, progress updates. [Post #5](/blog/spring-coroutines-05-flow-streaming) covers `Flow` in controllers, SSE, backpressure, and the Flux bridge.
+
+Happy coding! 🚀

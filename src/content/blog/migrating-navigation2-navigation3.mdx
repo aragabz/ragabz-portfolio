@@ -1,0 +1,97 @@
+---
+title: "Migrating from Navigation 2 to Navigation 3: What Actually Changed"
+date: 2026-08-23
+excerpt: "Map the conceptual shift (NavController → back stack, graph → entryProvider, string args → @Serializable NavKey) and when the rewrite is worth it."
+tags: ["Android", "Jetpack Compose", "Navigation", "Migration"]
+readingTime: 8
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Google’s honest take: think of it as a rewrite, not a migration — and the concept mapping helps while planning.
+
+<Callout variant="tip" title="What you'll learn">
+- The exact concept mapping table (NavController → back stack, graph → entryProvider, etc.)
+- When both libraries can coexist in one app
+- Practical leaf‑screen conversion steps
+</Callout>
+
+### Concept mapping table
+
+| Navigation 2 | Navigation 3 | Migration note |
+|--------------|--------------|----------------|
+| `NavController` | Your observable `SnapshotStateList<NavKey>` back stack | No more `navigate()` — use `backStack.add(key)` / `removeLast()` |
+| `NavHost(navController, graph)` | `NavDisplay(backStack, entryProvider)` | Graph XML is gone; destinations are flat entries |
+| String route + `Bundle` args | `@Serializable data class … : NavKey` | Compiler‑enforced arguments; no bundling gotchas |
+| Nested `NavGraph`s | Flat entries; group with your own abstractions | No parent/child hierarchy; organize with feature modules |
+| `navigate()`, `popBackStack()` | `backStack.add(key)`, `backStack.removeLast()` | Rename your mental model; IDE refactor helps |
+
+<Callout variant="note">
+The table above is excerpted from the official Android migration guide — keep it bookmarked while converting screens.
+</Callout>
+
+### Converting a leaf screen (no incoming results)
+
+1. **Delete the `NavHost` / `NavGraph` XML** (if using the legacy Navigation graph) and replace the composable with a plain `NavDisplay` + `entryProvider`.
+2. **Replace the route string** with a `@Serializable data class implementing NavKey`:
+   ```kotlin
+   // Nav2: "user_profile/{id}" + Bundle("id" to intent)
+   // Nav3:
+   @Serializable
+   data class UserProfile(val userId: String) : NavKey
+   ```
+3. **Update the navigation call**:
+   ```kotlin
+   // Nav2: navController.navigate("user_profile/{id}", args)
+   // Nav3:
+   backStack.add(UserProfile(userId))
+   ```
+4. **Update the `entryProvider`**:
+   ```kotlin
+   entryProvider {
+       entry<UserProfile> { key ->
+           UserProfileScreen(userId = key.userId)
+       }
+   }
+   ```
+5. **Add the three entry decorators** if you need ViewModels or saved state:
+   ```kotlin
+   NavDisplay(..., entryDecorators = listOf(
+       rememberSceneSetupNavEntryDecorator(),
+       rememberSavedStateNavEntryDecorator(),
+       rememberViewModelStoreNavEntryDecorator(),
+   ))
+   ```
+
+After step 4, the screen is wired; step 5 is optional depending on whether you need scoped ViewModels.
+
+### Coexisting Nav2 & Nav3 during transition
+
+Both artifacts are independent — you can have `androidx.navigation:navigation-compose:2.9.x` and `androidx.navigation3:navigation3‑*:1.1.4` in the same `build.gradle.kts`. Strategy:
+
+1. Pick a “strangler” feature module and migrate it end‑to‑end.
+2. Keep the remaining screens on Nav2; the new Nav3 screens use their own `NavDisplay` instance.
+3. Once the module is stable, remove the Nav2 dependency from that module’s `build.gradle.kts`.
+4. Repeat for the next feature.
+
+**Caveat:** Deep links configured for Nav2 won’t automatically work with Nav3 — you’ll need to add Nav3‑specific deep‑link handling (see the official guide) or keep the Nav2 deep‑link entry point active alongside the new Nav3 routes.
+
+### When the rewrite is worth it
+
+| Situation | Recommendation |
+|-----------|----------------|
+| Fresh app, no existing Nav2 investment | Adopt Nav3 from day 1 — simpler model, better Compose integration |
+| App with < 10 Nav2 screens, no deep‑link complexity | Migrate opportunistically; convert one screen per sprint |
+| Large existing Nav2 graph, heavy deep‑link usage, or complex nested graphs | Stay on Nav2 for now; the rewrite cost may outweigh benefits until you hit the pain points (adaptive layouts, ViewModel scoping, etc.) |
+
+### Resources
+
+- [Official migration guide — Android Devs](https://developer.android.com/guide/navigation/navigation-3/migration-guide)
+- [Concept mapping blog post — Android Devs](https://android-developers.googleblog.com/2025/11/migrating-from-navigation-2-to-navigation-3.html)
+- [Nav3 recipes — GitHub samples](https://github.com/android/nav3-recipes) (search “migration” folder)
+
+## Resources
+
+- [Navigation 3 guide — Android Developers](https://developer.android.com/guide/navigation/navigation-3)
+- [Navigation 3 releases](https://developer.android.com/jetpack/androidx/releases/navigation3)

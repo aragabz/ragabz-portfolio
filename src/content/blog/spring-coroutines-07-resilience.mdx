@@ -1,0 +1,221 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #7 — Timeouts, Retries & Circuit Breakers"
+date: 2026-12-19
+excerpt: "Production defenses for coroutine services: timeout budgets per call path, retries with exponential backoff and jitter, circuit breakers that actually stop calls, and bulkheads that contain noisy neighbors."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Resilience"]
+readingTime: 13
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+In a distributed system, every dependency *will* hang, slow down, or die — the only variable is whether your service survives it. Coroutines make resilience patterns unusually clean to implement because cancellation is a first-class language feature. This post assembles the defensive toolkit.
+
+<Callout variant="tip" title="What you'll learn">
+- Timeout budgets: `withTimeout`, defaults you must override, and budget math across fan-outs
+- A production-grade retry helper with exponential backoff and jitter
+- Circuit breakers with `resilience4j-kotlin`
+- Bulkheads via semaphore isolation
+- Composing everything into one coherent call policy
+</Callout>
+
+## Rule Zero: Every Remote Call Gets a Timeout
+
+An unbounded remote call isn't a latency risk — it's a resource leak waiting for traffic:
+
+```kotlin
+// ❌ waits forever if the peer stalls mid-response
+val user = userGateway.get(id)
+
+// ✅ bounded, with graceful degradation
+val user = withTimeoutOrNull(2.seconds) {
+    userGateway.get(id)
+} ?: User.anonymous()
+```
+
+Two details matter:
+
+1. **Timeouts cancel work** — when `withTimeout` fires, the in-flight call is cancelled upstream ([post #3](/blog/spring-coroutines-03-parallel-calls)); connections free immediately. That's the coroutine superpower over socket-level timeouts.
+2. **Budgets compose downward**: if the caller allows 800ms total, branches must allow less. Pass deadlines explicitly through layers rather than hardcoding each hop at 5 seconds.
+
+```kotlin
+suspend fun dashboard(userId: Long): Dashboard =
+    withTimeout(1500) {                      // overall budget
+        coroutineScope {
+            val user = async { withTimeout(500) { users.get(userId) } }
+            val recs = async { withTimeout(1200) { recs.forUser(userId) } }
+            Dashboard(user.await(), recs.await())
+        }
+    }
+```
+
+## Retries: Only What Deserves Them
+
+Retry blindly and you'll multiply load exactly when dependencies can least afford it. Two rules:
+
+- Retry **transient** failures only (timeouts, 503s, connection resets) — never validation errors or 4xx
+- Back off exponentially **with jitter** so thundering herds don't re-sync
+
+A reusable helper:
+
+```kotlin
+suspend fun <T> retryWithBackoff(
+    maxAttempts: Int = 3,
+    initialDelay: Duration = 100.milliseconds,
+    factor: Double = 2.0,
+    maxDelay: Duration = 5.seconds,
+    retryOn: (Throwable) -> Boolean = { it is TransientException },
+    block: suspend () -> T,
+): T {
+    var currentDelay = initialDelay
+    repeat(maxAttempts - 1) { attempt ->
+        try {
+            return block()
+        } catch (e: Throwable) {
+            if (!retryOn(e)) throw e
+            if (currentCoroutineContext().isActive.not()) throw e
+            val jittered = currentDelay * (0.5 + Random.nextDouble())   // full jitter
+            delay(jittered)
+            currentDelay = min(currentDelay * factor, maxDelay)
+        }
+    }
+    return block()   // last attempt, exception propagates naturally
+}
+```
+
+Usage reads like configuration:
+
+```kotlin
+val user = retryWithBackoff(
+    maxAttempts = 4,
+    retryOn = { it is GatewayException && it.isTransient },
+) {
+    withTimeout(1.seconds) { userGateway.get(id) }
+}
+```
+
+Note what's *inside* the retried unit: its own tight timeout. Each attempt fails fast instead of hanging out the full budget.
+
+<Callout variant="warning">
+Retries amplify failures by design (N attempts × M callers). Cap attempts low, add jitter always, and skip retries entirely for non-idempotent operations unless you control deduplication.
+</Callout>
+
+## Circuit Breakers: Stop Calling a Dead Service
+
+Retries help transient blips; they worsen outages by hammering a dying dependency. A circuit breaker tracks failures and trips open — failing fast without touching the network until a probe succeeds:
+
+```
+CLOSED ──failures exceed threshold──▶ OPEN ──after cool-down──▶ HALF_OPEN
+   ▲                                                    │
+   └────────────── probe succeeds ◀─────── trial call ◀──┘
+```
+
+The JVM standard is Resilience4j, whose Kotlin module supports suspend functions natively:
+
+```kotlin
+dependencies {
+    implementation("io.github.resilience4j:resilience4j-kotlin")
+    implementation("io.github.resilience4j:resilience4j-circuitbreaker")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+}
+```
+
+```yaml
+# application.yml
+resilience4j:
+  circuitbreaker:
+    instances:
+      recommendations:
+        slidingWindowSize: 20
+        failureRateThreshold: 50      # trip at 50% failure
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+```
+
+```kotlin
+@Service
+class RecommendationService(
+    private val recClient: RecClient,
+    private val breaker: CircuitBreaker,       // injected via CircuitBreakerRegistry
+) {
+    suspend fun forUser(userId: Long): List<Rec> =
+        CircuitBreaker.decorateSuspendFunction(breaker) {
+            recClient.forUser(userId)
+        }.invoke()
+}
+```
+
+More readable in practice — declarative annotation style:
+
+```kotlin
+@CircuitBreaker(name = "recommendations", fallbackMethod = "fallbackRecs")
+suspend fun forUser(userId: Long): List<Rec> =
+    recClient.forUser(userId)
+
+private suspend fun fallbackRecs(userId: Long, e: Throwable): List<Rec> {
+    log.warn("recommendations unavailable: {}", e.message)
+    return emptyList()          // degrade, don't fail the page
+}
+```
+
+Combine policies inside-out: **timeout → retry → circuit breaker → fallback**.
+
+## Bulkheads: Contain Noisy Neighbors
+
+When recommendations slow to 10s, who else pays? Without isolation, every shared resource (threads, connections, downstream capacity) gets dragged in. Coroutine bulkheads are just semaphores per dependency ([post #3](/blog/spring-coroutines-03-parallel-calls)):
+
+```kotlin
+@Component
+class Bulkheads {
+    val payments = Semaphore(30)     // payment provider tolerates 30 concurrent
+    val search = Semaphore(50)
+    val emails = Semaphore(10)       // SMTP relay chokes easily
+}
+
+suspend fun sendReceipt(order: Order) =
+    bulkheads.emails.withPermit {
+        mailer.send(order.receipt())
+    }
+```
+
+Call #11 to `emails` doesn't consume anything global — it queues politely, times out locally, and the blast radius stays contained.
+
+## The Full Policy, Assembled
+
+One gateway method showing every layer cooperating:
+
+```kotlin
+@Service
+class PricingGateway(
+    private val client: PricingClient,
+    private val bulkheads: Bulkheads,
+) {
+    @CircuitBreaker(name = "pricing", fallbackMethod = "stale")
+    suspend fun quote(symbol: String): Quote =
+        retryWithBackoff(maxAttempts = 3, retryOn = ::isTransient) {
+            bulkheads.search.withPermit {
+                withTimeoutOrNull(700.milliseconds) {
+                    client.quote(symbol)
+                } ?: throw TransientException("timeout")
+            }
+        }
+
+    private suspend fun stale(symbol: String, e: Throwable): Quote =
+        cache.lastKnown(symbol) ?: throw DependencyUnavailable("pricing", e)
+}
+```
+
+Reading order tells the whole story: bounded concurrency → bounded time → bounded repetition → bounded failure impact.
+
+## Exercises
+
+1. Add timeout budgets to an existing endpoint's fan-out so total p99 ≤ 1s under dependency degradation.
+2. Write Turbine tests ([post #6](/blog/spring-coroutines-06-testing)) for the retry helper: assert virtual-time backoff gaps and non-retryable pass-through.
+3. Trip a circuit breaker deliberately (fake throwing), verify HALF_OPEN probing behavior in logs/metrics.
+4. Add a bulkhead to your slowest dependency; load-test before/after and compare tail latencies of *unrelated* endpoints.
+
+## What's Next
+
+Everything is built and defended. The final post closes the loop on running this stack for real: [post #8](/blog/spring-coroutines-08-production) covers observability, MVC-vs-WebFlux-vs-virtual-threads decisions, dispatcher tuning, and a go-live checklist.
+
+Happy coding! 🚀

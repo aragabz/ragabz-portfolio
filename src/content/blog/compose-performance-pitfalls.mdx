@@ -1,0 +1,99 @@
+---
+title: "Compose Performance: avoid Recomposition Pitfalls with `remember`, `saving`, and `Snapshot`"
+date: 2026-08-23
+excerpt: "When `remember` stales, `SnapshotStateList` vs. `StateList`, and using `LaunchedEffect` safely."
+tags: ["Android", "Jetpack Compose", "Performance"]
+readingTime: 5
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Avoidable recomposition is the most common performance bottleneck in Compose. Here’s how to spot and fix it.
+
+<Callout variant="tip" title="What you'll learn">
+- How to compose `remember` pitfalls and stale closures
+- When to use `SnapshotStateList` instead of `MutableStateList`
+- Safe patterns for `LaunchedEffect` and `DisposableEffect`
+</Callout>
+
+### Common `remember` traps
+
+```kotlin
+@Composable
+fun BadExample(items: List<String>) {
+    // ❌ Remember captures the *initial* list reference;
+    // adding/removing items does NOT trigger recomposition of the list itself.
+    val remembered by remember { items }
+
+    // ✅ Remember *the derived state* you actually need
+    val itemCount = remember { items.size }
+
+    // ✅ Or snapshot the whole list once
+    val snapshot by rememberSnapshotStateList(items)
+}
+```
+
+`rememberSnapshotStateList` creates a `SnapshotStateList` that tracks changes via `SnapshotProtocol` — cheaper than recomposing the whole UI when the list grows/shrinks.
+
+### `SnapshotStateList` vs. `MutableStateList`
+
+| Operation | `MutableStateList` (standard) | `SnapshotStateList` |
+|-----------|------------------------------|---------------------|
+| `add/remove` | Recomposes all subscribers immediately | Batches changes; reads see a consistent snapshot |
+| `size`, `first`, etc. | Same API, but may recompose more often | Optimized for read‑only scenarios |
+| Use case | You need UI to update on every mutation | You only need to read the current state (e.g. recycle view, count) |
+
+```kotlin
+// ✅ Good: read‑only list of selected items
+val selectedIds by rememberSnapshotStateList mutableListOf()
+
+// ❌ Bad: mutating a shared list that many composables subscribe to
+val allItems by remember { mutableStateOf(mutableListOf<String>()) }
+```
+
+### `LaunchedEffect` & `DisposableEffect` best practices
+
+```kotlin
+@Composable
+fun SafeEffectExample(trigger: String?) {
+    // ✅ Safe: effect only runs when trigger changes; cleanup runs on exit
+    LaunchedEffect(trigger) {
+        // one‑off async work
+        webSocket.send(trigger)
+    }
+
+    // ✅ Safe: runs once on composition, cancels on composition cancel
+    DisposableEffect(Unit) {
+        val job = CoroutineScope(Dispatchers.IO).launch { /* … */ }
+        onDispose { job.cancel() }
+    }
+}
+```
+
+- **Never** capture mutable outer‑scope state inside `LaunchedEffect` without `remember`‑wrapping it; the effect may outlive the scope you expect.
+- **Always** pair `DisposableEffect` with `onDispose` cleanup to avoid leaked coroutines, especially when the composable is removed from the hierarchy unexpectedly.
+
+<Callout variant="note">
+If you find yourself writing `LaunchedEffect(key1, key2, key3)` with more than two keys, consider pulling the logic into a ViewModel or a dedicated side‑effect composable — deep key lists are a code smell for “doing too much in UI composition.”
+</Callout>
+
+### Profiling recompositions
+
+```bash
+# Enable compose logging in your test/dev build
+export ANDROID_COMPILE_COMpose_LOGGING=true
+
+# In Logcat, search for "Compose"
+# Look for lines like:
+#  Compose: Recomposed XXX times in YYY ms
+#  Compose: Composition too large: ... consider moving state out
+```
+
+A good rule of thumb: keep individual composables under 15‑20 recompositions per second. If you exceed that, refactor state ownership.
+
+## Resources
+
+- [Compose performance tips — Android Devs](https://developer.android.com/ui/compose/performance)
+- [SnapshotStateList API reference](https://developer.android.com/reference/kotlinx/compose/SnapshotStateList)
+- [LaunchedEffect & DisposableEffect — codelab](https://developer.android.com/codelabs/compose-launched-effect)

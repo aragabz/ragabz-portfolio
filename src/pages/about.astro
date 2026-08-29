@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar.astro';
 import About from '../components/About.astro';
 import Skills from '../components/Skills.astro';
 import Experience from '../components/Experience.astro';
+import Testimonials from '../components/react/Testimonials';
 import BackToTop from '../components/react/BackToTop';
 ---
 
@@ -17,6 +18,7 @@ import BackToTop from '../components/react/BackToTop';
     <About />
     <Skills />
     <Experience />
+    <Testimonials client:visible />
   </main>
 
   <BackToTop client:load />

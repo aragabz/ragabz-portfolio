@@ -1,0 +1,185 @@
+---
+title: "Jetpack Compose Multiplatform Desktop: Writing Real Desktop Apps in 2026"
+date: 2026-08-23
+excerpt: "expect/actual for file I/O, AWT/Swing interop, and publishing to Windows/macOS/Linux via Gradle."
+tags: ["Compose Multiplatform", "Desktop", "Kotlin"]
+readingTime: 5
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Compose on the desktop is no longer a novelty — it's a shipping target in 2026.
+
+<Callout variant="tip" title="What you'll learn">
+- How to structure `expect/actual` for file system, process, and clipboard access
+- Publishing a single `composeApp` artifact that runs on Windows, macOS, and Linux
+- Interop with native UI toolkits (AWT, Swing, JavaFX) when you need it
+</Callout>
+
+### Project structure for multi‑platform desktop
+
+```text
+my-app/
+├─ commonMain/           # Shared Compose UI, business logic
+├─ androidApp/           # Android Compose (same source set can be reused)
+├─ iosApp/               # iOS Compose (via CMP)
+├─ desktopApp/           # Desktop entry point — minimal
+│  └─ src/
+│     └─ main/kotlin/
+│         └‑ DesktopEntryPoint.kt
+└─ build.gradle.kts      # Platform‑specific plugins & dependencies
+```
+
+### Desktop entry point (commonMain)
+
+```kotlin
+// DesktopEntryPoint.kt — executed on all three OSes
+fun main() {
+    ComposeInitializer.init {
+        setContent {
+            MaterialTheme {
+                App()
+            }
+        }
+    }
+}
+
+@Composable
+fun App() {
+    // Example: a file‑picker button that works on all desktops
+    Column(verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Button(onClick = { openFilePicker() }) {
+            Text("Select a file")
+        }
+        val path by remember { mutableStateOf("") }
+        Text(" chosen: $path")
+    }
+}
+
+@JsExport
+@Composable
+fun openFilePicker() {
+    // expect/actual: see below — this is the actual impl for desktops
+    val result = filePicker.selectFile(
+        title = "Pick a file",
+        initialDirectory = systemPaths.documents,
+        fileFilters = listOf("*.txt", "*.md")
+    )
+    // Update UI atomically
+    // (the `filePicker` function is declared as `expect` in commonMain,
+    //  and actual implementations are provided per‑OS below)
+}
+```
+
+### `expect/actual` for desktop‑specific APIs
+
+**CommonMain — expect declarations**
+
+```kotlin
+expect fun filePicker(title: String, initialDirectory: String, fileFilters: List<String>): String?
+expect fun systemPaths: SystemPaths
+
+data class SystemPaths(
+    val documents: String,
+    val downloads: String,
+    val clipboard: String?
+)
+```
+
+**Actual implementations** (each platform module):
+
+**Desktop (JVM — Linux, macOS, Windows)**
+
+```kotlin
+actual object SystemPaths : SystemPaths {
+    override val documents = "${user.home}/Documents"
+    override val downloads = "${user.home}/Downloads"
+    override val clipboard = {
+        // Use java.awt.Toolkit for cross‑platform clipboard
+        val tl = java.awt.Toolkit.getDefaultToolkit().getSelectionClipboard()
+        tl?.toString() ?: ""
+    }
+}
+```
+
+**macOS (via macOS‑specific actual if you need Cocoa)**  
+You can add an `actual` block in `iosApp` or a separate `desktop-mac` source set if you need macOS‑specific APIs (e.g., `NSWorkspace`), but the pure Java/AWT approach works on all three platforms without extra native code.
+
+**Windows** — same `SystemPaths` actual works; just ensure the JDK version supports the paths (Java 11+).
+
+### AWT / Swing / JavaFX interop
+
+If you need existing desktop UI code, Compose can embed native components:
+
+```kotlin
+@Composable
+fun SwingDemo() {
+    // Create a simple Swing button inside the Compose hierarchy
+    val button = javax.swing.JButton("Swing says hi")
+    // Wrap it in a Compose-friendly container
+    androidx.compose.ui.platform.setContent {
+        // Use androidx.compose.ui.platform.WindowProvider to host Swing
+        // (details omitted for brevity — see Accompanist Swing interop)
+    }
+}
+```
+
+In practice, most apps either:
+
+- **Write desktop‑specific code in `expect/actual`** (file I/O, dialogs, system paths) as shown above.
+- **Keep the UI 100 % Compose** and avoid legacy toolkits, since Compose’s own layout & theming usually suffices for greenfield desktop apps.
+
+### Publishing to Windows/macOS/Linux from a single Gradle configuration
+
+```kotlin
+// build.gradle.kts (root or desktop module)
+plugins {
+    kotlin("multiplatform")
+    id("compose.multiplatform")
+}
+
+kotlin {
+    target("desktop") {
+        jvm { }
+        // No extra dependencies needed for basic Compose;
+        // the Compose BOM manages versions.
+    }
+    sourceSets {
+        commonMain.dependencies {
+            implementation("androidx.compose.ui:ui")
+            implementation("androidx.compose.material3:material3")
+            // Optional: add expect/actual deps
+        }
+    }
+}
+
+publishToMavenCentral {
+    // credentials & publishing logic (same as the library example above)
+}
+```
+
+Running `./gradlew desktop:run` launches the desktop process on your dev machine. To produce native installers:
+
+```bash
+./gradlew desktop:distZip   # produces a zip with the JRE‑bundled app
+# Or, for macOS:
+./gradlew :desktop:createDmg
+# And Windows:
+./gradlew :desktop:createSetup
+```
+
+### Common gotchas
+
+| Gotcha | Fix |
+|--------|-----|
+| `java.awt.headless` system property | Set `-Djava.awt.headless=false` in `gradle.properties` if you use AWT dialogs; otherwise Compose disables it automatically. |
+| Clipboard not working on Wayland (Linux) | Use `java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()` — it works on X11 and macOS; on Wayland you may need a small native bridge. |
+| Different JDK versions per OS | Use `jvmToolchain("21")` in the `kotlin {}` block to enforce a consistent JDK across all platforms. |
+| `File.renameTo()` deprecated | Use `java.nio.file.Files.move()` with `StandardCopyOption.ATOMIC_MOVE` for reliable cross‑platform renames. |
+
+## Resources
+
+- [Compose Multiplatform desktop — JetBrains docs](https://www.jetbrains.com/lp/compose-multiplatform/desktop/)
+- [Multiplatform project structure — Kotlinlang](https://kotlinlang.org/docs/multiplatform-common-source-sets.html)
+- [AWT A for Compose — Accompanist wiki](https://github.com/accompanist/compose-ui)

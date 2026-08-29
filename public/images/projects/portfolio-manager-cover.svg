@@ -1,0 +1,129 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Portfolio Manager — self-hosted portfolio CMS</title>
+<desc>Dark cover image with amber and orange accents for the aragabz/portfolio-manager repository, a self-hostable portfolio management tool. Shows the project name, its stack (React, Node.js, Express, MongoDB, Tailwind, Docker) and a terminal + browser card mockup.</desc>
+<defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+    .display { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  </style>
+
+  <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#16100A"/>
+    <stop offset="55%" stop-color="#1A120C"/>
+    <stop offset="100%" stop-color="#0E0905"/>
+  </linearGradient>
+
+  <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#FBBF24"/>
+    <stop offset="55%" stop-color="#F59E0B"/>
+    <stop offset="100%" stop-color="#F97316"/>
+  </linearGradient>
+
+  <linearGradient id="boxEdge" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#FBBF24"/>
+    <stop offset="100%" stop-color="#F97316"/>
+  </linearGradient>
+
+  <radialGradient id="glowAmber" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.5"/>
+    <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glowOrange" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#F97316" stop-opacity="0.4"/>
+    <stop offset="100%" stop-color="#F97316" stop-opacity="0"/>
+  </radialGradient>
+
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="30"/>
+  </filter>
+
+  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+    <circle cx="1.2" cy="1.2" r="1.2" fill="#FFFFFF" opacity="0.05"/>
+  </pattern>
+</defs>
+
+<rect width="1200" height="630" fill="url(#bgGrad)"/>
+<rect width="1200" height="630" fill="url(#dots)"/>
+
+<circle cx="140" cy="80" r="260" fill="url(#glowAmber)" filter="url(#soft)"/>
+<circle cx="980" cy="560" r="280" fill="url(#glowOrange)" filter="url(#soft)"/>
+
+<rect x="0.5" y="0.5" width="1199" height="629" fill="none" stroke="#312316" stroke-width="1"/>
+
+<rect x="80" y="90" width="298" height="30" rx="15" fill="#1B130D" stroke="#3A2A1A" stroke-width="1"/>
+<circle cx="98" cy="105" r="4" fill="#F59E0B"/>
+<text x="112" y="110" class="mono" font-size="13" letter-spacing="1.5" fill="#FBBF24">SELF-HOSTED PORTFOLIO CMS</text>
+
+<text x="76" y="210" class="display" font-size="86" font-weight="700" fill="url(#titleGrad)">Portfolio</text>
+<text x="76" y="292" class="display" font-size="86" font-weight="700" fill="url(#titleGrad)">Manager</text>
+
+<text x="80" y="330" class="display" font-size="19" font-weight="500" fill="#CBA98A">
+  <tspan x="80" dy="0">Publish your projects under your own domain,</tspan>
+  <tspan x="80" dy="26">with built-in analytics and zero third-party data.</tspan>
+</text>
+
+<g class="mono" font-size="15" font-weight="500">
+  <rect x="80" y="396" width="100" height="42" rx="21" fill="#1B130D" stroke="#F59E0B" stroke-width="1.2"/>
+  <text x="130" y="422" text-anchor="middle" fill="#FBBF24">React</text>
+
+  <rect x="196" y="396" width="118" height="42" rx="21" fill="#1B130D" stroke="#FBBF24" stroke-width="1.2"/>
+  <text x="255" y="422" text-anchor="middle" fill="#FCD34D">Node.js</text>
+
+  <rect x="330" y="396" width="122" height="42" rx="21" fill="#1B130D" stroke="#F59E0B" stroke-width="1.2"/>
+  <text x="391" y="422" text-anchor="middle" fill="#FBBF24">Express</text>
+
+  <rect x="468" y="396" width="130" height="42" rx="21" fill="#1B130D" stroke="#F97316" stroke-width="1.2"/>
+  <text x="533" y="422" text-anchor="middle" fill="#FDBA74">MongoDB</text>
+
+  <rect x="80" y="452" width="122" height="42" rx="21" fill="#1B130D" stroke="#F59E0B" stroke-width="1.2"/>
+  <text x="141" y="478" text-anchor="middle" fill="#FBBF24">Tailwind</text>
+
+  <rect x="218" y="452" width="112" height="42" rx="21" fill="#1B130D" stroke="#FBBF24" stroke-width="1.2"/>
+  <text x="274" y="478" text-anchor="middle" fill="#FCD34D">Docker</text>
+
+  <rect x="346" y="452" width="156" height="42" rx="21" fill="#1B130D" stroke="#F97316" stroke-width="1.2"/>
+  <text x="424" y="478" text-anchor="middle" fill="#FDBA74">REST API</text>
+</g>
+
+<rect x="80" y="522" width="476" height="46" rx="10" fill="#120C07" stroke="#2A1E12" stroke-width="1"/>
+<circle cx="102" cy="545" r="4" fill="#34D399"/>
+<text x="118" y="550" class="mono" font-size="15" fill="#E8CDB2">docker run -p 3000:3000 portfolio-manager</text>
+
+<text x="80" y="600" class="mono" font-size="14" fill="#6B4E33">github.com/aragabz/portfolio-manager</text>
+
+<!-- Terminal + browser mockup on the right -->
+<g transform="translate(1005,330)">
+  <!-- Browser card (top) -->
+  <rect x="-210" y="-190" width="420" height="150" rx="14" fill="#191009" stroke="#2A1E12" stroke-width="1.5"/>
+  <rect x="-210" y="-190" width="420" height="34" rx="14" fill="#221508"/>
+  <circle cx="-188" cy="-173" r="5" fill="#F87171"/>
+  <circle cx="-168" cy="-173" r="5" fill="#FBBF24"/>
+  <circle cx="-148" cy="-173" r="5" fill="#34D399"/>
+  <rect x="-124" y="-182" width="190" height="22" rx="8" fill="#1A110A" stroke="#3A2A1A" stroke-width="1"/>
+
+  <rect x="-188" y="-136" width="380" height="76" rx="8" fill="#1A110A" stroke="#2E2115" stroke-width="1"/>
+  <rect x="-170" y="-122" width="120" height="14" rx="5" fill="#3A2A1A"/>
+  <rect x="-170" y="-100" width="180" height="10" rx="5" fill="#2E2115"/>
+  <rect x="-170" y="-84" width="140" height="10" rx="5" fill="#2E2115"/>
+  <rect x="-170" y="-68" width="200" height="10" rx="5" fill="#2E2115"/>
+  <circle cx="40" cy="-120" r="5" fill="#F59E0B"/>
+  <rect x="-70" y="-122" width="96" height="14" rx="6" fill="#F59E0B"/>
+
+  <!-- Terminal (bottom) -->
+  <rect x="-210" y="-18" width="420" height="150" rx="14" fill="#0F0A05" stroke="#2A1E12" stroke-width="1.5"/>
+  <circle cx="-175" cy="5" r="5" fill="#F87171"/>
+  <circle cx="-155" cy="5" r="5" fill="#FBBF24"/>
+  <circle cx="-135" cy="5" r="5" fill="#34D399"/>
+  <text x="-128" y="10" class="mono" font-size="12" fill="#6B4E33">terminal</text>
+
+  <rect x="-190" y="30" width="380" height="90" rx="6" fill="#070504" stroke="#1C130C" stroke-width="1"/>
+
+  <text x="-172" y="56" class="mono" font-size="13" fill="#8A6A48">$ docker compose up -d</text>
+  <text x="-172" y="78" class="mono" font-size="13" fill="#8A6A48">Creating network  portfolio-manager</text>
+  <text x="-172" y="100" class="mono" font-size="13" fill="#34D399">✔  Started mongo  ·  port 27017</text>
+  <text x="-172" y="116" class="mono" font-size="13" fill="#F59E0B">✔  Started app   ·  port 3000</text>
+
+  <path d="M-172 132 h6 v-5 h6 v5 h6" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round"/>
+</g>
+</svg>

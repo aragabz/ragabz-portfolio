@@ -1,0 +1,215 @@
+---
+title: "Spring Boot + Kotlin + Coroutines #5 — Streaming Responses with Flow"
+date: 2026-12-05
+excerpt: "From single values to infinite streams: Flow in controllers, NDJSON and Server-Sent Events, the Flux bridge for reactive libraries, backpressure, and cancellation that follows disconnected clients."
+tags: ["Spring Boot", "Kotlin", "Coroutines", "Flow", "SSE"]
+readingTime: 13
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+A `suspend` function returns one value; a `Flow` returns many — lazily, asynchronously, cancellably. That upgrade unlocks a class of endpoints traditional request/response MVC handles awkwardly: live dashboards, AI token streams, export jobs, notification feeds. Today we build them.
+
+<Callout variant="tip" title="What you'll learn">
+- Returning `Flow<T>` from Spring controllers (NDJSON & SSE)
+- Cold vs hot streams — and why it matters behind an HTTP endpoint
+- Bridging `Flux` ↔ `Flow` when consuming reactive libraries
+- How client disconnects cancel upstream work automatically
+- Backpressure without drowning slow consumers
+</Callout>
+
+## One Value vs Many
+
+```kotlin
+suspend fun currentUser(): User          // one value, then done
+
+fun priceTicks(symbol: String): Flow<Price>   // a stream — potentially endless
+```
+
+`Flow` is cold by default: nothing runs until collected, and each collector gets its own execution. Think of it as an async `Sequence` with cancellation and context built in ([Kotlin series #7](/blog/kotlin-series-07-coroutines)).
+
+## Flow in Controllers
+
+Spring supports `Flow` as a controller return type natively — both stacks convert it to a streaming response.
+
+### NDJSON (newline-delimited JSON)
+
+Each element becomes a JSON document on its own line:
+
+```kotlin
+@RestController
+@RequestMapping("/api/prices")
+class PriceController(private val marketFeed: MarketFeed) {
+
+    @GetMapping("/{symbol}", produces = [MediaType.APPLICATION_NDJSON_VALUE])
+    fun prices(@PathVariable symbol: String): Flow<PriceTick> =
+        marketFeed.stream(symbol)
+}
+```
+
+Client-side, you read lines as they arrive:
+
+```bash
+curl -N http://localhost:8080/api/prices/AAPL
+{"symbol":"AAPL","price":227.4,"ts":"..."}
+{"symbol":"AAPL","price":227.45,"ts":"..."}
+...
+```
+
+### Server-Sent Events
+
+For browser `EventSource` consumers, emit SSE frames:
+
+```kotlin
+@GetMapping("/{symbol}/events", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+fun priceEvents(@PathVariable symbol: String): Flow<ServerSentEvent<String>> =
+    marketFeed.stream(symbol).map { tick ->
+        ServerSentEvent.builder(tick.toJson())
+            .event("price")
+            .id(tick.ts.toString())
+            .build()
+    }
+```
+
+```js
+// Browser side
+const es = new EventSource("/api/prices/AAPL/events");
+es.addEventListener("price", e => render(JSON.parse(e.data)));
+```
+
+Use NDJSON for machine-to-machine streams; SSE when browsers or proxies are involved (SSE plays nicer with intermediaries and gives you named events).
+
+### Progress reporting for long operations
+
+Streaming isn't only about infinity — it's excellent for long-running jobs:
+
+```kotlin
+@PostMapping(value = ["/reports"], produces = [MediaType.APPLICATION_NDJSON_VALUE])
+fun generateReport(@RequestBody spec: ReportSpec): Flow<Progress> = flow {
+    emit(Progress.started(spec))
+    val rows = reportRepository.loadRows(spec)      // chunked source
+    rows.chunked(1000).forEachIndexed { i, chunk ->
+        processChunk(chunk)
+        emit(Progress.percent(((i + 1) * 1000f / rows.size).toInt()))
+    }
+    emit(Progress.done(reportId = saveReport()))
+}
+```
+
+The UI shows real progress instead of a spinner of lies.
+
+## Cancellation: The Killer Feature
+
+Here's where coroutine streams embarrass every hand-rolled alternative. When the client disconnects:
+
+1. Spring detects the broken pipe and **cancels the coroutine collecting your Flow**
+2. Cancellation propagates **upstream through every operator** to the source
+3. Your `flow {}` block stops at its next suspension point — resources released, no orphaned work
+
+```kotlin
+fun tailLogs(file: Path): Flow<String> = flow {
+    file.useLines { lines ->
+        // ... follow the file ...
+        emit(line)   // if nobody's listening anymore, this throws CancellationException
+    }
+}                   // ...and cleanup here happens automatically
+```
+
+No "is the client still there?" polling. No leaked background jobs appending to dead sockets. Structured concurrency does it because *collecting is scoped*.
+
+## Cold Streams Behind HTTP: What Actually Runs
+
+Since `marketFeed.stream(symbol)` is cold, each connected client triggers its own independent pipeline — per-client subscriptions fall out naturally:
+
+```kotlin
+class MarketFeed(private val provider: ProviderGateway) {
+    fun stream(symbol: String): Flow<PriceTick> = flow {
+        while (currentCoroutineContext().isActive) {
+            emit(provider.latest(symbol))     // suspends between polls
+            delay(250)
+        }
+    }
+}
+```
+
+Two clients on `/prices/AAPL` → two pipelines → two poll loops. For per-client data (personalized feeds), that's exactly right. For *shared* broadcast data (one market feed for everyone), per-client pipelines waste work — that's the job of **hot** streams:
+
+| Tool | Nature | Use for |
+|------|--------|---------|
+| `Flow` (cold) | Per-collector pipeline | Personalized queries, exports, job progress |
+| `StateFlow` | Hot, holds latest value | Current state (e.g., last price) |
+| `SharedFlow` | Hot, multicast | Broadcasting one event stream to N clients |
+
+A shared broadcast looks like this:
+
+```kotlin
+@Singleton
+class TickerHub {
+    private val _ticks = MutableSharedFlow<PriceTick>(replay = 0)
+    val ticks: SharedFlow<PriceTick> = _ticks.asSharedFlow()
+
+    // one upstream ingestion loop, started at app boot:
+    fun start(scope: CoroutineScope) {
+        scope.launch {
+            provider.connect().collect { _ticks.emit(it) }
+        }
+    }
+}
+
+// Controller — each client just taps the shared flow:
+@GetMapping("/{symbol}", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+fun prices(@PathVariable symbol: String): Flow<PriceTick> =
+    tickerHub.ticks.filter { it.symbol == symbol }
+```
+
+One ingestion cost, unlimited subscribers, and disconnection still cleans up per-client filters automatically.
+
+## The Flux Bridge
+
+Plenty of libraries speak Reactor (`Flux`/`Mono`) — R2DBC drivers, Kafka reactive clients, older internal SDKs. `kotlinx-coroutines-reactor` converts both directions:
+
+```kotlin
+// Flux → Flow: consume reactive sources idiomatically
+fun recentOrders(userId: Long): Flow<Order> =
+    r2dbcRepository.findAllByUserId(userId)     // returns Flux<Order>
+        .asFlow()
+
+// Flow → Flux: feed reactive consumers
+fun toReactive(flow: Flow<AuditEvent>): Flux<AuditEvent> =
+    flow.asFlux()
+```
+
+Exceptions, cancellation, and context propagate across the bridge — including transaction and security contexts from [post #4](/blog/spring-coroutines-04-transactions), which is precisely why `kotlinx-coroutines-reactor` belongs in every dependency list.
+
+<Callout variant="note">
+Rule of thumb for new code: model internals with coroutines (`suspend`/`Flow`), convert to/from `Flux` only at library boundaries. Don't let reactor types leak into domain services.
+</Callout>
+
+## Backpressure Without Tears
+
+What if the consumer is slower than production? Flows use a simple contract: **the producer suspends inside `emit()` until the consumer is ready**. Suspended emission *is* natural backpressure — no dropped items, no unbounded buffers by default.
+
+When you intentionally want decoupling, say so explicitly:
+
+```kotlin
+feed.stream(symbol)
+    .buffer(capacity = 10)          // absorb bursts, still bounded
+    .conflate()                     // keep only latest when consumer lags — ideal for prices!
+    .onEach { pushToClient(it) }
+```
+
+`.conflate()` is perfect for tick data: if the UI can't render 40 updates/second, show the freshest one rather than queuing stale ones. Choose per-stream semantics deliberately: buffer (keep all), conflate (latest wins), collectLatest (cancel-and-restart processing).
+
+## Exercises
+
+1. Build an SSE endpoint streaming simulated ticks every 200ms; open three curl sessions and verify independence.
+2. Kill one client mid-stream and log inside the `flow {}` block to observe cancellation arriving.
+3. Replace the cold feed with a `MutableSharedFlow` hub; confirm one ingestion loop serves all clients.
+4. Add `.conflate()` to a fast stream and measure how emissions change for a slow consumer.
+
+## What's Next
+
+Your service now streams, fans out, and transacts correctly. It's time to make sure it *actually works*: [post #6](/blog/spring-coroutines-06-testing) covers unit-testing virtual time with `runTest`, mocking suspend collaborators with MockK, and integration tests that don't flake.
+
+Happy coding! 🚀

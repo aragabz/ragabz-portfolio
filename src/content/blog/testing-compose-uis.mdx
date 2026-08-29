@@ -1,0 +1,104 @@
+---
+title: "Testing Compose UIs: Unit Tests, TestRule, and Screenshot Testing with Accompanist"
+date: 2026-08-23
+excerpt: "createComposeRule, testing SideEffects, and pixel-diff workflows for regression guardrails."
+tags: ["Testing", "Jetpack Compose", "Android"]
+readingTime: 7
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+A solid test suite gives you confidence to refactor Compose UIs without fear of breaking visual behavior.
+
+<Callout variant="tip" title="What you'll learn">
+- How to create and configure `createComposeRule`
+- Testing `SideEffect`s, `remember`, and `state {}` in isolation
+- Pixel‑diff regression testing with Accompanist and PixelTest
+</Callout>
+
+### Basic compose test rule
+
+```kotlin
+@get:Rule
+val composeTestRule = createComposeRule()
+
+@Test fun `greeter composable shows entered name`() = composeTestRule.setUp {
+    // Compose rule automatically starts/ stops the dispatcher
+    composeTestRule.setContent {
+        Greeting("Android")
+    }
+
+    // Use the codelab‑provided matcher to find text
+    composeOnView(withText("Android")).check(matches(isDisplayed()))
+}
+```
+
+`composeTestRule` provides `DispatchingTestRule` under the hood, so `SystemClock` and `CoroutineScope` behave predictably inside `@Test`.
+
+### Testing `SideEffect` and `remember`
+
+```kotlin
+@Test fun `side effect applies correct font scaling`() = composeTestRule.setUp {
+    // Arrange: set a system font scaling factor
+    val scaling = 1.5f
+    doReturn(scaling).when(Resources).configuration.fontScale
+
+    // Act: compose a composable that reads the config
+    composeTestRule.setContent {
+        Text("Size dependent")
+    }
+
+    // Assert: read the composed via semantics or measure
+    val size = composeTestRule.getComposition().remembered mutableStateOf(0f)
+    // (custom matcher example)
+    composeOnView(withText("Size dependent")).check(matches(isDisplayed()))
+}
+```
+
+For `remember`‑based state, use `composeTestRule.clearComposition()` between tests to avoid cross‑test contamination.
+
+<Callout variant="warning">
+Never call `composeTestRule.clearSetUp()` mid‑test — it resets the composition and dispatches a composition change, which can flake your assertions. Always teardown in the `@After` block or let the rule handle it on test completion.
+</Callout>
+
+### Pixel‑diff regression with Accompanist + PixelTest
+
+```kotlin
+@Test fun `ui regression: home screen snapshot matches baseline`() = composeTestRule.setUp {
+    composeTestRule.setContent {
+        HomeScreen() // your root composable
+    }
+
+    // Take a snapshot of the current composition
+    val composableSnapshot = composeTestRule.takeSnapshot()
+
+    // Compare against a baseline PNG stored in test/resources
+    val result = PixelTest.compare(
+        composableSnapshot,
+        Baseline.HOME_SCREEN,   // references test/resources/baseline/home_screen.png
+        tolerance = 0.01f     // 1 % pixel diff allowed
+    )
+
+    assertTrue(result.isAccepted, { "Regression detected: ${result.diffImagePath}" })
+}
+```
+
+- Store baselines version‑controlled (e.g. `test/baselines/`) alongside the test.
+- Run `PixelTest` in CI as a `fail-fast` step — any visual change (intentional or not) will block the merge.
+- Adjust `tolerance` per‑screen: tighter on exact‑layout screens (forms), looser on decorative or animated screens.
+
+### Common testing pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| `CoroutineScope` not disposed → leaked jobs | Use `composeTestRule.clearSetUp()` in `@After` or `use DisposeOnCompositionDestroy()` |
+| Test order dependence (state leakage) | Isolate each test with `composeTestRule.setUp { }` / `composeTestRule tearDown { }` |
+| Pixel diff flakes on animated UIs | Increase `tolerance` or snapshot only static parts of the UI (use `ScreenshotTarget.Window` with `includeVisibleRegionsOnly = true`) |
+
+## Resources
+
+- [Compose testing — Android Devs](https://developer.android.com/training/testing/ui/compose)
+- [createComposeRule API reference](https://developer.android.com/reference/androidx/test/core/createComposeRule)
+- [Accompanist PixelTest — GitHub](https://github.com/accompanist/pixel-test)
+- [Compose test rules codelab](https://developer.android.com/codelabs/compose-testing)

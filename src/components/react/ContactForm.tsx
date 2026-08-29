@@ -1,24 +1,49 @@
 import { useState } from 'react';
 
-type SubmitStatus = 'idle' | 'success';
+type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export default function ContactForm() {
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    setErrors({});
 
+    const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
     const email = formData.get('email') as string;
     const subject = formData.get('subject') as string;
     const message = formData.get('message') as string;
 
-    const fullSubject = encodeURIComponent(`Contact Form: ${subject} from ${name}`);
-    const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`);
+    setSubmitStatus('submitting');
 
-    window.location.href = `mailto:ahmedragab.se@gmail.com?subject=${fullSubject}&body=${body}`;
-    setSubmitStatus('success');
+    try {
+      const response = await fetch('https://formspree.io/f/PUBLIC_FORMSPREE_ID', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          subject,
+          message,
+        }),
+      });
+
+      if (response.ok) {
+        setSubmitStatus('success');
+        e.currentTarget.reset();
+      } else {
+        const errorData = await response.json();
+        setErrors(prev => ({ ...prev, form: errorData.message || 'Failed to send message' }));
+        setSubmitStatus('error');
+      }
+    } catch (err) {
+      setErrors(prev => ({ ...prev, form: 'Network error. Please try again.' }));
+      setSubmitStatus('error');
+    }
   };
 
   return (
@@ -109,8 +134,13 @@ export default function ContactForm() {
               color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '600',
               cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
             }}
+            disabled={submitStatus === 'submitting'}
           >
-            Send Message
+            {submitStatus === 'submitting' ? (
+              <span style={{ flexShrink: 0 }}>Sending...</span>
+            ) : (
+              <span>Send Message</span>
+            )}
           </button>
 
           {submitStatus === 'success' && (
@@ -119,7 +149,17 @@ export default function ContactForm() {
               border: '1px solid var(--color-brand-orange)', borderRadius: '8px', color: 'var(--color-brand-orange)',
               display: 'flex', alignItems: 'center', gap: '0.5rem'
             }}>
-              <span>Opening your email client...</span>
+              <span>Message sent successfully!</span>
+            </div>
+          )}
+
+          {submitStatus === 'error' && (
+            <div role="alert" aria-live="assertive" style={{
+              padding: '1rem', background: 'color-mix(in srgb, var(--color-red-500) 10%, transparent)',
+              border: '1px solid var(--color-red-500)', borderRadius: '8px', color: 'var(--color-red-500)',
+              display: 'flex', alignItems: 'center', gap: '0.5rem'
+            }}>
+              <span>Failed to send message. Please try again.</span>
             </div>
           )}
         </div>

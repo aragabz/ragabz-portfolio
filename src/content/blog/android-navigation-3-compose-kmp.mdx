@@ -1,0 +1,412 @@
+---
+title: "Android Navigation 3: A Practical Guide for Compose and Kotlin Multiplatform Apps"
+date: 2026-08-22
+excerpt: "Navigation 3 rebuilds Android navigation around a back stack you own. Learn the core APIs, build a real Compose app, then share the same navigation across Android, iOS, desktop, and web with Compose Multiplatform."
+tags: ["Android", "Jetpack Compose", "Kotlin Multiplatform", "Navigation"]
+readingTime: 16
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+If you have ever fought with nested `NavGraph`s, string-based route arguments, or a `NavController` that refused to cooperate with a list-detail layout, Navigation 3 is Google's answer. Announced at Google I/O 2025 and stable since November 2025, Jetpack Navigation 3 (`androidx.navigation3`) throws out the navigation graph and hands you something radical: *your own back stack, as a plain observable list*.
+
+Better still, this isn't Android-only anymore. Since Compose Multiplatform 1.10, the JetBrains-published artifacts bring the same API to iOS, desktop, and web — one navigation model for your entire Kotlin Multiplatform app.
+
+<Callout variant="tip" title="What you'll learn">
+- Why Navigation 3 exists and how it differs from Navigation 2
+- The four core concepts: `NavKey`, back stack, `entryProvider`, `NavDisplay`
+- Building a complete Android Compose app with typed routes and scoped ViewModels
+- Sharing the identical navigation code in a KMP app targeting Android, iOS, desktop, and web
+- The serialization gotcha that breaks iOS state restoration — and how to fix it
+</Callout>
+
+## Why a New Library?
+
+Navigation 2 was designed around XML-era navigation graphs and Fragments. When Compose arrived, it was retrofitted onto it, which left some permanent friction:
+
+| Pain point with Navigation 2 | How Navigation 3 solves it |
+|---|---|
+| The library owns the back stack | **You own it** — a `SnapshotStateList` you observe directly |
+| Routes are strings with argument bundling | Routes are **typed objects** (`NavKey`) that carry their own data |
+| Destinations live in a parent/child graph | Destinations are a flat set of composable entries — no hierarchy |
+| One destination per screen makes adaptive layouts painful | Multiple destinations can render at once (list-detail, two-pane) |
+| Hard to customize transitions and scenes | Low-level `Scene` APIs let you build custom display behavior |
+
+The mental shift is simple: **navigating forward means adding a key to a list. Going back means removing one.** Everything else is built on top of that.
+
+## The Four Core Concepts
+
+Before writing code, meet the cast. Every Navigation 3 app is built from these pieces:
+
+| Concept | What it is |
+|---------|-----------|
+| `NavKey` | A marker interface for route objects. Make them `@Serializable` so the back stack survives process death. |
+| Back stack | A `SnapshotStateList` of keys returned by `rememberNavBackStack()`. It's Compose state — mutate it and the UI updates. |
+| `entryProvider` | A DSL that maps each `NavKey` type to its content composable (`NavEntry`). Replaces the nav graph. |
+| `NavDisplay` | The composable that renders the top of the back stack, handles back gestures, and orchestrates scenes. |
+
+The library ships as two main artifacts plus optional add-ons:
+
+| Artifact | What it gives you |
+|----------|------------------|
+| `androidx.navigation3:navigation3-runtime` | `NavKey`, `NavEntry`, `EntryProvider`, `rememberNavBackStack` |
+| `androidx.navigation3:navigation3-ui` | `NavDisplay`, `Scene`, scene strategies |
+| `androidx.lifecycle:lifecycle-viewmodel-navigation3` | ViewModels scoped to back stack entries |
+| `androidx.compose.material3.adaptive:adaptive-navigation3` | Adaptive scenes (list-detail) for large screens |
+
+<Callout variant="warning">
+Requirements: `compileSdk` 36 or later and `minSdk` 23. Navigation 3 is Compose-first — there is no Fragment story, no Views interop layer, no XML graphs.
+</Callout>
+
+## Part 1 — An Android App with Compose
+
+Let's build a small profiles app: a list screen, a detail screen, and a settings screen. Full Android setup first, then the interesting parts.
+
+### Dependencies
+
+In `gradle/libs.versions.toml`:
+
+```toml
+[versions]
+nav3Core = "1.1.4"
+lifecycleViewmodelNav3 = "2.11.0"
+kotlinxSerializationCore = "1.9.0"
+
+[libraries]
+androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3Core" }
+androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "nav3Core" }
+androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycleViewmodelNav3" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }
+
+[plugins]
+jetbrains-kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+```
+
+Then in `app/build.gradle.kts`:
+
+```kotlin
+plugins {
+    alias(libs.plugins.jetbrains.kotlin.serialization)
+}
+
+dependencies {
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+    implementation(libs.kotlinx.serialization.core)
+}
+```
+
+### Define Typed Routes
+
+Routes implement `NavKey` and are annotated `@Serializable`:
+
+```kotlin
+@Serializable
+data object ProfileList : NavKey
+
+@Serializable
+data class ProfileDetail(val userId: String) : NavKey
+
+@Serializable
+data object Settings : NavKey
+```
+
+Notice what you get for free compared to Navigation 2's `"profiles/{userId}"` strings: the argument is a constructor parameter, the compiler enforces it, and navigating requires a fully-formed object. Typos are impossible.
+
+### Own the Back Stack
+
+```kotlin
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                App()
+            }
+        }
+    }
+}
+
+@Composable
+fun App() {
+    val backStack = rememberNavBackStack(ProfileList)
+
+    NavDisplay(
+        backStack = backStack,
+        onBack = { backStack.removeLastOrNull() },
+        entryProvider = entryProvider {
+            entry<ProfileList> {
+                ProfileListScreen(
+                    onProfileClick = { userId -> backStack.add(ProfileDetail(userId)) },
+                    onSettingsClick = { backStack.add(Settings) }
+                )
+            }
+            entry<ProfileDetail> { key ->
+                ProfileDetailScreen(userId = key.userId)
+            }
+            entry<Settings> {
+                SettingsScreen()
+            }
+        }
+    )
+}
+```
+
+Read that `App()` composable carefully — it contains the entire navigation architecture:
+
+- `rememberNavBackStack(ProfileList)` creates the back stack with `ProfileList` as the start destination. Under the hood it's a `SnapshotStateList` wired into Compose state and saved for restoration, so process death puts your stack back.
+- `backStack.add(...)` navigates forward. `backStack.removeLastOrNull()` goes back. There is no `navigate()`, no `popBackStack()`, no `launchSingleTop` flags.
+- `entryProvider { }` resolves each key to its UI. Unlike a nav graph, entries declare no parent-child relationships — it's a flat lookup.
+- `onBack` is called by the system back gesture/button. Because you handle it yourself, predictive back animations work out of the box, and you can veto or redirect the pop if a screen needs confirmation.
+
+### Passing Results Back
+
+Since the back stack is yours, returning a result is just coordinating state before popping:
+
+```kotlin
+// In the detail screen's delete handler
+onDeleteConfirmed = {
+    viewModel.deleteProfile(userId)
+    backStack.removeLastOrNull() // pop to the list; shared state already updated
+}
+```
+
+For richer flows you can also pass lambdas *inside* the key itself. Keep in mind keys are serialized for restoration, so non-serializable members like lambdas won't survive process death — fine for ephemeral pickers, but prefer shared state holders for anything that must survive configuration changes.
+
+### ViewModels Scoped to Entries
+
+The feature that matters most in real apps: each back stack entry gets its own `ViewModelStore`, so ViewModels die exactly when their entry leaves the back stack — no more Activity-scoped ViewModels leaking across screens.
+
+Add the decorators to `NavDisplay`:
+
+```kotlin
+NavDisplay(
+    backStack = backStack,
+    onBack = { backStack.removeLastOrNull() },
+    entryDecorators = listOf(
+        rememberSceneSetupNavEntryDecorator(),
+        rememberSavedStateNavEntryDecorator(),
+        rememberViewModelStoreNavEntryDecorator(),
+    ),
+    entryProvider = entryProvider {
+        entry<ProfileDetail> { key ->
+            // Scoped to this entry — cleared when it leaves the back stack
+            val viewModel: ProfileDetailViewModel = viewModel()
+            ProfileDetailScreen(viewModel = viewModel, userId = key.userId)
+        }
+        // ...
+    }
+)
+```
+
+Inside an `entry` block, the composition is wrapped in an entry-scoped `ViewModelStoreOwner`, so plain `viewModel()` resolution lands on the right store automatically. `rememberSavedStateNavEntryDecorator()` additionally gives each entry its own saved-instance state.
+
+<Callout variant="tip">
+Keep the three decorators in the order shown — scene setup first, then saved state, then ViewModel store. Each decorator wraps the previous one, and later ones rely on owners installed by earlier ones.
+</Callout>
+
+### Adaptive Layouts: Two Screens at Once
+
+Because destinations are independent entries rather than graph nodes, nothing stops `NavDisplay` from showing several at once. The `androidx.compose.material3.adaptive:adaptive-navigation3` artifact adds scene strategies that turn a back stack of `[List, Detail]` into a side-by-side list-detail layout on expanded windows, while phones keep a normal push navigation:
+
+```kotlin
+dependencies {
+    implementation("androidx.compose.material3.adaptive:adaptive-navigation3:1.3.0")
+}
+```
+
+You mark entries with pane metadata and hand the strategy to `NavDisplay`; the same single back stack then renders one pane or two depending on window size. This is the use case that motivated the whole redesign — with Navigation 2 it required parallel navigation graphs and fragile synchronization. See the [adaptive layouts guide](https://developer.android.com/guide/navigation/navigation-3/adaptive-layouts) and the recipes repository linked at the end for complete examples.
+
+## Part 2 — The Same Navigation in a KMP App
+
+Here's where Navigation 3 gets genuinely exciting for Kotlin Multiplatform. Starting with Compose Multiplatform 1.10, JetBrains publishes multiplatform versions of the Nav3 artifacts supporting **Android, iOS, desktop (JVM), and web (WasmJS)**.
+
+### Dependencies for commonMain
+
+In your version catalog:
+
+```toml
+[versions]
+multiplatform-nav3 = "1.1.1"
+
+[libraries]
+jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "multiplatform-nav3" }
+```
+
+And if you use ViewModels or adaptive layouts, the multiplatform companions:
+
+```toml
+[versions]
+compose-multiplatform-adaptive = "1.3.0-beta02"
+compose-multiplatform-lifecycle = "2.10.0"
+
+[libraries]
+jetbrains-material3-adaptiveNavigation3 = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "compose-multiplatform-adaptive" }
+jetbrains-lifecycle-viewmodelNavigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "compose-multiplatform-lifecycle" }
+```
+
+Drop these into `commonMain.dependencies` of your shared module. The API surface is the same `NavDisplay`, `rememberNavBackStack`, and `entryProvider` you just learned — the Android code above compiles almost unchanged as shared code.
+
+### The One Real Difference: Key Serialization
+
+On Android (JVM), Navigation 3 can lean on reflection to serialize your `NavKey` classes during state restoration. Reflection isn't available on iOS or web, so those platforms need **explicit polymorphic registration** of every key type. Skip it and everything works — until process death or a page reload silently resets the back stack.
+
+The fix is a `SavedStateConfiguration` passed to `rememberNavBackStack`. For a single-module project, the cleanest pattern is a sealed interface:
+
+```kotlin
+@Serializable
+sealed interface Route : NavKey
+
+@Serializable
+data object ProfileList : Route
+
+@Serializable
+data class ProfileDetail(val userId: String) : Route
+
+@Serializable
+data object Settings : Route
+```
+
+Then register the whole hierarchy once:
+
+```kotlin
+private val config = SavedStateConfiguration {
+    serializersModule = SerializersModule {
+        polymorphic(NavKey::class) {
+            subclassesOfSealed<Route>()
+        }
+    }
+}
+
+@Composable
+fun App() {
+    val backStack = rememberNavBackStack(config, ProfileList)
+
+    NavDisplay(
+        backStack = backStack,
+        onBack = { backStack.removeLastOrNull() },
+        entryProvider = entryProvider {
+            entry<ProfileList> { /* ... */ }
+            entry<ProfileDetail> { key -> /* ... */ }
+            entry<Settings> { /* ... */ }
+        }
+    )
+}
+```
+
+This entire block lives in `commonMain` — no `expect/actual`, no platform branches. `subclassesOfSealed<Route>()` picks up every subclass automatically, including routes you add later.
+
+<Callout variant="warning">
+This is the most common KMP bug report for Nav3: everything runs perfectly on Android, then on iOS the back stack resets after the process is killed. Always test restoration on a non-JVM target early.
+</Callout>
+
+### Multi-Module Apps
+
+With feature modules, give each module its own sealed interface and aggregate them at the app level:
+
+```kotlin
+// :feature-profiles
+@Serializable
+sealed interface ProfilesFeature : NavKey
+
+@Serializable
+data class ProfileDetail(val userId: String) : ProfilesFeature
+
+// :feature-settings
+@Serializable
+sealed interface SettingsFeature : NavKey
+
+@Serializable
+data object Settings : SettingsFeature
+
+// :app (commonMain)
+private val config = SavedStateConfiguration {
+    serializersModule = SerializersModule {
+        polymorphic(NavKey::class) {
+            subclassesOfSealed<ProfilesFeature>()
+            subclassesOfSealed<SettingsFeature>()
+        }
+    }
+}
+```
+
+Each feature module stays decoupled — it never sees other modules' routes — while the app composes them into one serializer registry. If your routes can't form sealed hierarchies, register subclasses individually with `subclass(RouteX::class, RouteX.serializer())` and merge `SerializersModule`s instead. With dependency injection, you can even collect serializers into a set dynamically.
+
+### Platform Differences Worth Knowing
+
+The API is shared, but platform behavior differs at the edges:
+
+| Concern | Android | iOS | Desktop | Web (WasmJS) |
+|---------|---------|-----|---------|--------------|
+| Back input | System back + predictive animation | Edge-swipe gesture | Esc key | Esc key |
+| State restoration | Saved instance state / process death | Process re-launch | App restart | Page reload |
+| Polymorphic config needed? | No (reflection available) | **Yes** | No | **Yes** |
+| Browser history sync | N/A | N/A | N/A | Not yet |
+
+That last row matters for web targets: the back stack currently does not integrate with the browser's back button or URL bar. Official support is tracked in [CMP-8924](https://youtrack.jetbrains.com/projects/CMP/issues/CMP-8924/Integrate-Browser-History-with-Nav3); until it ships, [terrakok/navigation3-browser](https://github.com/terrakok/navigation3-browser) is a community proof-of-concept bridge.
+
+A typical project structure ends up looking like this:
+
+```text
+composeApp/
+├── src/
+│   ├── commonMain/kotlin/
+│   │   ├── navigation/        # Route sealed interfaces, SavedStateConfig, AppRoot()
+│   │   └── features/          # Screens + entry-scoped ViewModels, all shared
+│   ├── androidMain/
+│   ├── iosMain/
+│   ├── desktopMain/
+│   └── wasmJsMain/
+├── androidApp/                # Thin Android launcher (or single-target composeApp)
+└── iosApp/                    # Xcode project wrapping the shared Compose UI
+```
+
+The navigation layer — routes, back stack, `NavDisplay` wiring — is fully shared code. Platforms only differ in their `main` entry points and manifest/plist configuration for deep links.
+
+## Migrating from Navigation 2
+
+Google's own guidance is honest: think of it as a rewrite rather than a migration. The concept mapping helps while planning:
+
+| Navigation 2 | Navigation 3 |
+|---|---|
+| `NavController` | Your observable back stack |
+| `NavHost(navController, graph)` | `NavDisplay(backStack, entryProvider)` |
+| String route + `Bundle` args | `@Serializable NavKey` data class |
+| Nested `NavGraph`s | Flat entries; group flows with your own abstractions |
+| `navigate()` / `popBackStack()` | `backStack.add(key)` / `backStack.removeLast()` |
+
+Practical tips if you migrate incrementally:
+
+1. Start by converting leaf screens (no incoming results) — they're mechanical rewrites.
+2. Replace graph-scoped ViewModel wiring with `entryDecorators` plus entry-scoped `viewModel()`.
+3. Navigation 2 and 3 are independent artifacts and can coexist in one app, so convert features gradually instead of blocking a release on a big-bang rewrite.
+
+<Callout variant="note">
+There is an official agent skill for migrating to Nav3 in Google's Android skills repository, and the [migration guide](https://developer.android.com/guide/navigation/navigation-3/migration-guide) covers edge cases like deep links and conditional navigation patterns.
+</Callout>
+
+## Common Pitfalls
+
+1. **Missing `@Serializable` on a key.** It compiles fine, then crashes or silently drops state during restoration. Make it a team lint rule.
+2. **Skipping `SavedStateConfiguration` in KMP.** Android-only testing hides the problem completely. Run the iOS target through a process kill before shipping.
+3. **Mutating the back stack during composition.** Call `add`/`remove` from event handlers and effects, not directly inside composable bodies, or you'll fight recomposition loops.
+4. **Forgetting the decorators.** Without `rememberViewModelStoreNavEntryDecorator()`, `viewModel()` falls back to the nearest existing owner — usually the Activity — and your "scoped" ViewModel quietly outlives every screen.
+5. **Rebuilding the Nav2 graph mentally.** There is no nesting, no parent scopes, no `currentDestination`. Model flows with your own state holders; the flatness is a feature.
+
+## When Should You Adopt?
+
+- **New Android apps**: yes, unconditionally. Stable since late 2025 and now the recommended approach — the simpler model pays off immediately.
+- **Existing Nav2 apps**: migrate opportunistically. Convert features gradually; both libraries coexist without conflict.
+- **KMP projects**: adopt with awareness. The multiplatform artifacts track the Jetpack releases closely, but verify current version status — expect alpha-to-stable churn on the non-JVM targets.
+
+## Resources
+
+- [Navigation 3 guide — Android Developers](https://developer.android.com/guide/navigation/navigation-3)
+- [Navigation 3 releases](https://developer.android.com/jetpack/androidx/releases/navigation3)
+- [Nav3 recipes — official samples](https://github.com/android/nav3-recipes)
+- [Compose Multiplatform Nav3 docs — Kotlinlang](https://kotlinlang.org/docs/multiplatform/compose-navigation-3.html)
+- [Multiplatform Nav3 recipes port](https://github.com/terrakok/nav3-recipes)
+
+Happy navigating!

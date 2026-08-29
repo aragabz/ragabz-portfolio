@@ -1,0 +1,91 @@
+---
+title: "State Management in Jetpack Compose: Derived State, MVI, and the Case Against Global Redux"
+date: 2026-08-23
+excerpt: "When to use `derivedStateOf`, `remember { mutableStateOf() }`, and MVI patterns versus when Zustand or Redux actually makes sense in a Compose app."
+tags: ["Android", "Jetpack Compose", "State Management", "Architecture"]
+readingTime: 6
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Compose has its own state model, and knowing which tool fits which problem saves hours of debugging.
+
+<Callout variant="tip" title="What you'll learn">
+- When `remember { mutableStateOf() }` is enough vs. when you need `derivedStateOf`
+- How to structure a simple MVI loop with `StateFlow` and `collectAsCompose`
+- Why reaching for global Redux/Zustand often adds unnecessary ceremony
+</Callout>
+
+## Compose‑first state
+
+```kotlin
+@Composable
+fun Greeting(name: String) {
+    // UI‑only state: recreated instantly on composition
+    val count = remember { mutableStateOf(0) }
+    val upperCase by remember { derivedStateOf { count.value.uppercase() } }
+
+    Button(onClick = { count.value++ }) {
+        Text(text = upperCase)
+    }
+}
+```
+
+`remember { mutableStateOf() }` triggers a recomposition when the reference changes. `derivedStateOf` memoizes the calculation and only recomputes when its inputs actually change — essential for expensive UI calculations.
+
+## When global stores make sense
+
+| Situation | Recommended tool |
+|-----------|-----------------|
+| Shared auth token across many distant screens | `AuthRepository` + `ViewModel` + `Hilt` |
+| Complex form validation with cross‑field rules | `Zustand` or `Redux` + `createSelectors` |
+| Time‑travel debugging or persistence quotients | `Redux` tooling (`@Reducer`, `payloads`) |
+
+<Callout variant="warning">
+Avoid putting UI‑only data (e.g. animation progress, transient selections) into a global store — it forces every subscriber to re‑render on *any* store change, destroying Compose’s selective-subscription benefit.
+</Callout>
+
+## Simple MVI loop
+
+```kotlin
+// UI
+val (state, dispatch) = useViewModel<MyViewModel>()
+Text(state.title)
+Button(onClick = { dispatch(LoadData) }) { Text("Load") }
+
+// Domain
+class MyViewModel : ViewModel() {
+    private val _title = MutableStateFlow("Hello")
+    val title: StateFlow<String> = _title
+        .map { "Updated: $it" }
+        .stateIn(
+            scope = CoroutineScope(Dispatchers.Main),
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = "Hello",
+        )
+
+    fun loadData() {
+        viewModelScope.launch {
+            val data = repository.fetch()
+            _title.postValue(data)
+        }
+    }
+}
+```
+
+The `stateIn` operator gives you a `StateFlow` that survives configuration changes and scopes its lifecycle to the ViewModel — no manual `saveEnabled` flags needed.
+
+## When to reach for Zustand/Redux
+
+- **Form state** that must survive process death without a `ViewModel` (e.g. a quick survey with no DI).
+- **Time‑travel debugging** where you need exact action replay.
+- **State that truly is global** (e.g. theme preferences stored in `SharedPreferences`) and accessed from many unrelated screens.
+
+**Bottom line:** Start with Compose’s `StateFlow`/`mutableStateOf`/`.flow {}` abstractions. Only pull in a global store when the pattern above doesn’t fit your problem shape.
+
+## Resources
+
+- [Compose state beyond the basics — Android Devs](https://developer.android.com/ui/compose/state)
+- [MVI architecture — GitHub sample](https://github.com/android/views-architecture-samples)
+- [Zustand docs](https://zustand.docs.pmnd.rs/)

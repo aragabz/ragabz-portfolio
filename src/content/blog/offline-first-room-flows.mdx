@@ -1,0 +1,98 @@
+---
+title: "Building Offline‑First Android Apps with Room, Kotlin Flows, and Repository Patterns"
+date: 2026-08-23
+excerpt: "Data layer: Room migrations, Flow↔LiveData conversion, coroutine scopes, and keeping the UI reactive without memory leaks."
+tags: ["Android", "Room", "Kotlin", "Coroutines", "Persistence"]
+readingTime: 7
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+A solid offline‑first layer lets your app work when the network disappears and keeps the UI predictably reactive.
+
+<Callout variant="tip" title="What you'll learn">
+- How to write Room entities with proper `@PrimaryKey` and `@ColumnInfo`
+- Exposing data as `Flow` vs. `LiveData` and when to choose each
+- Patterns for repository‑scoped coroutine scopes and `viewModelScope`
+</Callout>
+
+### Room entities & DAOs
+
+```kotlin
+@Entity(tableName = "users")
+data class User(
+    @PrimaryKey @ColumnInfo(name = "user_id") val id: Int,
+    @ColumnInfo(name = "name") val name: String,
+    @ColumnInfo(name = "email") val email: String
+)
+
+@Dao
+interface UserDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(user: User)
+
+    @Query("SELECT * FROM users WHERE id = :id")
+    suspend fun getById(id: Int): User?
+
+    @Query("SELECT * FROM users")
+    Flow<User> loadAll(): Flow<User>
+}
+```
+
+`suspend` functions handle single‑write operations; `Flow` gives a live observable stream that automatically pauses when no collector is active.
+
+### Repository layer with Flow
+
+```kotlin
+class UserRepository(private val dao: UserDao, private val api: UserApi) {
+    // Combine network & local source, preferring cached data while fresh
+    val users: Flow<List<User>> = combineLatest(
+        dao.loadAll(),
+        api.usersFlow().cacheIn(5_000) // 5‑second in‑memory cache
+    ) { local, remote -> if (remote.isNotEmpty()) remote else local }
+        .distinctUntilChanged()
+
+    suspend fun refresh() = viewModelScope.launch {
+        val remote = api.fetchUsers()
+        dao.insertAll(remote)
+    }
+}
+```
+
+`combineLatest` lets you keep stale local data while the network response arrives, then `distinctUntilChanged` prevents unnecessary UI updates when the set hasn't actually changed.
+
+<Callout variant="warning">
+Never expose a `LiveData` from a Repository — it’s tied to `LifecycleOwner` and can leak if the UI stays active beyond the intended scope. Use `Flow` and collect in the UI with `collectAsCompose()` or `launch { flow.collect { ... } }`.
+</Callout>
+
+### UI consumption
+
+```kotlin
+@Composable
+fun UserScreen(repository: UserRepository = UserRepository(UserDao.getInstance(), UserApi())) {
+    val users by repository.users.asStateFlow(state {}).collectAsCompose()
+    val empty by remember { mutableStateOf(false) }
+
+    LazyColumn {
+        items(users) { user ->
+            UserCard(user)
+        }
+        if (users.isEmpty() && !empty) {
+            Text("No users — pull to refresh", style = MaterialTheme.typography.body2)
+        }
+    }
+
+    Button(onClick = { repository.refresh(); empty = true }) {
+        Text("Refresh")
+    }
+}
+```
+
+`asStateFlow(state {})` converts the `Flow` into a `StateFlow` scoped to the composed tree, so `collectAsCompose()` handles lifecycle awareness automatically.
+
+## Resources
+
+- [Room getting‑started — Android Devs](https://developer.android.com/training/data-storage/room)
+- [Flow & Kotlin coroutines — Kotlin docs](https://kotlinlang.org/docs/coroutines-guide.html)
+- [ViewModel + Flow codelab](https://developer.android.com/codelabs/android-compose-viewmodel)

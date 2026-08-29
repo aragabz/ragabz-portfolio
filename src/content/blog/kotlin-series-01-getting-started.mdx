@@ -1,0 +1,284 @@
+---
+title: "Kotlin from Zero to Hero #1 — Getting Started: Setup, Variables & Basic Types"
+date: 2026-08-22
+excerpt: "The first step of the Kotlin series: install the toolchain, write your first program, and understand val vs var, basic types, type inference, and string templates."
+tags: ["Kotlin", "Kotlin Series", "Beginners", "Backend"]
+readingTime: 10
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Welcome to the **Kotlin from Zero to Hero** series! Over eight posts we'll go from "what is Kotlin?" to writing idiomatic, production-grade code — including null safety, OOP, collections, generics, and coroutines. This first post gets your environment running and covers the absolute fundamentals.
+
+<Callout variant="tip" title="Series roadmap">
+1. **Getting Started** ← you are here
+2. [Control Flow](/blog/kotlin-series-02-control-flow): if, when, loops
+3. [Functions & Lambdas](/blog/kotlin-series-03-functions-lambdas)
+4. [Null Safety](/blog/kotlin-series-04-null-safety)
+5. [Classes & OOP](/blog/kotlin-series-05-oop-data-classes)
+6. [Collections & Generics](/blog/kotlin-series-06-collections-generics)
+7. [Coroutines](/blog/kotlin-series-07-coroutines)
+8. [Testing & Best Practices](/blog/kotlin-series-08-testing-best-practices)
+
+At the end we'll also cover [how Kotlin evolved between versions](/blog/kotlin-versions-k2-era), from the K2 compiler to Kotlin 2.4.
+</Callout>
+
+## What is Kotlin?
+
+Kotlin is a statically typed, multiplatform language developed by JetBrains. It compiles to JVM bytecode, JavaScript, WebAssembly, and native binaries. Its headline features:
+
+- **Concise** — dramatically less boilerplate than Java
+- **Null-safe** — the compiler tracks nullability at the type level
+- **Interop-friendly** — 100% interoperable with Java; you can mix both in one project
+- **Multiplatform** — Android, backend (Spring, Ktor), iOS (via Kotlin Multiplatform), web, desktop
+
+It's the officially preferred language for Android development since Google I/O 2019, and increasingly popular on the server side too — Spring has first-class Kotlin support.
+
+## Setting Up Your Environment
+
+You have three main options:
+
+### 1. IntelliJ IDEA or Android Studio (recommended)
+
+The full IDE experience with refactoring, debugging, and inspection support. The Community edition is free.
+
+### 2. Command-line compiler
+
+If you want to understand what happens under the hood:
+
+```bash
+# macOS
+brew install kotlin
+
+# SDKMAN (Linux/macOS)
+sdk install kotlin
+```
+
+Then compile and run:
+
+```bash
+kotlinc hello.kt -include-runtime -d hello.jar
+java -jar hello.jar
+```
+
+### 3. Online playground
+
+Zero installation: try code snippets instantly at [play.kotlinlang.org](https://play.kotlinlang.org). Perfect for following along with this series.
+
+<Callout variant="note">
+Kotlin 2.x uses the **K2 compiler**, which is significantly faster than the old K1 frontend. You don't need to configure anything special — any current toolchain ships K2 by default.
+</Callout>
+
+## Your First Program
+
+Create a file called `hello.kt`:
+
+```kotlin
+fun main() {
+    println("Hello, Kotlin!")
+}
+```
+
+That's it. Notice what's *missing* compared to Java:
+
+- No class wrapping the function — top-level functions are idiomatic
+- No `String[] args` parameter required
+- No semicolons
+- `System.out.println` becomes simply `println`
+
+If you want command-line arguments:
+
+```kotlin
+fun main(args: Array<String>) {
+    println("Program arguments: ${args.joinToString()}")
+}
+```
+
+## Variables: `val` vs `var`
+
+Kotlin has two ways to declare variables, and choosing between them is a deliberate design decision you make every time:
+
+```kotlin
+val name = "Ahmed"     // read-only reference (like final in Java)
+var age = 30           // mutable variable
+
+age = 31               // OK
+// name = "Other"      // Compilation error: Val cannot be reassigned
+```
+
+**Rule of thumb: use `val` everywhere by default, and only reach for `var` when you truly need reassignment.** Immutable-by-default code is easier to reason about, safer in concurrent contexts, and more idiomatic.
+
+<Callout variant="warning">
+`val` means the *reference* is immutable, not necessarily the object it points to:
+
+```kotlin
+val list = mutableListOf(1, 2, 3)
+list.add(4)      // fine — the object is mutable
+// list = mutableListOf()   // error — the reference is fixed
+```
+</Callout>
+
+## Type Inference
+
+You rarely need to declare types explicitly — the compiler figures them out:
+
+```kotlin
+val count = 42          // Int inferred
+val price = 19.99       // Double inferred
+val isActive = true     // Boolean inferred
+val letter = 'A'        // Char inferred
+```
+
+Declare types when the intent isn't obvious, when the inferred type is too specific for your needs, or for public APIs where documentation matters:
+
+```kotlin
+val timeoutMillis: Long = 5000   // be explicit about the width
+val items: List<String> = emptyList()
+```
+
+## Basic Types
+
+Kotlin's basic types are real types (not primitives like Java's `int`), though the compiler optimizes them to primitives at runtime whenever possible.
+
+### Numbers
+
+| Type | Size | Example |
+|------|------|---------|
+| `Byte` | 8 bits | `val b: Byte = 1` |
+| `Short` | 16 bits | `val s: Short = 300` |
+| `Int` | 32 bits | `val i = 100_000` |
+| `Long` | 64 bits | `val l = 10L` |
+| `Float` | 32 bits | `val f = 1.5f` |
+| `Double` | 64 bits | `val d = 1.5` |
+
+Use underscores for readability in long numeric literals: `val creditCard = 1234_5678_9012_3456L`.
+
+Unlike Java, **there is no implicit widening conversion**. Conversions must be explicit:
+
+```kotlin
+val i: Int = 10
+// val l: Long = i            // compilation error!
+val l: Long = i.toLong()      // correct
+val d: Double = l.toDouble()  // every type has toXxx() conversions
+```
+
+This design prevents subtle bugs — Java's implicit conversions famously cause surprises like `ArrayList.equals()` behaving unexpectedly across integer types.
+
+### Booleans
+
+```kotlin
+val isEnabled = true
+val hasPermission = false
+```
+
+Supports standard operators: `&&`, `||`, `!` — all short-circuiting.
+
+### Characters and Strings
+
+```kotlin
+val c: Char = 'K'
+val s = "Kotlin"
+```
+
+Strings are immutable and support indexing and iteration:
+
+```kotlin
+val first = s[0]        // 'K'
+for (ch in s) print(ch) // iterates over characters
+```
+
+## String Templates
+
+One of Kotlin's most-loved everyday features — embed values directly in strings:
+
+```kotlin
+val name = "Ragab"
+val age = 27
+
+println("Name: $name")           // simple variable
+println("Next year: ${age + 1}") // arbitrary expression
+println("Length: ${name.length}")
+```
+
+For multi-line strings, use triple quotes — no escaping needed:
+
+```kotlin
+val json = """
+    {
+        "name": "$name",
+        "age": $age
+    }
+""".trimIndent()
+
+println(json)
+```
+
+`.trimIndent()` removes the common leading whitespace so the output is clean JSON.
+
+<Callout variant="tip">
+Escape a literal dollar sign as `\$` when you don't want interpolation: `"Price: \$100"`.
+</Callout>
+
+## Comments
+
+Standard syntax, plus Kotlin's own doc format called KDoc:
+
+```kotlin
+// line comment
+
+/* block comment,
+   /* which can be nested */ like this */
+
+/**
+ * Calculates shipping cost.
+ *
+ * @param weight package weight in kilograms
+ * @return cost in USD
+ */
+fun shippingCost(weight: Double): Double = weight * 2.5
+```
+
+Nested block comments are a small but genuine improvement over Java — you can comment out blocks that already contain comments.
+
+## A Taste of What Makes Kotlin Different
+
+To end this post, here's a small comparison showing the flavor of the language. Summing even numbers up to 10:
+
+**Java:**
+
+```java
+List<Integer> evens = new ArrayList<>();
+for (int i = 0; i <= 10; i++) {
+    if (i % 2 == 0) evens.add(i);
+}
+```
+
+**Kotlin:**
+
+```kotlin
+val evens = (0..10).filter { it % 2 == 0 }
+```
+
+Don't worry about the details yet — by the end of this series, that second snippet will feel completely natural.
+
+## Exercises
+
+Try these in the playground before moving on:
+
+1. Declare a read-only variable holding your city, then interpolate it into a sentence.
+2. Convert an `Int` to a `Double` explicitly and print the result.
+3. Build a multi-line string containing three lines about yourself, using `.trimIndent()`.
+4. Write a `main` that prints the sum of two numbers stored in `val`s.
+
+## What's Next
+
+In [post #2](/blog/kotlin-series-02-control-flow), we'll cover control flow in Kotlin — including `when`, Kotlin's supercharged replacement for `switch` that works as an expression.
+
+## Resources
+
+- [Kotlin official docs — Getting started](https://kotlinlang.org/docs/getting-started.html)
+- [Kotlin Playground](https://play.kotlinlang.org)
+- [Coding conventions](https://kotlinlang.org/docs/coding-conventions.html)
+
+Happy coding! 🚀
