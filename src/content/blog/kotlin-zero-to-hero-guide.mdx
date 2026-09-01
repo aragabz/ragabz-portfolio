@@ -1,0 +1,1042 @@
+---
+title: "Kotlin from Zero to Hero: The Complete Guide"
+date: 2026-10-10
+excerpt: "The entire Kotlin language in one guide: setup, variables, control flow, functions, lambdas, null safety, OOP, data classes, collections, generics, coroutines, Flow, testing, and idiomatic best practices."
+tags: ["Kotlin", "Kotlin Series", "Beginners", "Backend"]
+readingTime: 50
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Kotlin is a statically typed, multiplatform language developed by JetBrains. It compiles to JVM bytecode, JavaScript, WebAssembly, and native binaries. Its headline features:
+
+- **Concise** — dramatically less boilerplate than Java
+- **Null-safe** — the compiler tracks nullability at the type level
+- **Interop-friendly** — 100% interoperable with Java; you can mix both in one project
+- **Multiplatform** — Android, backend (Spring, Ktor), iOS (via Kotlin Multiplatform), web, desktop
+
+This guide takes you from zero to idiomatic Kotlin — every major topic covered end to end.
+
+<Callout variant="tip" title="What you'll learn">
+- Environment setup, variables, and basic types
+- Control flow: `if` as expression, `when`, ranges, loops
+- Functions, lambdas, extension functions, and scope functions
+- Null safety: nullable types, safe calls, Elvis, smart casts
+- OOP: classes, data classes, sealed hierarchies, objects, delegation
+- Collections, functional pipelines, lazy sequences, and generics
+- Coroutines: suspend, structured concurrency, cancellation, dispatchers, Flow
+- Testing with JUnit 5, Kotest, MockK, and `runTest`
+- Idiomatic Kotlin best practices checklist
+</Callout>
+
+## Table of Contents
+
+1. [Setup & Basics](#setup--basics)
+2. [Control Flow](#control-flow)
+3. [Functions, Lambdas & Scope Functions](#functions-lambdas--scope-functions)
+4. [Null Safety](#null-safety)
+5. [Classes, Data Classes & OOP](#classes-data-classes--oop)
+6. [Collections, Functional Operations & Generics](#collections-functional-operations--generics)
+7. [Coroutines](#coroutines)
+8. [Testing & Best Practices](#testing--best-practices)
+
+---
+
+## Setup & Basics
+
+### Installing Kotlin
+
+You have three main options:
+
+**IntelliJ IDEA or Android Studio (recommended):** The full IDE experience with refactoring, debugging, and inspection support. The Community edition is free.
+
+**Command-line compiler:**
+
+```bash
+# macOS
+brew install kotlin
+
+# SDKMAN (Linux/macOS)
+sdk install kotlin
+```
+
+```bash
+kotlinc hello.kt -include-runtime -d hello.jar
+java -jar hello.jar
+```
+
+**Online playground:** Zero installation at [play.kotlinlang.org](https://play.kotlinlang.org).
+
+<Callout variant="note">
+Kotlin 2.x uses the **K2 compiler**, which is significantly faster than the old K1 frontend. Any current toolchain ships K2 by default.
+</Callout>
+
+### Your first program
+
+```kotlin
+fun main() {
+    println("Hello, Kotlin!")
+}
+```
+
+Notice what's *missing* compared to Java: no class wrapping the function, no `String[] args` parameter required, no semicolons, `System.out.println` becomes simply `println`.
+
+### Variables: `val` vs `var`
+
+```kotlin
+val name = "Ahmed"     // read-only reference (like final in Java)
+var age = 30           // mutable variable
+
+age = 31               // OK
+// name = "Other"      // Compilation error: Val cannot be reassigned
+```
+
+**Rule of thumb: use `val` everywhere by default, and only reach for `var` when you truly need reassignment.**
+
+<Callout variant="warning">
+`val` means the *reference* is immutable, not necessarily the object it points to:
+
+```kotlin
+val list = mutableListOf(1, 2, 3)
+list.add(4)      // fine — the object is mutable
+// list = mutableListOf()   // error — the reference is fixed
+```
+</Callout>
+
+### Type inference and basic types
+
+You rarely need to declare types explicitly — the compiler figures them out:
+
+```kotlin
+val count = 42          // Int inferred
+val price = 19.99       // Double inferred
+val isActive = true     // Boolean inferred
+```
+
+Declare types when the intent isn't obvious:
+
+```kotlin
+val timeoutMillis: Long = 5000
+val items: List<String> = emptyList()
+```
+
+Kotlin's basic types are real types (not primitives like Java's `int`), though the compiler optimizes them to primitives at runtime whenever possible.
+
+| Type | Size | Example |
+|------|------|---------|
+| `Byte` | 8 bits | `val b: Byte = 1` |
+| `Short` | 16 bits | `val s: Short = 300` |
+| `Int` | 32 bits | `val i = 100_000` |
+| `Long` | 64 bits | `val l = 10L` |
+| `Float` | 32 bits | `val f = 1.5f` |
+| `Double` | 64 bits | `val d = 1.5` |
+
+Unlike Java, **there is no implicit widening conversion**:
+
+```kotlin
+val i: Int = 10
+// val l: Long = i            // compilation error!
+val l: Long = i.toLong()      // correct
+```
+
+### String templates
+
+One of Kotlin's most-loved everyday features — embed values directly in strings:
+
+```kotlin
+val name = "Ragab"
+val age = 27
+
+println("Name: $name")           // simple variable
+println("Next year: ${age + 1}") // arbitrary expression
+println("Length: ${name.length}")
+```
+
+For multi-line strings, use triple quotes:
+
+```kotlin
+val json = """
+    {
+        "name": "$name",
+        "age": $age
+    }
+""".trimIndent()
+```
+
+---
+
+## Control Flow
+
+### `if` is an expression
+
+In Java, `if` is a statement — it produces no value. In Kotlin, **`if` returns a value**:
+
+```kotlin
+val number = 7
+
+// if as an expression (producing a value)
+val parity = if (number % 2 == 0) "even" else "odd"
+println(parity) // odd
+```
+
+With multiple branches, the last expression of each branch becomes the result:
+
+```kotlin
+val grade = if (score >= 90) {
+    println("Excellent!")
+    "A"
+} else if (score >= 80) {
+    "B"
+} else {
+    "C"
+}
+```
+
+<Callout variant="note">
+There is no ternary operator (`condition ? a : b`) in Kotlin — `val x = if (cond) a else b` reads just as well.
+</Callout>
+
+### `when`: Kotlin's supercharged `switch`
+
+`when` matches a value against multiple branches. Unlike Java's `switch`, it requires no `break`, can match arbitrary expressions, works as an expression itself, and supports type checks and destructuring.
+
+```kotlin
+val message = when (httpStatus) {
+    200 -> "OK"
+    301, 302 -> "Redirect"
+    in 400..499 -> "Client error"
+    else -> "Unknown"
+}
+```
+
+**Matching types** with automatic smart-casting:
+
+```kotlin
+fun describe(value: Any): String = when (value) {
+    is Int -> "Integer: $value"            // value smart-cast to Int
+    is String -> "String of ${value.length} chars"
+    is List<*> -> "List with ${value.size} items"
+    else -> "Something else"
+}
+```
+
+**Without a subject** — each branch is a boolean condition:
+
+```kotlin
+fun feel(): String = when {
+    temp < 10 -> "cold"
+    temp in 10..25 -> "pleasant"
+    else -> "hot"
+}
+```
+
+**Exhaustive matching** with sealed types:
+
+```kotlin
+sealed interface PaymentResult
+
+data class Approved(val id: String) : PaymentResult
+data class Declined(val reason: String) : PaymentResult
+object Pending : PaymentResult
+
+fun render(result: PaymentResult): String = when (result) {
+    is Approved -> "Payment ${result.id} approved"
+    is Declined -> "Declined: ${result.reason}"
+    Pending -> "Waiting..."
+}
+```
+
+No `else` needed: the compiler verifies every case. Add a new subclass later and every incomplete `when` becomes a compile error.
+
+### Ranges and loops
+
+```kotlin
+val numbers = 1..5        // inclusive: 1, 2, 3, 4, 5
+val exclusive = 1 until 5 // excludes end: 1, 2, 3, 4
+val countdown = 5 downTo 1
+val evens = 0..20 step 2
+
+if (age in 18..65) println("working age")
+```
+
+Kotlin has no classic C-style `for(i = 0; i < n; i++)`. Instead, `for` works with any object providing an iterator:
+
+```kotlin
+for (i in 1..3) print("$i ")
+
+for ((index, item) in listOf("a", "b").withIndex()) {
+    println("$index -> $item")
+}
+```
+
+**Labels** let you jump out of nested loops directly:
+
+```kotlin
+outer@ for (i in 1..3) {
+    for (j in 1..3) {
+        if (i * j > 6) continue@outer
+        if (i == 3 && j == 2) break@outer
+        print("($i,$j) ")
+    }
+}
+```
+
+---
+
+## Functions, Lambdas & Scope Functions
+
+### Declaring functions
+
+```kotlin
+fun greet(name: String): String {
+    return "Hello, $name!"
+}
+```
+
+**Single-expression functions** — drop the braces and `return`:
+
+```kotlin
+fun greet(name: String): String = "Hello, $name!"
+fun double(x: Int) = x * 2
+```
+
+### Default and named arguments
+
+Two features that eliminate most builder-pattern boilerplate from Java:
+
+```kotlin
+fun connect(
+    host: String,
+    port: Int = 5432,
+    timeoutMs: Long = 3_000,
+    ssl: Boolean = false,
+) {
+    println("Connecting to $host:$port (ssl=$ssl)")
+}
+
+connect("db.example.com")                              // all defaults
+connect("db.example.com", port = 5433)                 // one override
+connect(host = "db.example.com", ssl = true)           // skip middle params!
+```
+
+<Callout variant="note">
+Java code calling your Kotlin functions can't use default arguments directly. Add `@JvmOverloads` to generate the traditional overload chain automatically.
+</Callout>
+
+### Extension functions
+
+The signature Kotlin feature. Extensions let you **add new functions to existing types** — even types you don't own:
+
+```kotlin
+fun String.truncate(max: Int): String =
+    if (length <= max) this else take(max) + "…"
+
+println("Kotlin is fantastic".truncate(9))  // "Kotlin is…"
+```
+
+<Callout variant="warning">
+Extensions are resolved **statically** — they don't modify the class, so they don't participate in runtime polymorphism. If a member function and an extension have identical signatures, the member always wins.
+</Callout>
+
+### Lambdas
+
+A lambda is an anonymous function you pass around as a value:
+
+```kotlin
+val sum: (Int, Int) -> Int = { a, b -> a + b }
+
+operate(4, 5) { a, b -> a * b }        // trailing lambda
+operate(4, 5, ::sumOf)                  // method reference
+```
+
+When the lambda has exactly one parameter you can skip naming it and use the implicit `it`:
+
+```kotlin
+val names = listOf("Ali", "Omar", "Sara")
+val lengths = names.map { it.length }          // [3, 4, 4]
+val longOnes = names.filter { it.length > 3 }  // [Omar]
+```
+
+Chained together, this is the fluent collection style:
+
+```kotlin
+val result = (1..100)
+    .filter { it % 3 == 0 }
+    .map { it * it }
+    .take(3)                    // [9, 36, 81]
+```
+
+### Scope functions
+
+Five standard-library functions that execute a block within an object's scope:
+
+| Function | Block receiver | Returns | Typical use |
+|----------|---------------|---------|-------------|
+| `let` | `it` | block result | transform a (nullable) value |
+| `run` | `this` | block result | compute something from an object |
+| `with` | `this` (argument) | block result | group calls on an object |
+| `apply` | `this` | the object | configure/initialize an object |
+| `also` | `it` | the object | side effects: logging, validation |
+
+```kotlin
+// apply — configure an object, return it
+val server = Server().apply {
+    port = 8080
+    host = "0.0.0.0"
+    start()
+}
+
+// let — transform, especially after null checks
+user?.email?.let { email ->
+    sendWelcome(email)
+}
+
+// also — peek with side effects
+val order = createOrder()
+    .also { logger.info("Created order ${it.id}") }
+    .also { validate(it) }
+
+// with / run — grouped computation
+val header = with(request) {
+    "$method $path HTTP/1.1"
+}
+```
+
+<Callout variant="tip">
+Internalize the pattern: *configure* → `apply`, *transform/null-check* → `let`, *side-effect* → `also`, *compute* → `run`/`with`.
+</Callout>
+
+---
+
+## Null Safety
+
+Tony Hoare called his invention of the null reference a *"billion-dollar mistake"*. Kotlin removes that entire class of bugs **at compile time**.
+
+### Nullable vs non-nullable types
+
+```kotlin
+val name: String = "Ragab"     // can NEVER be null
+val nickname: String? = null   // CAN be null — note the ?
+```
+
+The compiler enforces this everywhere:
+
+```kotlin
+fun shout(text: String) = text.uppercase()
+
+shout(name)          // fine
+// shout(nickname)   // compilation error: expected String, found String?
+```
+
+### Safe calls: `?.`
+
+```kotlin
+val nickname: String? = null
+println(nickname?.length)   // null — no exception
+
+val city = user?.address?.city   // null if ANY link is null
+```
+
+### Elvis operator: `?:`
+
+```kotlin
+val displayName = nickname ?: "Anonymous"
+val shippingCity = user?.address?.city ?: "Unknown"
+val requiredEmail = user?.email ?: error("User must have an email")
+
+// guard clauses — return and throw are expressions
+fun process(order: Order?) {
+    val validOrder = order ?: return          // bail out early
+    println(validOrder.total)
+}
+```
+
+### Smart casts
+
+After you check for null, the compiler *knows* the value isn't null anymore:
+
+```kotlin
+fun printLength(text: String?) {
+    if (text != null) {
+        println(text.length)     // no ?. needed — text is smart-cast to String
+    }
+}
+
+// type checks
+fun describe(x: Any) {
+    if (x is Int) println(x + 1)      // x smart-cast to Int
+}
+```
+
+### `lateinit`: deferred initialization
+
+```kotlin
+class OrderController @Inject constructor() {
+    private lateinit var paymentService: PaymentService
+
+    fun submit(order: Order): Receipt = pay(paymentService, order)
+}
+```
+
+Rules: only `var`, only non-null object types, accessing before assignment throws `UninitializedPropertyAccessException`. Prefer constructor injection whenever you control the design.
+
+### Platform types: the interop escape hatch
+
+What happens when Java code hands Kotlin a `String` that might be null? Java types carry no nullability information, so Kotlin marks them as **platform types**:
+
+```kotlin
+// Java: public String getConfig(String key) { ... }
+val config = javaClass.getConfig("timeout")
+config.length   // compiles — but NPEs if Java returned null!
+```
+
+Best practice: immediately assign to explicitly typed variables:
+
+```kotlin
+val config: String? = javaClass.getConfig("timeout")   // assume nullable
+val len = config?.length ?: 0
+```
+
+---
+
+## Classes, Data Classes & OOP
+
+### Classes and constructors
+
+A minimal class needs no body at all:
+
+```kotlin
+class Point(val x: Int, val y: Int)
+
+val p = Point(3, 4)
+println(p.x)          // 3 — a real property, no getX() ceremony
+```
+
+**Constructor bodies** go in `init` blocks:
+
+```kotlin
+class User(val email: String) {
+    val normalizedEmail: String
+
+    init {
+        require("@" in email) { "Invalid email" }
+        normalizedEmail = email.lowercase()
+    }
+}
+```
+
+### Properties with custom accessors
+
+```kotlin
+class Rectangle(val width: Double, val height: Double) {
+    val area: Double
+        get() = width * height
+
+    var score: Int = 0
+        set(value) {
+            field = value.coerceIn(0, 100)
+        }
+}
+```
+
+### Data classes
+
+Add one modifier and the compiler generates `equals()`, `hashCode()`, `toString()`, `copy()`, and destructuring support:
+
+```kotlin
+data class Money(val amount: Long, val currency: String)
+
+val price = Money(1999, "USD")
+price.toString()                    // Money(amount=1999, currency=USD)
+price == Money(1999, "USD")         // true — structural equality
+```
+
+**`copy` for immutable updates:**
+
+```kotlin
+data class Order(
+    val id: String,
+    val items: List<String>,
+    val status: String = "NEW",
+)
+
+val order = Order(id = "#1", items = listOf("coffee"))
+val shipped = order.copy(status = "SHIPPED")   // new object; original untouched
+```
+
+**Destructuring:**
+
+```kotlin
+val (id, items, status) = order
+orders.map { (id, _) -> id }
+```
+
+### Sealed hierarchies
+
+`sealed` restricts inheritance to a known, fixed set of subtypes. Combined with exhaustive `when`, it gives compiler-checked state machines:
+
+```kotlin
+sealed interface UiState {
+    data object Loading : UiState
+    data class Success(val items: List<String>) : UiState
+    data class Error(val message: String) : UiState
+}
+
+fun render(state: UiState): String = when (state) {
+    is UiState.Loading -> "Loading…"
+    is UiState.Success -> "Loaded ${state.items.size} items"
+    is UiState.Error -> "Failed: ${state.message}"
+}
+```
+
+Rule of thumb: **enums** for closed sets of *values*; **sealed classes** for closed sets of *types carrying different data*.
+
+### Object declarations & companion objects
+
+```kotlin
+// Singleton
+object IdGenerator {
+    private var counter = 0L
+    fun next(): Long = ++counter
+}
+
+// Companion: per-class statics
+class Temperature private constructor(private val celsius: Double) {
+    companion object {
+        fun fromFahrenheit(f: Double) = Temperature((f - 32) * 5 / 9)
+        fun absoluteZero() = Temperature(-273.15)
+    }
+}
+```
+
+### Delegation with `by`
+
+```kotlin
+interface Logger { fun log(msg: String) }
+
+class ConsoleLogger : Logger {
+    override fun log(msg: String) = println("[LOG] $msg")
+}
+
+class TimedLogger(private val inner: Logger) : Logger by inner {
+    override fun log(msg: String) = inner.log("${System.nanoTime()} $msg")
+}
+```
+
+### Visibility modifiers
+
+| Modifier | Visible to |
+|----------|-----------|
+| `public` *(default)* | everyone |
+| `private` | inside the declaring class/file |
+| `protected` | class + subclasses (not top-level) |
+| `internal` | anywhere in the same module |
+
+---
+
+## Collections, Functional Operations & Generics
+
+### The collection family
+
+| Type | Read-only | Mutable |
+|------|-----------|---------|
+| Ordered elements | `List<T>` | `MutableList<T>` |
+| Unique elements | `Set<T>` | `MutableSet<T>` |
+| Key-value pairs | `Map<K, V>` | `MutableMap<K, V>` |
+
+```kotlin
+val list = listOf("a", "b", "c")
+val mlist = mutableListOf(1, 2)
+val set = setOf(1, 2, 2, 3)               // Set {1, 2, 3}
+val map = mapOf("k1" to 1, "k2" to 2)     // note the infix `to`
+```
+
+<Callout variant="warning">
+Read-only ≠ immutable! A read-only interface may still *view* a mutable underlying list. True immutability comes from persistent data structures (e.g., kotlinx.collections.immutable).
+</Callout>
+
+### Transforming data: the core pipeline
+
+```kotlin
+data class Product(val name: String, val price: Double, val category: String)
+
+products.map { it.name }                       // [Laptop, Mouse, Desk, Chair]
+products.filter { it.price < 400 }             // Mouse, Desk, Chair
+products.map { it.category }.distinct()        // [Electronics, Furniture]
+
+// Grouping
+val byCategory = products.groupBy { it.category }
+val byName = products.associateBy { it.name }
+
+// Slicing
+list.take(3)
+list.partition { it.price > 100 }   // Pair(over100, rest)
+
+// Aggregation
+products.sumOf { it.price }
+products.maxByOrNull { it.price }   // Product? — null-safe!
+```
+
+### `fold` and `reduce`
+
+```kotlin
+val total = listOf(1, 2, 3, 4).reduce { acc, n -> acc + n }        // 10
+val labeled = listOf(1, 2, 3).fold("") { acc, n -> "$acc$n" }      // "123"
+```
+
+### Lazy sequences
+
+Each list operator processes the whole list eagerly. Chain many steps on big data and you allocate intermediate lists repeatedly:
+
+```kotlin
+// Eager — allocates intermediate lists
+(1..1_000_000).toList()
+    .filter { it % 2 == 0 }
+    .map { it * 2 }
+    .take(5)
+
+// Lazy — computes ONLY what take needs
+(1..1_000_000).asSequence()
+    .filter { it % 2 == 0 }
+    .map { it * 2 }
+    .take(5)
+    .toList()
+```
+
+Rules of thumb: **Lists** for few chained steps, need multiple passes or random access. **Sequences** for large inputs, expensive steps, short-circuiting.
+
+### Generics
+
+```kotlin
+fun <T> firstOrNull(items: List<T>): T? = items.firstOrNull()
+
+fun <T : Comparable<T>> maxOf(a: T, b: T): T =
+    if (a >= b) a else b       // upper bound: T must be Comparable<T>
+```
+
+**Variance: `out` and `in`**
+
+```kotlin
+interface Producer<out T> {      // covariant: only PRODUCES T
+    fun next(): T
+}
+
+interface Consumer<in T> {       // contravariant: only CONSUMES T
+    fun consume(item: T)
+}
+```
+
+- **`out T`** (covariance): `Producer<Dog>` can be used as `Producer<Animal>` — safe because T never enters, only exits.
+- **`in T`** (contravariance): `Consumer<Animal>` works wherever a `Consumer<Dog>` is needed — safe because T only goes in.
+
+Mnemonic: **PECS** — Producer `out`, Consumer `in`.
+
+**`reified` generics at runtime:**
+
+```kotlin
+inline fun <reified T : Any> String.toOrNull(): T? = when (T::class) {
+    Int::class -> trim().toIntOrNull() as T?
+    Long::class -> trim().toLongOrNull() as T?
+    else -> error("Unsupported")
+}
+
+"42".toOrNull<Int>()     // 42
+"x".toOrNull<Int>()      // null
+```
+
+---
+
+## Coroutines
+
+Threads are expensive — thousands of them exhaust memory and schedulers. **Coroutines** are Kotlin's answer: lightweight concurrency that lets you write asynchronous code that reads exactly like sequential code.
+
+### Suspending functions
+
+Add `suspend` to a function and it gains a superpower: it may pause itself and free its thread while waiting:
+
+```kotlin
+suspend fun fetchUser(id: Int): User {
+    val profile = api.getProfile(id)      // suspends during network call...
+    val settings = api.getSettings(id)    // ...thread serves others meanwhile
+    return User(profile, settings)
+}
+```
+
+<Callout variant="warning">
+`suspend` functions can only be called from other `suspend` functions or inside coroutines. The compiler enforces this.
+</Callout>
+
+### Launching coroutines: the builders
+
+**`launch`** — fire-and-forget (returns no result):
+
+```kotlin
+fun main() = runBlocking {
+    launch {
+        delay(1000L)                  // non-blocking sleep
+        println("World!")
+    }
+    println("Hello,")                 // printed FIRST
+}
+```
+
+**`async`** — parallel work with results:
+
+```kotlin
+suspend fun loadDashboard(): Dashboard = coroutineScope {
+    val userDeferred = async { api.getUser() }       // starts now
+    val postsDeferred = async { api.getPosts() }     // starts in parallel
+    
+    Dashboard(
+        user = userDeferred.await(),
+        posts = postsDeferred.await(),
+    )
+}
+```
+
+Both requests run concurrently; total time is max(a, b), not a + b.
+
+**`runBlocking`** — the bridge between non-suspend world and coroutines. Used mainly in `main()` and tests.
+
+### Structured concurrency
+
+Every coroutine lives inside a scope, forming a parent-child tree with strict rules:
+
+1. A parent doesn't complete until all children complete
+2. Cancelling a parent cancels all children
+3. A child's failure propagates up and cancels siblings
+
+```kotlin
+fun main() = runBlocking {
+    launch { delay(500); println("child 1 done") }
+    launch { delay(300); println("child 2 done") }
+}   // waits for BOTH before exiting
+```
+
+No orphaned background jobs, no forgotten cleanup — the classic "thread pool leak" bug is structurally impossible.
+
+### Dispatchers: where code runs
+
+| Dispatcher | Use for |
+|------------|---------|
+| `Dispatchers.Default` | CPU-bound work: parsing, sorting, algorithms |
+| `Dispatchers.IO` | Blocking I/O: files, JDBC, network |
+| `Dispatchers.Main` | UI thread (Android/Swing/Compose) |
+
+```kotlin
+suspend fun loadReport(): Report = withContext(Dispatchers.IO) {
+    val raw = File("report.json").readText()
+    parse(raw)
+}
+```
+
+### Cancellation and timeouts
+
+Cancellation is **cooperative**: coroutines check for it at suspension points:
+
+```kotlin
+val job = launch {
+    repeat(1000) { i ->
+        delay(100)
+        println("working $i")
+    }
+}
+delay(350)
+job.cancel()
+job.join()
+```
+
+Timeouts become one-liners:
+
+```kotlin
+withTimeoutOrNull(2_000) {
+    fetchSlowResource()
+} ?: CachedResult               // null if timed out
+```
+
+### Flow: streams of async values
+
+`suspend` returns one value; `Flow` returns many, asynchronously and lazily:
+
+```kotlin
+fun temperatureReadings(): Flow<Int> = flow {
+    repeat(5) {
+        emit(sensor.readCelsius())
+        delay(1000)
+    }
+}
+
+temperatureReadings()
+    .filter { it > 25 }
+    .map { "Warm: $it°C" }
+    .collect { println(it) }
+```
+
+Flows are cold (nothing runs until collected), support rich operators, and integrate with structured concurrency automatically.
+
+<Callout variant="note">
+In Spring Boot, controller methods returning `Flow<T>` stream responses naturally; Ktor was designed around coroutines from day one.
+</Callout>
+
+### Common pitfalls
+
+1. **Calling suspend from `runBlocking` inside production code** — blocks precious threads
+2. **Using `GlobalScope`** — breaks structured concurrency; leaks unless manually managed
+3. **Heavy loops without cooperation** — insert `yield()` or `ensureActive()` so cancellation lands
+4. **Parallel decomposition with `launch` + shared mutable state** — prefer `async`, immutability, or `Mutex`
+
+---
+
+## Testing & Best Practices
+
+### JUnit 5, the Kotlin way
+
+Function names can contain spaces via backticks — tests become self-documenting specs:
+
+```kotlin
+class MoneyTest {
+
+    @Test
+    fun `two equal amounts are structurally equal`() {
+        assertEquals(Money(100, "USD"), Money(100, "USD"))
+    }
+
+    @Test
+    fun `negative amounts are rejected`() {
+        assertFailsWith<IllegalArgumentException> {
+            Money(-5, "EUR")
+        }
+    }
+}
+```
+
+### Kotest: property-based testing
+
+```kotlin
+class StackSpec : FunSpec({
+    test("popping empty stack throws") {
+        val stack = Stack<Int>()
+        shouldThrowExactly<NoSuchElementException> { stack.pop() }
+    }
+})
+```
+
+Property-based testing generates hundreds of random inputs and verifies invariants:
+
+```kotlin
+checkAll(arb.int()) { n ->
+    listOf(n).reversed().reversed() shouldBe listOf(n)
+}
+```
+
+### Testing coroutines: virtual time
+
+`runTest` replaces real delays with **virtual time** — a 10-second `delay()` completes instantly:
+
+```kotlin
+class TickerTest {
+
+    @Test
+    fun `ticker emits three events then stops`() = runTest {
+        val emissions = mutableListOf<Int>()
+
+        val job = launch {
+            tickerFlow().take(3).toList(emissions)
+        }
+        advanceTimeBy(350)
+        job.join()
+
+        assertEquals(listOf(1, 2, 3), emissions)
+    }
+}
+```
+
+| API | Purpose |
+|-----|---------|
+| `advanceTimeBy(ms)` | fast-forward the virtual clock |
+| `runCurrent()` | execute tasks scheduled for "now" |
+| `UnconfinedTestDispatcher` | eager execution for setup steps |
+
+### Mocking with MockK
+
+```kotlin
+class OrderServiceTest {
+
+    private val repository = mockk<OrderRepository>(relaxed = true)
+    private val notifier = mockk<Notifier>()
+
+    private val service = OrderService(repository, notifier)
+
+    @Test
+    fun `submitting order notifies customer`() = runTest {
+        every { repository.save(any()) } returns Order(id = "#42", status = "NEW")
+        coEvery { notifier.notifyCustomer(any(), any()) } just runs
+
+        service.submit(Order(id = "", items = listOf("tea")))
+
+        coVerify(exactly = 1) { notifier.notifyCustomer("#42", any()) }
+    }
+}
+```
+
+Prefer hand-written fakes when they're simple — over-mocking couples tests to implementation details:
+
+```kotlin
+class InMemoryOrderRepository : OrderRepository {
+    private val orders = mutableMapOf<String, Order>()
+    override fun save(order: Order) { orders[order.id] = order }
+    override fun findById(id: String): Order? = orders[id]
+}
+```
+
+### The idiomatic Kotlin checklist
+
+When reviewing code, check:
+
+**Expressions & structure**
+- ✅ **`val` by default**, `var` only with justification
+- ✅ **Expressions over statements**: `if`/`when` returning values, single-expression functions
+- ✅ **`when` over `if` chains**; sealed hierarchies for closed sets of states
+
+**Safety**
+- ✅ **No `!!`**, minimal platform-type leakage; nullability explicit at boundaries
+- ✅ **`require`/`check`/`error`** for precondition failures instead of bare exceptions
+
+**Modeling**
+- ✅ **Data classes for values, sealed interfaces for alternatives, enums for constants**
+- ✅ **Immutable state updated via `copy()`**
+
+**Functions**
+- ✅ **Extension functions keep utilities discoverable**
+- ✅ **Scope functions used sparingly and purposefully** — `apply` to build, `let` to transform, `also` to peek
+
+**Collections & generics**
+- ✅ **Read-only collection types in APIs** (`List<T>` params/returns, never `MutableList`)
+- ✅ **Sequences for large/lazy pipelines**; eager lists otherwise
+- ✅ **Variance correct on generic types**: producer `out`, consumer `in`
+
+**Concurrency**
+- ✅ **Structured concurrency always** — no `GlobalScope` in app logic
+- ✅ **Injected dispatchers**, blocking calls confined to `Dispatchers.IO`
+- ✅ **Cancellation-friendly loops** — suspension points or explicit `ensureActive()`
+
+<Callout variant="tip">
+A useful litmus test: hand your file to a Java developer. If they can translate it line-by-line back to Java without losing meaning, you've written Java-in-Kotlin. Idiomatic Kotlin leans on expressions, immutability, and the type system so the *compiler* carries more of the correctness burden.
+</Callout>
+
+## Where to Go From Here
+
+You now have the complete core language. Natural next steps:
+
+- **Backend**: Ktor or [Spring Boot](/blog/spring-boot-kotlin) with coroutines
+- **Android**: Compose Multiplatform builds directly on everything here
+- **Multiplatform**: share business logic across iOS/Android/web
+- **Language evolution**: see how the language itself changed — [Kotlin 1.x → 2.4 version guide](/blog/kotlin-version-differences-guide)
+- **Deep dive**: [Spring Boot + Kotlin + Coroutines guide](/blog/spring-boot-kotlin-coroutines-guide)
+
+## Resources
+
+- [Kotlin official docs](https://kotlinlang.org/docs/home.html)
+- [Kotlin Playground](https://play.kotlinlang.org)
+- [Coding conventions](https://kotlinlang.org/docs/coding-conventions.html)

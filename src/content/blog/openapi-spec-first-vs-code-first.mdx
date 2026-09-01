@@ -1,0 +1,491 @@
+---
+title: "OpenAPI in Backend Projects: Spec-First, Code-First, or Something In Between?"
+date: 2026-08-31
+excerpt: "Three ways to use OpenAPI in your Spring Boot project — and why the best answer isn't as black-and-white as the internet makes it seem."
+tags: ["OpenAPI", "Spring Boot", "Kotlin", "API Design", "Backend"]
+readingTime: 15
+draft: true
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Every API team eventually hits the same question: where does the OpenAPI spec come from? Do you write it first and generate code from it? Do you annotate your code and generate the spec? Or do you write the spec by hand and only generate the boring parts?
+
+The internet has strong opinions on this. Some will tell you spec-first is the only "real" approach. Others will say code-first is the practical choice. The truth, as usual, is messier — and more useful — than either camp admits.
+
+<Callout variant="tip" title="What you'll learn">
+- The three main approaches to OpenAPI in a Spring Boot project: spec-first, code-first, and hybrid
+- The real trade-offs of each approach (not just the theoretical ones)
+- When each approach actually makes sense
+- How to combine spec-first design with minimal code generation for the best of both worlds
+- A practical decision framework for your next project
+</Callout>
+
+## The Three Approaches
+
+Before diving into details, here's the one-liner for each:
+
+| Approach | How it works | Spec lives in... |
+|----------|-------------|-----------------|
+| **Spec-first** | Write the OpenAPI YAML → generate DTOs, interfaces, server stubs | A standalone `.yaml` file you own |
+| **Code-first** | Write annotated Kotlin code → generate the spec at runtime or build time | Extracted from your code annotations |
+| **Hybrid** | Write the spec → generate only DTOs and clients → hand-write controllers and business logic | A standalone `.yaml` file you own |
+
+Let's look at each one properly.
+
+## Approach 1: Spec-First
+
+Spec-first means the OpenAPI document is the **source of truth**. You design the API contract in YAML, and everything else — code, documentation, client SDKs — flows from it.
+
+### How it works
+
+1. You write the OpenAPI spec by hand (or with a visual editor like Stoplight, Redocly, or Swagger Editor).
+2. You run a code generator (typically `openapi-generator`) to produce DTOs, server interfaces, and sometimes full controller stubs.
+3. You implement the generated interfaces with your business logic.
+
+### Spring Boot + Kotlin setup
+
+The standard tool is `openapi-generator` v7.x with the `kotlin-spring` generator.
+
+```yaml
+# openapi.yaml — your source of truth
+openapi: "3.1.0"
+info:
+  title: "Product Catalog API"
+  version: "1.0.0"
+paths:
+  /products:
+    get:
+      operationId: listProducts
+      summary: "List all products"
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "A list of products"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      summary: "Create a new product"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: "Product created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+components:
+  schemas:
+    Product:
+      type: object
+      required: [id, name, price]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+          format: decimal
+        category:
+          type: string
+    CreateProductRequest:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+          format: decimal
+        category:
+          type: string
+```
+
+Generate the code:
+
+```bash
+openapi-generator generate \
+  -i openapi.yaml \
+  -g kotlin-spring \
+  -o generated \
+  --additional-properties=interfaceOnly=true,useSpringBoot3=true
+```
+
+This produces:
+
+```kotlin
+// Generated — ProductController.kt
+interface ProductController : ProductApi {
+
+    override fun listProducts(limit: kotlin.Int?): ResponseEntity<List<Product>> {
+        // You implement this
+        throw UnsupportedOperationException("Not yet implemented")
+    }
+
+    override fun createProduct(createProductRequest: CreateProductRequest): ResponseEntity<Product> {
+        // You implement this
+        throw UnsupportedOperationException("Not yet implemented")
+    }
+}
+```
+
+And the generated DTOs:
+
+```kotlin
+// Generated — Product.kt
+data class Product(
+    val id: java.util.UUID,
+    val name: kotlin.String,
+    val price: java.math.BigDecimal,
+    val category: kotlin.String? = null
+)
+```
+
+Then you write your actual implementation:
+
+```kotlin
+@Service
+class ProductServiceImpl(
+    private val productRepository: ProductRepository
+) : ProductController {
+
+    override fun listProducts(limit: kotlin.Int?): ResponseEntity<List<Product>> {
+        val products = productRepository.findAll().take(limit ?: 20)
+        return ResponseEntity.ok(products.map { it.toDto() })
+    }
+
+    override fun createProduct(createProductRequest: CreateProductRequest): ResponseEntity<Product> {
+        val product = productRepository.save(createProductRequest.toEntity())
+        return ResponseEntity.status(HttpStatus.CREATED).body(product.toDto())
+    }
+}
+```
+
+### Strengths
+
+- **Contract-first design.** You think about the API surface before writing any code. This forces clarity about what the API *does* before you get attached to an implementation.
+- **Multi-team alignment.** Frontend, mobile, and backend teams can work in parallel once the spec is agreed on. No waiting for "the API to be ready."
+- **Client generation is trivial.** Generate TypeScript, Python, Swift, or Java clients from the same spec. Contract drift between server and client is impossible.
+- **Documentation is automatic.** Swagger UI, Redoc, and ReDoc render directly from the spec. No annotations polluting your code.
+- **Contract testing.** Tools like Schemathesis can fuzz the spec to find inconsistencies before you deploy.
+
+### Weaknesses
+
+- **Spec drift.** The spec is only accurate if someone updates it every time the code changes. In practice, this is the #1 failure mode — the spec falls behind and becomes a lie.
+- **Two sources of friction.** You're managing both the spec file and the generated code. Merge conflicts in the YAML. Build steps that can break.
+- **Limited expressiveness.** OpenAPI can't describe everything your code can do. Custom validation rules, business logic constraints, complex Kotlin generics — the spec has no way to express them.
+- **Generator opinions.** The generated code may not match your project's conventions (naming, packaging, error handling). You spend time overriding generator templates.
+
+## Approach 2: Code-First
+
+Code-first means your Kotlin code is the source of truth. You annotate your controllers, DTOs, and models, and a library generates the OpenAPI spec from them.
+
+### How it works
+
+1. You write your Spring Boot controllers and DTOs as you normally would.
+2. You add annotations (or let the library infer from your code structure).
+3. At runtime (or build time), the library scans your code and produces the OpenAPI spec.
+
+### Spring Boot + Kotlin setup
+
+The standard tool is `springdoc-openapi` v2.8.x for Spring Boot 3.x (or v3.1.0 for Spring Boot 4.x).
+
+```kotlin
+// build.gradle.kts
+dependencies {
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17")
+}
+```
+
+Your controller:
+
+```kotlin
+@RestController
+@RequestMapping("/products")
+class ProductController(
+    private val productService: ProductService
+) {
+
+    @Operation(summary = "List all products", description = "Returns a paginated list of products")
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Products retrieved successfully")
+    ])
+    @GetMapping
+    fun listProducts(
+        @Parameter(description = "Maximum number of products to return")
+        @RequestParam(defaultValue = "20") limit: Int
+    ): ResponseEntity<List<ProductDto>> {
+        val products = productService.findAll(limit)
+        return ResponseEntity.ok(products)
+    }
+
+    @Operation(summary = "Create a new product")
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "201", description = "Product created successfully"),
+        ApiResponse(responseCode = "400", description = "Invalid input")
+    ])
+    @PostMapping
+    fun createProduct(
+        @RequestBody @Valid request: CreateProductRequest
+    ): ResponseEntity<ProductDto> {
+        val product = productService.create(request)
+        return ResponseEntity.status(HttpStatus.CREATED).body(product)
+    }
+}
+```
+
+Your DTOs:
+
+```kotlin
+data class ProductDto(
+    @field:Schema(description = "Unique product identifier", format = "uuid")
+    val id: UUID,
+
+    @field:Schema(description = "Product name", requiredMode = Schema.RequiredMode.REQUIRED)
+    val name: String,
+
+    @field:Schema(description = "Product price", requiredMode = Schema.RequiredMode.REQUIRED)
+    val price: BigDecimal,
+
+    @field:Schema(description = "Product category")
+    val category: String? = null
+)
+
+data class CreateProductRequest(
+    @field:Schema(description = "Product name", requiredMode = Schema.RequiredMode.REQUIRED)
+    @field:NotBlank
+    val name: String,
+
+    @field:Schema(description = "Product price", requiredMode = Schema.RequiredMode.REQUIRED)
+    @field:Positive
+    val price: BigDecimal,
+
+    @field:Schema(description = "Product category")
+    val category: String? = null
+)
+```
+
+The spec is automatically available at:
+- `http://localhost:8080/v3/api-docs` (JSON)
+- `http://localhost:8080/swagger-ui.html` (Swagger UI)
+
+### Strengths
+
+- **Single source of truth.** The code *is* the spec. No drift possible — the spec always matches the code.
+- **Zero extra files.** No YAML to manage, no build step to run, no merge conflicts in spec files.
+- **Rich type information.** Kotlin's type system, validation annotations, and Spring's metadata all flow into the spec automatically.
+- **Fast to start.** No learning curve for OpenAPI YAML. Just annotate your existing code and you have a spec.
+- **Great for prototyping.** If you're building an internal API or a MVP, code-first gets you to a working API with docs in minutes.
+
+### Weaknesses
+
+- **Spec is an afterthought.** You design the API as you code, not before. By the time the spec is generated, the design decisions are baked in. If the API shape is wrong, you refactor code — not just a YAML file.
+- **Annotations pollute your code.** `@Operation`, `@ApiResponse`, `@Parameter` — your controllers become a mix of business logic and documentation. The signal-to-noise ratio drops.
+- **Contract-first workflows break down.** Frontend teams can't start until the backend code exists. You can't do contract testing before implementation.
+- **Spec quality depends on annotation diligence.** If someone skips `@Schema` on a DTO field, that field is invisible in the spec. The spec is only as good as your team's discipline.
+- **Harder to generate non-Java clients.** Generating a TypeScript client from a Kotlin-annotated spec is possible, but the Kotlin types don't always map cleanly.
+
+## Approach 3: Hybrid — Spec + Minimal Generation
+
+This is the approach that doesn't get enough attention. The idea is simple:
+
+1. Write the OpenAPI spec by hand (or collaboratively with your API design tool).
+2. Generate **only the parts that are mechanical**: DTOs, request/response models, and API client interfaces.
+3. **Hand-write** controllers, services, validation, and business logic.
+
+You get the contract-first benefits without the full code-generation overhead.
+
+### How it looks in practice
+
+The spec is the same `openapi.yaml` from the spec-first section. The difference is in what you generate:
+
+```bash
+# Generate only models — no server stubs, no Spring code
+openapi-generator generate \
+  -i openapi.yaml \
+  -g kotlin \
+  -o generated/models \
+  --additional-properties=library=non-virtual
+```
+
+This gives you clean data classes with no Spring coupling:
+
+```kotlin
+// Generated — clean, minimal, no Spring annotations
+data class Product(
+    val id: java.util.UUID,
+    val name: kotlin.String,
+    val price: java.math.BigDecimal,
+    val category: kotlin.String? = null
+)
+```
+
+Now you write the controller yourself — no generated interface to conform to:
+
+```kotlin
+@RestController
+@RequestMapping("/api/v1/products")
+class ProductController(
+    private val productService: ProductService
+) {
+
+    @GetMapping
+    suspend fun listProducts(
+        @RequestParam(defaultValue = "20") limit: Int
+    ): ResponseEntity<List<Product>> {
+        val products = productService.findAll(limit)
+        return ResponseEntity.ok(products)
+    }
+
+    @PostMapping
+    suspend fun createProduct(
+        @RequestBody @Valid request: CreateProductRequest
+    ): ResponseEntity<Product> {
+        val product = productService.create(request)
+        return ResponseEntity.status(HttpStatus.CREATED).body(product)
+    }
+}
+```
+
+### Why this works well
+
+- **The spec is designed up front.** You think about the API contract before writing code. This is the big win of spec-first.
+- **DTOs are never wrong.** They're generated from the spec, so they match the contract exactly. No hand-typing data classes and hoping you didn't miss a field.
+- **Your controllers are clean.** No `interfaceOnly=true` generator templates, no `delegatePattern` boilerplate. You write idiomatic Spring Boot code.
+- **You control the routing.** The spec says `GET /products`, but you decide the controller mapping, the exception handling, the response wrapping. The generator doesn't impose opinions on your controller structure.
+- **Client generation still works.** You can generate TypeScript or Python clients from the same spec for frontend teams.
+
+### The trade-off
+
+You're responsible for keeping the spec and code in sync. If you add a field to the spec, you regenerate the DTOs. If you change the code, you update the spec. There's no enforcement — it's a discipline, not a guarantee.
+
+The mitigation: add a CI check that regenerates DTOs from the spec and fails if there's a diff. This catches drift early without coupling your entire codebase to the generator.
+
+```yaml
+# In your CI pipeline
+- name: Check spec-code sync
+  run: |
+    openapi-generator generate -i openapi.yaml -g kotlin -o /tmp/check
+    diff -r /tmp/check/src/main/kotlin/ generated/src/main/kotlin/
+```
+
+## Comparison: All Three Side by Side
+
+| Dimension | Spec-First | Code-First | Hybrid |
+|-----------|-----------|------------|--------|
+| **Design phase** | Before code | During/after code | Before code |
+| **Spec accuracy** | Drifts if not maintained | Always accurate | Drifts if not maintained |
+| **Contract-first workflows** | ✅ Full support | ❌ Not possible | ✅ Full support |
+| **Client SDK generation** | ✅ Trivial | ⚠️ Possible but messy | ✅ Trivial |
+| **Code cleanliness** | ⚠️ Generator opinions | ⚠️ Annotation noise | ✅ You control the code |
+| **Setup complexity** | Medium | Low | Medium |
+| **Multi-team alignment** | ✅ Excellent | ❌ Backend-dependent | ✅ Excellent |
+| **Spec as documentation** | ✅ Always available | ✅ Always available | ✅ Always available |
+| **Kotlin type fidelity** | ⚠️ Generator-dependent | ✅ Full control | ✅ Generated DTOs + full control |
+
+## When to Use Which
+
+There's no universal answer, but there are patterns.
+
+**Choose code-first when:**
+
+- You're building an internal API that only your team consumes.
+- You're prototyping and the API shape is still evolving.
+- Your team doesn't have experience with OpenAPI YAML and the learning curve isn't worth it.
+- Speed to first working endpoint matters more than contract discipline.
+
+**Choose spec-first (full generation) when:**
+
+- You're building a public API or an API consumed by external teams.
+- You need to generate clients in multiple languages.
+- The API contract is stable and unlikely to change frequently.
+- You have tooling around the spec (mock servers, contract testing, API gateways).
+
+**Choose the hybrid approach when:**
+
+- You want contract-first design but don't want to live inside generated code.
+- You're building a Kotlin-first backend and want idiomatic Spring Boot controllers.
+- You want the safety net of generated DTOs without the overhead of generated server stubs.
+- Your team is comfortable writing OpenAPI YAML but also comfortable writing Spring Boot code.
+
+The hybrid is often the right default for Kotlin/Spring Boot projects. You get the design discipline of spec-first, the accuracy of generated models, and the freedom to write clean, idiomatic controllers. The spec serves as your contract documentation and client generation source, while your code stays clean and under your control.
+
+## The Practical Workflow
+
+Here's how the hybrid approach works in a real project:
+
+### 1. Design the spec first
+
+Use Stoplight Studio, Swagger Editor, or just a YAML file in your repo. Discuss the API shape with your team before writing any Kotlin.
+
+### 2. Generate DTOs in the build
+
+Add the `openapi-generator` Gradle plugin so DTOs are generated as part of your build:
+
+```kotlin
+// build.gradle.kts
+plugins {
+    id("org.openapi.generator") version "7.14.0"
+}
+
+openApiGenerate {
+    generatorName.set("kotlin")
+    inputSpec.set("${projectDir}/openapi.yaml")
+    outputDir.set("${projectDir}/generated")
+    additionalProperties.set(mapOf(
+        "library" to "non-virtual",
+        "dateLibrary" to "java8"
+    ))
+}
+```
+
+### 3. Write controllers by hand
+
+Don't generate server stubs. Write your controllers, services, and repositories yourself. Use the generated DTOs as your request/response types.
+
+### 4. Add a spec drift check to CI
+
+Regenerate DTOs from the spec in CI. If the generated code differs from what's checked in, the build fails. This catches accidental spec changes that don't get reflected in DTOs (and vice versa).
+
+### 5. Generate clients for frontend teams
+
+When frontend teams need a TypeScript or Swift client, run the generator with the client language target. The spec is the contract — the generated client matches it exactly.
+
+## What About Other Languages?
+
+The approaches are the same regardless of language, but the tooling differs:
+
+| Language | Spec-First Generator | Code-First Library |
+|----------|---------------------|-------------------|
+| **Kotlin/Spring** | `openapi-generator` kotlin-spring | `springdoc-openapi` |
+| **Java/Spring** | `openapi-generator` spring | `springdoc-openapi` |
+| **TypeScript/Express** | `openapi-generator` typescript-node | `tsoa` |
+| **Python/FastAPI** | `openapi-generator` python | FastAPI native (auto-generates spec) |
+| **Go/Gin** | `openapi-generator` go-server | `swaggo/swag` |
+
+FastAPI deserves special mention: it generates the OpenAPI spec from your type hints automatically. It's the closest thing to "code-first that just works" because the Python type system is the spec. But even with FastAPI, many teams still use a separate spec for client generation and contract testing.
+
+## Closing Thoughts
+
+The spec-first vs code-first debate is framed as a binary choice, but the hybrid approach — spec-first design with minimal code generation — gives you the best of both worlds for most Spring Boot projects. You design the contract up front, generate the mechanical parts, and write the interesting code by hand.
+
+The right approach depends on your context. If you're building a public API consumed by external teams, spec-first with full generation gives you the strongest contract guarantees. If you're building an internal API and speed matters most, code-first gets you there fastest. And if you're somewhere in between — which most teams are — the hybrid is the pragmatic middle ground.
+
+Whichever approach you choose, the important thing is that you *have* an approach. Teams that don't think about API contracts end up with documentation that lies, clients that break, and integration tests that fail for mysterious reasons. A consistent OpenAPI strategy — even an imperfect one — is better than no strategy at all.
