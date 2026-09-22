@@ -232,5 +232,96 @@ href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=sw
         document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
       });
     </script>
+
+    <!-- Mermaid.js for diagram rendering -->
+    <script is:inline src="/mermaid/mermaid.min.js"></script>
+    <script is:inline>
+      // Initialize mermaid with startOnLoad to auto-render .mermaid elements
+      if (window.mermaid) {
+        mermaid.initialize({
+          startOnLoad: true,
+          theme: 'default',
+          securityLevel: 'loose',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          flowchart: {
+            useMaxWidth: true,
+            htmlLabels: true,
+            curve: 'basis'
+          }
+        });
+      }
+
+      // Transform mermaid code blocks to mermaid diagrams
+      function transformMermaidBlocks() {
+        document.querySelectorAll('.blog-content pre[data-language="mermaid"]').forEach((pre) => {
+          const code = pre.querySelector('code');
+          if (!code) return;
+          
+          const mermaidText = code.textContent;
+          if (!mermaidText || mermaidText.trim() === '') return;
+
+          // Check if already transformed
+          if (pre.dataset.mermaidTransformed === 'true') return;
+
+          // Create a div for mermaid to render into (using text content only)
+          const mermaidDiv = document.createElement('div');
+          mermaidDiv.className = 'mermaid';
+          mermaidDiv.textContent = mermaidText;
+
+          // Replace the pre with the mermaid div
+          pre.parentNode.replaceChild(mermaidDiv, pre);
+          pre.dataset.mermaidTransformed = 'true';
+
+          // Re-run mermaid on the new element
+          if (window.mermaid) {
+            try {
+              mermaid.run({ nodes: [mermaidDiv] });
+            } catch (e) {
+              console.warn('Mermaid rendering failed:', e);
+            }
+          }
+        });
+      }
+
+      // Initial transform
+      function initMermaid() {
+        if (window.mermaid) {
+          transformMermaidBlocks();
+        }
+      }
+
+      // Use MutationObserver to catch dynamically added content
+      const mermaidObserver = new MutationObserver((mutations) => {
+        let shouldTransform = false;
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.matches && node.matches('.blog-content pre[data-language="mermaid"]')) {
+                shouldTransform = true;
+                break;
+              }
+              if (node.querySelector && node.querySelector('.blog-content pre[data-language="mermaid"]')) {
+                shouldTransform = true;
+                break;
+              }
+            }
+          }
+        }
+        if (shouldTransform && window.mermaid) {
+          transformMermaidBlocks();
+        }
+      });
+
+      // Start observing
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          initMermaid();
+          mermaidObserver.observe(document.body, { childList: true, subtree: true });
+        });
+      } else {
+        initMermaid();
+        mermaidObserver.observe(document.body, { childList: true, subtree: true });
+      }
+    </script>
   </body>
 </html>
