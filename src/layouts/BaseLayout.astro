@@ -49,6 +49,7 @@ export interface Props {
   image?: string;
   type?: string;
   keywords?: string[];
+  noindex?: boolean;
 }
 
 const {
@@ -56,6 +57,7 @@ const {
   description = locales.en.about.description,
   image = '/og-image.jpg',
   type = 'website',
+  noindex = false,
   keywords = [
     'Software Engineer',
     'Technical Lead',
@@ -113,6 +115,7 @@ const siteName = locales.en.siteName;
     <meta name="keywords" content={keywords.join(', ')} />
     <meta name="author" content="Ahmed Ragab" />
     <link rel="canonical" href={canonicalURL} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
     
     <ClientRouter />
     

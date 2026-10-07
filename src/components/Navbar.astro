@@ -10,7 +10,8 @@ const cleanPathname = pathname.replace(/\/$/, '') || '/';
 
 const navLinks = [
   { href: `${base}`, label: 'Home', isExact: true },
-  { href: `${base}about`, label: 'About', isExact: false },
+  { href: `${base}#about`, label: 'About', isExact: false },
+  { href: `${base}#projects`, label: 'Projects', isExact: false },
   { href: `${base}blog`, label: 'Blog', isExact: false },
   { href: `${base}contact`, label: 'Contact', isExact: false },
 ];

@@ -2,8 +2,12 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Navbar from '../components/Navbar.astro';
 import Hero from '../components/Hero.astro';
+import About from '../components/About.astro';
+import Skills from '../components/Skills.astro';
+import Experience from '../components/Experience.astro';
 import Projects from '../components/Projects.astro';
 import Blog from '../components/Blog.astro';
+import Testimonials from '../components/react/Testimonials';
 import BackToTop from '../components/react/BackToTop';
 ---
 
@@ -21,8 +25,12 @@ import BackToTop from '../components/react/BackToTop';
 
   <main id="main-content" role="main">
     <Hero />
+    <About />
+    <Skills />
+    <Experience />
     <Projects />
     <Blog />
+    <Testimonials client:visible />
   </main>
 
   <!-- Back to Top Button -->

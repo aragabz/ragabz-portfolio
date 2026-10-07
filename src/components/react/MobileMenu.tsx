@@ -265,6 +265,7 @@ function getIconForLink(label: string): string {
   const iconMap: Record<string, string> = {
     'Home': 'mdi:home',
     'About': 'mdi:account-circle',
+    'Projects': 'mdi:apps',
     'Experience': 'mdi:briefcase',
     'Blog': 'mdi:post',
     'Contact': 'mdi:email',

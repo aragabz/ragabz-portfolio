@@ -15,34 +15,12 @@ interface TestimonialsProps {
   testimonials?: Testimonial[];
 }
 
-const defaultTestimonials: Testimonial[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    role: 'CTO',
-    company: 'Tech Corp',
-    quote: 'Exceptional developer with great attention to detail. Delivered our project ahead of schedule with outstanding quality.',
-    rating: 5,
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    role: 'Product Manager',
-    company: 'Startup Inc',
-    quote: 'A true professional who understands both technical and business requirements. Highly recommend!',
-    rating: 5,
-  },
-  {
-    id: '3',
-    name: 'Mike Johnson',
-    role: 'Lead Developer',
-    company: 'Digital Agency',
-    quote: 'Great to work with! Excellent communication skills and deep technical knowledge. Would definitely work together again.',
-    rating: 5,
-  },
-];
+// Add real testimonials here as they come in (name, role, company, quote, optional rating).
+const defaultTestimonials: Testimonial[] = [];
 
 export default function Testimonials({ testimonials = defaultTestimonials }: TestimonialsProps) {
+  if (testimonials.length === 0) return null;
+
   return (
     <section 
       id="testimonials"

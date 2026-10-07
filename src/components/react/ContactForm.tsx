@@ -16,10 +16,17 @@ export default function ContactForm() {
     const subject = formData.get('subject') as string;
     const message = formData.get('message') as string;
 
+    const formId = import.meta.env.PUBLIC_FORMSPREE_ID;
+    if (!formId) {
+      setErrors(prev => ({ ...prev, form: 'Contact form is not configured. Please email me directly instead.' }));
+      setSubmitStatus('error');
+      return;
+    }
+
     setSubmitStatus('submitting');
 
     try {
-      const response = await fetch('https://formspree.io/f/PUBLIC_FORMSPREE_ID', {
+      const response = await fetch(`https://formspree.io/f/${formId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -159,7 +166,7 @@ export default function ContactForm() {
               border: '1px solid var(--color-red-500)', borderRadius: '8px', color: 'var(--color-red-500)',
               display: 'flex', alignItems: 'center', gap: '0.5rem'
             }}>
-              <span>Failed to send message. Please try again.</span>
+              <span>{errors.form || 'Failed to send message. Please try again.'}</span>
             </div>
           )}
         </div>

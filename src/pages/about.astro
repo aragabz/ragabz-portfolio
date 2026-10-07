@@ -1,25 +1,24 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Navbar from '../components/Navbar.astro';
-import About from '../components/About.astro';
-import Skills from '../components/Skills.astro';
-import Experience from '../components/Experience.astro';
-import Testimonials from '../components/react/Testimonials';
-import BackToTop from '../components/react/BackToTop';
+
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
+const target = `${base}#about`;
 ---
 
-<BaseLayout 
+<BaseLayout
   title="About Me - Ahmed Ragab"
   description="Learn more about my background, skills, and professional experience as a Software Engineering Technical Lead."
+  noindex
 >
-  <Navbar />
+  <meta http-equiv="refresh" content={`0; url=${target}`} />
+  <script is:inline define:vars={{ target }}>
+    window.location.replace(target);
+  </script>
 
-  <main id="main-content" role="main" class="py-12">
-    <About />
-    <Skills />
-    <Experience />
-    <Testimonials client:visible />
+  <main id="main-content" role="main" class="min-h-screen flex items-center justify-center px-6 py-24 text-center">
+    <p>
+      The About section has moved to the home page.
+      <a href={target} style="color: var(--color-accent-strong); text-decoration: underline;">Continue to About →</a>
+    </p>
   </main>
-
-  <BackToTop client:load />
 </BaseLayout>
