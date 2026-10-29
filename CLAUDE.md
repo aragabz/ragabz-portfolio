@@ -14,6 +14,7 @@ This project uses **Yarn 4** (node-modules linker, not PnP) and requires **Node.
 yarn dev            # dev server at http://localhost:4321
 yarn build          # astro build && pagefind --site dist
 yarn preview        # serve the dist/ build locally
+yarn check          # astro check (type-checks .astro/.ts/.tsx; needs TypeScript 6.x, see package.json)
 yarn test           # vitest (unit/component tests, jsdom)
 yarn test:ui        # vitest with UI
 yarn test:coverage  # vitest with v8 coverage

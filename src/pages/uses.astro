@@ -91,7 +91,7 @@ const categories = [
       <!-- Categories -->
       <div class="space-y-16">
         {categories.map((category, categoryIndex) => (
-          <section key={category.title}>
+          <section>
             <FadeIn client:load delay={categoryIndex * 0.1}>
               <h2 class="text-3xl font-bold mb-8" style="color: var(--color-brand-orange);">
                 {category.title}
@@ -101,7 +101,7 @@ const categories = [
             <StaggerContainer client:load staggerDelay={0.05}>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {category.items.map((item) => (
-                  <StaggerItem key={item.name} client:load>
+                  <StaggerItem client:load>
                     <div
                       style={{
                         padding: '1.5rem',

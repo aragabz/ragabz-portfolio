@@ -63,7 +63,6 @@ const interests = [
           <div class="space-y-4">
             {currentProjects.map((project) => (
               <div
-                key={project.title}
                 style={{
                   padding: '1.5rem',
                   background: 'var(--color-bg-secondary)',
@@ -106,7 +105,6 @@ const interests = [
           <div class="space-y-4">
             {learning.map((item) => (
               <div
-                key={item.topic}
                 style={{
                   padding: '1.5rem',
                   background: 'var(--color-bg-secondary)',
@@ -159,7 +157,6 @@ const interests = [
           <div class="space-y-4">
             {reading.map((book) => (
               <div
-                key={book.title}
                 style={{
                   padding: '1.5rem',
                   background: 'var(--color-bg-secondary)',
@@ -205,7 +202,6 @@ const interests = [
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {interests.map((interest) => (
               <div
-                key={interest.text}
                 style={{
                   padding: '1.5rem',
                   background: 'var(--color-bg-secondary)',

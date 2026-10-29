@@ -77,7 +77,9 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
           return (
             <div
               key={`${exp.company}-${index}`}
-              ref={(el) => (itemRefs.current[index] = el)}
+              ref={(el) => {
+                itemRefs.current[index] = el;
+              }}
               data-index={index}
               className="relative pl-12 md:pl-20 pb-12"
               style={{
