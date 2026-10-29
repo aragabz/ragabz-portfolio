@@ -59,9 +59,9 @@ Always fetch blog posts through `src/utils/blog.ts#getVisibleBlogPosts()` rather
 
 Interactive pieces live in `src/components/react/*.tsx` and are mounted into `.astro` components with Astro's client directives (e.g. `client:load`). Astro components (`.astro`) handle everything static/SEO; reach for a React component only when you need client-side interactivity (filters, search, forms, theme toggle, etc.), consistent with the existing split.
 
-### Home hero 3D network
+### Home hero aurora background
 
-`src/components/HeroNetwork.astro` renders a decorative three.js node network behind the hero (`src/scripts/hero-network.ts`). three.js (~130 KB gzip) is dynamically imported on `requestIdleCallback`, so it never blocks the hero text; keep it a lazy import and keep three.js out of any other page. The scene reads colours from the CSS theme tokens (and re-reads them when `data-theme` changes), renders a single static frame under `prefers-reduced-motion`, pauses when off-screen or the tab is hidden, is skipped under Save-Data or without WebGL (the CSS glow on `.hero-network` is the fallback), and disposes itself plus its GL context on `astro:before-swap`.
+`src/components/HeroBackground.astro` renders a decorative aurora / mesh-gradient glow behind the hero. It is pure CSS: soft `radial-gradient` blobs drift via transform-only keyframes (no `filter: blur` — the gradient falloff provides the softness, so animation stays on the compositor), and a static inline-SVG `feTurbulence` grain overlay hides gradient banding. All colours come from the theme tokens via `var()`/`color-mix()` (cool tones are `--color-accent` rotated in OKLCH with relative colour syntax, with a token-only fallback), so theme switches need no JS. Phones (<768px) get three smaller blobs; `prefers-reduced-motion` gets a static gradient. A tiny script (`src/scripts/hero-background.ts`, dynamically imported on `requestIdleCallback`) only pauses the animation (`.is-paused` → `animation-play-state`) when the hero is off-screen or the tab is hidden and adds a pointer-follow drift to one blob on fine-pointer devices; it re-inits on `astro:page-load` and cleans up on `astro:before-swap`. Keep it CSS-first: the gradient must render without JS.
 
 ### Styling
 

@@ -1,0 +1,221 @@
+---
+// Decorative aurora / mesh-gradient glow behind the hero. Everything visual is
+// pure CSS: soft radial-gradient blobs drifting via transform-only keyframes,
+// plus a static SVG film grain that hides gradient banding. The optional script
+// (loaded when the browser is idle) only pauses the animation off-screen or in
+// a hidden tab and adds a gentle pointer-follow drift to one blob.
+---
+
+<div class="hero-bg" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+  <div class="blob blob-pointer"></div>
+  <div class="grain"></div>
+</div>
+
+<script>
+  let cleanup: (() => void) | undefined;
+
+  function init() {
+    const root = document.querySelector<HTMLElement>('.hero-bg');
+    if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const start = () =>
+      import('../scripts/hero-background').then(({ mountHeroBackground }) => {
+        if (root.isConnected) cleanup = mountHeroBackground(root);
+      });
+    if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 2000 });
+    else setTimeout(start, 200);
+  }
+
+  // Fires on the initial load and after every view-transition navigation.
+  document.addEventListener('astro:page-load', init);
+  document.addEventListener('astro:before-swap', () => {
+    cleanup?.();
+    cleanup = undefined;
+  });
+</script>
+
+<style>
+  .hero-bg {
+    /* Palette: warm tones are the accent tokens; cool tones are the accent
+       rotated around the OKLCH hue wheel, so both follow the theme. */
+    --aurora-warm: var(--color-accent);
+    --aurora-deep: var(--color-accent-strong);
+    --aurora-cool: color-mix(in srgb, var(--color-text-tertiary) 80%, var(--color-bg));
+    --aurora-cool-2: var(--color-bg-tertiary);
+    /* Overall intensity; dark mode raises it (see below). */
+    --aurora-alpha: 34%;
+
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    /* Calm the area behind the text block and fade into the next section. */
+    mask-image:
+      radial-gradient(ellipse 60% 48% at 50% 46%, rgb(0 0 0 / 0.55) 0%, black 75%),
+      linear-gradient(to bottom, black 70%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    .hero-bg {
+      --aurora-cool: oklch(from var(--color-accent) calc(l * 0.95) calc(c * 0.75) calc(h + 205));
+      --aurora-cool-2: oklch(from var(--color-accent) l calc(c * 0.65) calc(h + 150));
+    }
+  }
+
+  :global([data-theme='dark']) .hero-bg {
+    --aurora-alpha: 42%;
+  }
+
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    /* A soft, roughly Gaussian falloff: reads as a heavily blurred blob
+       without paying for a filter on an animated layer. */
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--blob-color) var(--aurora-alpha), transparent) 0%,
+      color-mix(in srgb, var(--blob-color) calc(var(--aurora-alpha) * 0.72), transparent) 30%,
+      color-mix(in srgb, var(--blob-color) calc(var(--aurora-alpha) * 0.36), transparent) 55%,
+      color-mix(in srgb, var(--blob-color) calc(var(--aurora-alpha) * 0.1), transparent) 78%,
+      transparent 100%
+    );
+    will-change: transform;
+    animation: var(--blob-anim) var(--blob-duration) ease-in-out infinite alternate;
+  }
+
+  .blob-1 {
+    --blob-color: var(--aurora-warm);
+    --blob-anim: drift-1;
+    --blob-duration: 26s;
+    width: 62vmax;
+    height: 52vmax;
+    left: -16vmax;
+    top: -18vmax;
+  }
+
+  .blob-2 {
+    --blob-color: var(--aurora-cool);
+    --blob-anim: drift-2;
+    --blob-duration: 32s;
+    width: 58vmax;
+    height: 50vmax;
+    right: -18vmax;
+    top: -8vmax;
+  }
+
+  .blob-3 {
+    --blob-color: var(--aurora-deep);
+    --blob-anim: drift-3;
+    --blob-duration: 38s;
+    width: 54vmax;
+    height: 40vmax;
+    left: 18%;
+    bottom: -22vmax;
+  }
+
+  .blob-4 {
+    --blob-color: var(--aurora-cool-2);
+    --blob-anim: drift-4;
+    --blob-duration: 44s;
+    width: 40vmax;
+    height: 36vmax;
+    left: -10vmax;
+    bottom: -6vmax;
+  }
+
+  /* Follows the pointer (offset set by the script); otherwise rests up-right. */
+  .blob-pointer {
+    --blob-color: var(--aurora-warm);
+    width: 34vmax;
+    height: 34vmax;
+    left: calc(50% - 17vmax);
+    top: calc(42% - 17vmax);
+    opacity: 0.55;
+    animation: none;
+    translate: var(--pointer-x, 14vmax) var(--pointer-y, -6vmax);
+    transition: translate 2.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  /* Static film grain: breaks up 8-bit banding in the soft gradients. */
+  .grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.07;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1.6 -0.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  :global([data-theme='dark']) .grain {
+    opacity: 0.1;
+  }
+
+  .hero-bg:global(.is-paused) .blob {
+    animation-play-state: paused;
+  }
+
+  @keyframes drift-1 {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(8vw, 6vh, 0) scale(1.08); }
+    to { transform: translate3d(14vw, -2vh, 0) scale(0.96); }
+  }
+
+  @keyframes drift-2 {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(-10vw, 10vh, 0) scale(0.92); }
+    to { transform: translate3d(-4vw, 18vh, 0) scale(1.06); }
+  }
+
+  @keyframes drift-3 {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(12vw, -8vh, 0) scale(1.1); }
+    to { transform: translate3d(-8vw, -4vh, 0) scale(0.95); }
+  }
+
+  @keyframes drift-4 {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to { transform: translate3d(10vw, -14vh, 0) scale(1.12); }
+  }
+
+  /* Phones: three smaller layers, no pointer blob. */
+  @media (max-width: 767px) {
+    .blob-4,
+    .blob-pointer {
+      display: none;
+    }
+
+    .blob-1 {
+      width: 120vw;
+      height: 70vh;
+      left: -45vw;
+      top: -18vh;
+    }
+
+    .blob-2 {
+      width: 110vw;
+      height: 64vh;
+      right: -50vw;
+      top: 14vh;
+    }
+
+    .blob-3 {
+      width: 120vw;
+      height: 56vh;
+      left: -10vw;
+      bottom: -26vh;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blob {
+      animation: none;
+      transition: none;
+      will-change: auto;
+    }
+  }
+</style>
