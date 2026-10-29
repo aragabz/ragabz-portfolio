@@ -27,25 +27,35 @@ export default defineConfig({
     AstroPWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Your Portfolio',
-        short_name: 'Portfolio',
-        description: 'Professional portfolio showcasing projects and expertise',
+        name: 'Ahmed Ragab - Portfolio',
+        short_name: 'Ahmed Ragab',
+        description: 'Ahmed Ragab, Software Engineering Technical Lead: projects, experience, and articles on Kotlin, Android, KMP, and Spring Boot.',
         theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
+        // Relative to the manifest URL, so they resolve correctly under any `base`.
         icons: [
-          {
-            src: `${base}/favicon.svg`,
-            sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
-          },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
         ],
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
-        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff,woff2}'],
+        // JS is cached on first use instead of precached, so visitors don't
+        // download lazily-loaded chunks (e.g. mermaid, several MB) up front.
+        globPatterns: ['**/*.{css,html,svg,png,jpg,jpeg,webp,woff,woff2}'],
         runtimeCaching: [
+          {
+            // Hashed filenames are immutable, so cache-first is safe.
+            urlPattern: /\/_astro\/.*\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'astro-js-cache',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
@@ -86,11 +96,10 @@ export default defineConfig({
       rollupOptions: {
         output: {
           manualChunks: (id) => {
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'react-vendor';
-              }
-              return 'vendor';
+            // Only React gets its own chunk; everything else (e.g. mermaid) keeps
+            // Vite's default splitting so lazy imports stay lazy.
+            if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
+              return 'react-vendor';
             }
           },
         },

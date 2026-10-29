@@ -41,7 +41,6 @@ Follow this pattern (see `BaseLayout.astro`, `blog/[slug].astro`) for any new in
 ### Layouts
 
 - `src/layouts/BaseLayout.astro` is the real layout used by every page (SEO meta/OG tags, canonical URL, dark/light theme bootstrap via `data-theme` + `localStorage`, `ClientRouter` view transitions, and the Mermaid diagram rendering pipeline below). Pass `title`/`description`/`image`/`type`/`keywords` props per-page.
-- `src/layouts/Layout.astro` is an unused Astro-starter leftover — don't build on it.
 
 ### Content collections (`src/content.config.ts`)
 
@@ -53,7 +52,7 @@ Always fetch blog posts through `src/utils/blog.ts#getVisibleBlogPosts()` rather
 
 ### Blog rendering & Mermaid diagrams
 
-`src/pages/blog/[slug].astro` renders MDX via `render(post)` and builds a nested table-of-contents from the returned `headings`. Mermaid is **not** wired through `rehype-mermaid`/remark at build time — instead `BaseLayout.astro` loads a static `public/mermaid/mermaid.min.js` script and, client-side, walks the rendered HTML for `pre[data-language="mermaid"]` blocks, swaps each for a `div.mermaid`, and calls `mermaid.run()`. A `MutationObserver` re-applies this after Astro view-transition navigations. If Mermaid diagrams stop rendering after a content or layout change, check this client-side transform in `BaseLayout.astro`, not the markdown pipeline.
+`src/pages/blog/[slug].astro` renders MDX via `render(post)` and builds a nested table-of-contents from the returned `headings`. Mermaid is **not** wired through `rehype-mermaid`/remark at build time — instead a bundled `<script>` in `BaseLayout.astro` runs on every `astro:page-load` (initial load and each view-transition navigation), finds `.blog-content pre[data-language="mermaid"]` blocks, and only if any exist dynamically `import('mermaid')`, swaps each block for a `div.mermaid`, and calls `mermaid.run()`. Keep it a lazy import (and keep `manualChunks` in `astro.config.mjs` from pulling mermaid into an eagerly-loaded chunk) — the library is several MB. If diagrams stop rendering, check this client-side transform in `BaseLayout.astro`, not the markdown pipeline.
 
 ### React islands
 
@@ -66,5 +65,5 @@ Tailwind CSS 4 is configured via the `@theme` directive directly in `src/styles/
 ### Build config notes (`astro.config.mjs`)
 
 - `output: 'static'`; Sharp is the image service.
-- Vite build: Terser minification with `drop_console: true`, manual chunk splitting (`react-vendor` vs `vendor`), and `rollup-plugin-visualizer` emits `stats.html` at the repo root on every build for bundle inspection.
+- Vite build: Terser minification with `drop_console: true`, manual chunk splitting (only React into `react-vendor`; everything else uses Vite defaults), and `rollup-plugin-visualizer` emits `stats.html` at the repo root on every build for bundle inspection (gitignored).
 - PWA via `@vite-pwa/astro` (manifest + Workbox runtime caching for Google Fonts).
