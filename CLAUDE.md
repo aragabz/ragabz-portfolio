@@ -67,5 +67,5 @@ Tailwind CSS 4 is configured via the `@theme` directive directly in `src/styles/
 
 - `output: 'static'`; Sharp is the image service.
 - Vite build: Terser minification with `drop_console: true`, manual chunk splitting (only React into `react-vendor`; everything else uses Vite defaults), and `rollup-plugin-visualizer` emits `stats.html` at the repo root on every build for bundle inspection (gitignored).
-- PWA via `@vite-pwa/astro`: HTML/CSS/images/fonts are precached; hashed `/_astro/*.js` is runtime-cached on first use so lazy chunks (mermaid) aren't downloaded up front.
+- No service worker, on purpose: the site only ships a static `public/manifest.webmanifest` (install metadata + `public/icons/`), linked from `BaseLayout.astro`. Its URLs are relative so they work under any `base`.
 - Inter is self-hosted via `@fontsource-variable/inter` (imported in `BaseLayout.astro`); don't reintroduce Google Fonts.
