@@ -73,3 +73,15 @@ test('PWA manifest icons resolve', async ({ page, request }) => {
     expect(res.status(), icon.src).toBe(200);
   }
 });
+
+test('mobile menu opens, animates in, and navigates', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('./', { waitUntil: 'networkidle' });
+
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  const menu = page.getByRole('navigation', { name: 'Mobile navigation' });
+  await expect(menu).toBeVisible();
+
+  await menu.getByRole('link', { name: 'Blog' }).click();
+  await expect(page).toHaveURL(/\/blog\/?$/);
+});
