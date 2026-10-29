@@ -42,6 +42,12 @@ jobs:
       - name: Build
         run: yarn build
 
+      - name: Install Playwright browser
+        run: yarn playwright install --with-deps chromium
+
+      - name: E2E smoke tests
+        run: yarn test:e2e
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

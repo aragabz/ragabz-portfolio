@@ -1,6 +1,7 @@
 ---
 import ThemeToggle from './react/ThemeToggle';
 import MobileMenu from './react/MobileMenu';
+import Search from './react/Search';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 const pathname = Astro.url.pathname;
@@ -37,27 +38,31 @@ function isLinkActive(linkHref: string, isExact: boolean) {
         AR
       </a>
       
-      <ul class="hidden md:flex gap-8 items-center list-none m-0 p-0">
-        {navLinks.map((link) => {
-          const active = isLinkActive(link.href, link.isExact);
-          return (
-            <li>
-              <a 
-                href={link.href} 
-                class="transition-colors hover-text-brand-orange font-medium"
-                style={active ? "color: var(--color-brand-orange);" : "color: var(--color-text);"}
-              >
-                {link.label}
-              </a>
-            </li>
-          );
-        })}
-        <li><ThemeToggle client:load /></li>
-      </ul>
-      
-      <div class="flex items-center gap-2 md:hidden">
-        <ThemeToggle client:load />
-        <MobileMenu client:load links={navLinks} />
+      <div class="flex items-center gap-2 md:gap-8">
+        <ul class="hidden md:flex gap-8 items-center list-none m-0 p-0">
+          {navLinks.map((link) => {
+            const active = isLinkActive(link.href, link.isExact);
+            return (
+              <li>
+                <a 
+                  href={link.href} 
+                  class="transition-colors hover-text-brand-orange font-medium"
+                  style={active ? "color: var(--color-brand-orange);" : "color: var(--color-text);"}
+                >
+                  {link.label}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div class="flex items-center gap-2">
+          <Search client:idle />
+          <ThemeToggle client:load />
+          <div class="md:hidden">
+            <MobileMenu client:load links={navLinks} />
+          </div>
+        </div>
       </div>
     </div>
   </div>

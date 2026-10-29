@@ -90,7 +90,7 @@ function formatDate(date: Date) {
       <header class="mb-14 max-w-[720px]">
         <p class="eyebrow">Blog</p>
 
-        <h1 class="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.08] font-bold tracking-tight mb-8" style="color: var(--color-text);">
+        <h1 data-pagefind-meta="title" class="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.08] font-bold tracking-tight mb-8" style="color: var(--color-text);">
           {post.data.title}
         </h1>
 
@@ -118,7 +118,7 @@ function formatDate(date: Date) {
 
       <!-- Article Body + TOC -->
       <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:gap-16">
-        <div class="blog-content max-w-[720px]">
+        <div class="blog-content max-w-[720px]" data-pagefind-body>
           <Content />
         </div>
 

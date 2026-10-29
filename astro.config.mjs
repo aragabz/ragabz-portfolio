@@ -6,14 +6,7 @@ import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 import AstroPWA from '@vite-pwa/astro';
-
-const repo = process.env.GITHUB_REPOSITORY?.split('/')[1];
-const owner = process.env.GITHUB_REPOSITORY_OWNER;
-const isUserSite = !!owner && repo === `${owner}.github.io`;
-
-// Default to root path for local development and use repository path in GitHub Actions.
-const base = process.env.GITHUB_ACTIONS === 'true' && repo && !isUserSite ? `/${repo}` : '/';
-const site = owner ? `https://${owner}.github.io` : 'https://example.com';
+import { base, site } from './site.config.mjs';
 
 // https://astro.build/config
 export default defineConfig({
@@ -53,20 +46,6 @@ export default defineConfig({
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
               },
             },
           },

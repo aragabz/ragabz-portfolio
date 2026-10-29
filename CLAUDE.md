@@ -18,20 +18,20 @@ yarn check          # astro check (type-checks .astro/.ts/.tsx; needs TypeScript
 yarn test           # vitest (unit/component tests, jsdom)
 yarn test:ui        # vitest with UI
 yarn test:coverage  # vitest with v8 coverage
-yarn test:e2e       # playwright e2e tests
+yarn test:e2e       # playwright smoke tests in e2e/ against the production build (run `yarn build` first)
 ```
 
 Run a single vitest file/test: `yarn test src/path/to/file.test.ts` or `yarn test -t "test name"`.
 
-There are currently no test files in the repo (`src/**/*.{test,spec}.*` is empty, and there's no Playwright `tests/` dir) even though vitest/Playwright/RTL are fully configured — add specs under `src/` next to the code they cover (vitest is configured with jsdom + React Testing Library via `src/test/setup.ts`).
+There are no vitest unit tests yet even though vitest/RTL are configured — add specs under `src/` next to the code they cover (jsdom + React Testing Library via `src/test/setup.ts`). Playwright smoke tests live in `e2e/` and run in CI after the build; `playwright.config.ts` serves `dist/` with `yarn preview` under the same `base` as the build (shared via `site.config.mjs`), so they catch asset URLs that ignore the base path. Note: Astro 7 auto-backgrounds `astro preview` when it detects an AI agent environment (e.g. `CLAUDECODE`/`AI_AGENT` env vars), which breaks Playwright's `webServer`; when running e2e as an agent, unset those vars (`env -u AI_AGENT -u CLAUDECODE yarn test:e2e`) and `yarn astro preview stop` any leftover daemon.
 
-Search only works after a full `yarn build`: `pagefind --site dist` generates `dist/pagefind/*` post-build, and `Search.tsx` loads `/pagefind/pagefind.js` at runtime. It will warn and no-op in `yarn dev`/before a build.
+Search only works after a full `yarn build`: `pagefind --site dist` generates `dist/pagefind/*` post-build, and `Search.tsx` (mounted in `Navbar.astro`) dynamically imports `${base}pagefind/pagefind.js` the first time search opens; in `yarn dev` it shows an "unavailable" message. Only elements marked `data-pagefind-body` (blog post content, project pages) are indexed — add that attribute to any new page type that should be searchable.
 
 ## Architecture
 
 ### Base path / GitHub Pages deployment
 
-`astro.config.mjs` computes `base` dynamically from `GITHUB_REPOSITORY`/`GITHUB_REPOSITORY_OWNER` env vars set by Actions: if the repo is a project page (not `<owner>.github.io`) built under CI, `base` becomes `/<repo>/`; otherwise (local dev, or a user/org site) it's `/`. Because of this, **internal links and asset URLs cannot be hardcoded** — every page/layout that builds an href reads `import.meta.env.BASE_URL` and normalizes it to end with `/`, e.g.:
+`site.config.mjs` (imported by `astro.config.mjs` and `playwright.config.ts`) computes `base` dynamically from `GITHUB_REPOSITORY`/`GITHUB_REPOSITORY_OWNER` env vars set by Actions: if the repo is a project page (not `<owner>.github.io`) built under CI, `base` becomes `/<repo>/`; otherwise (local dev, or a user/org site) it's `/`. Because of this, **internal links and asset URLs cannot be hardcoded** — every page/layout that builds an href reads `import.meta.env.BASE_URL` and normalizes it to end with `/`, e.g.:
 
 ```js
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
@@ -67,4 +67,5 @@ Tailwind CSS 4 is configured via the `@theme` directive directly in `src/styles/
 
 - `output: 'static'`; Sharp is the image service.
 - Vite build: Terser minification with `drop_console: true`, manual chunk splitting (only React into `react-vendor`; everything else uses Vite defaults), and `rollup-plugin-visualizer` emits `stats.html` at the repo root on every build for bundle inspection (gitignored).
-- PWA via `@vite-pwa/astro` (manifest + Workbox runtime caching for Google Fonts).
+- PWA via `@vite-pwa/astro`: HTML/CSS/images/fonts are precached; hashed `/_astro/*.js` is runtime-cached on first use so lazy chunks (mermaid) aren't downloaded up front.
+- Inter is self-hosted via `@fontsource-variable/inter` (imported in `BaseLayout.astro`); don't reintroduce Google Fonts.

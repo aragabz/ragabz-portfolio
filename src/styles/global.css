@@ -2,7 +2,7 @@
 
 @theme {
   /* Typography */
-  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --font-family-sans: 'Inter Variable', 'Inter', system-ui, sans-serif;
   --line-height-relaxed-custom: 1.7;
   --letter-spacing-tight-1: -0.01em;
   --letter-spacing-tight-2: -0.02em;
@@ -255,4 +255,58 @@ textarea:focus-visible {
 
 [data-theme="dark"] .mermaid svg {
   filter: invert(1) hue-rotate(180deg);
+}
+
+/* Search (src/components/react/Search.tsx) */
+.search-trigger:hover {
+  background: var(--color-bg-tertiary) !important;
+  border-color: var(--color-brand-orange) !important;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.search-result {
+  display: block;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.search-result:hover,
+.search-result:focus-visible {
+  background: var(--color-bg-tertiary);
+}
+
+.search-result h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-brand-orange);
+}
+
+.search-result p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.search-result mark {
+  background: color-mix(in srgb, var(--color-brand-orange) 25%, transparent);
+  color: inherit;
+}
+
+.search-hint {
+  margin: 0;
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
 }

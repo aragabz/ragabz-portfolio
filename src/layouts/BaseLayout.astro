@@ -1,7 +1,9 @@
 ---
+import '@fontsource-variable/inter/wght.css';
 import '../styles/global.css';
 import Footer from '../components/Footer.astro';
 import { ClientRouter } from 'astro:transitions';
+import { pwaInfo } from 'virtual:pwa-info';
 
 const locales = {
   en: {
@@ -86,6 +88,7 @@ const siteName = locales.en.siteName;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    {pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} />}
     <meta name="generator" content={Astro.generator} />
     
     <!-- Performance & Mobile -->
@@ -188,21 +191,6 @@ const siteName = locales.en.siteName;
         "name": "Ahmed Ragab"
       }
     })} />
-    
-    <!-- Preconnect to Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    
-    <!-- Preload Critical Fonts -->
-    <link 
-      rel="preload" 
-href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-    </noscript>
   </head>
   <body>
     <slot />

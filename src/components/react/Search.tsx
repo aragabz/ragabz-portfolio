@@ -1,146 +1,110 @@
 import { useEffect, useRef, useState } from 'react';
 
-interface SearchProps {
-  className?: string;
+// Minimal typing for the parts of the Pagefind JS API we use.
+interface PagefindResultData {
+  url: string;
+  excerpt: string;
+  meta: { title?: string };
+}
+interface Pagefind {
+  options(opts: { baseUrl: string }): Promise<void>;
+  search(query: string): Promise<{ results: Array<{ id: string; data(): Promise<PagefindResultData> }> } | null>;
 }
 
-export default function Search({ className = '' }: SearchProps) {
-  const [isOpen, setIsOpen] = useState(false);
+interface SearchResult extends PagefindResultData {
+  id: string;
+}
+
+type Status = 'idle' | 'loading' | 'ready' | 'unavailable';
+
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
+
+// Pagefind is generated into dist/ after `astro build`, so it can only be
+// imported at runtime, and only exists after a full `yarn build`.
+let pagefindPromise: Promise<Pagefind> | null = null;
+function loadPagefind(): Promise<Pagefind> {
+  pagefindPromise ??= import(/* @vite-ignore */ `${base}pagefind/pagefind.js`).then(async (pagefind: Pagefind) => {
+    await pagefind.options({ baseUrl: base });
+    return pagefind;
+  });
+  pagefindPromise.catch(() => {
+    pagefindPromise = null;
+  });
+  return pagefindPromise;
+}
+
+export default function Search() {
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [status, setStatus] = useState<Status>('idle');
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const latestQuery = useRef('');
 
-  // Initialize Pagefind
-  useEffect(() => {
-    // Load Pagefind dynamically after build
-    const loadPagefind = async () => {
-      if (typeof window !== 'undefined') {
-        try {
-          // Use fetch to check if pagefind exists (generated post-build)
-          const script = document.createElement('script');
-          script.src = '/pagefind/pagefind.js';
-          script.type = 'module';
-          script.onload = async () => {
-            // @ts-ignore
-            if (window.pagefind) {
-              console.log('Pagefind loaded successfully');
-            }
-          };
-          script.onerror = () => {
-            console.warn('Pagefind not available. Run full build to generate search index.');
-          };
-          document.head.appendChild(script);
-        } catch (error) {
-          console.warn('Pagefind not loaded yet.');
-        }
-      }
-    };
-    loadPagefind();
-  }, []);
+  const openSearch = () => {
+    dialogRef.current?.showModal();
+    inputRef.current?.focus();
+    if (status === 'idle') {
+      setStatus('loading');
+      loadPagefind().then(
+        () => setStatus('ready'),
+        () => setStatus('unavailable'),
+      );
+    }
+  };
 
-  // Handle keyboard shortcuts
+  // Cmd+K / Ctrl+K opens search from anywhere on the page.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+K or Ctrl+K to open search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         openSearch();
       }
-      // Escape to close
-      if (e.key === 'Escape' && isOpen) {
-        closeSearch();
-      }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  });
 
-  const openSearch = () => {
-    setIsOpen(true);
-    dialogRef.current?.showModal();
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
-
-  const closeSearch = () => {
-    setIsOpen(false);
-    dialogRef.current?.close();
-    setQuery('');
-  };
-
-  const handleSearch = async (value: string) => {
+  const runSearch = async (value: string) => {
     setQuery(value);
-    
+    latestQuery.current = value;
+
     if (!value.trim()) {
-      if (searchContainerRef.current) {
-        searchContainerRef.current.innerHTML = '';
-      }
+      setResults([]);
       return;
     }
 
     try {
-      // @ts-ignore
-      if (window.pagefind) {
-        // @ts-ignore
-        const search = await window.pagefind.search(value);
-        const results = await Promise.all(search.results.slice(0, 5).map((r: any) => r.data()));
-        
-        if (searchContainerRef.current) {
-          searchContainerRef.current.innerHTML = results
-            .map(
-              (result: any) => `
-                <a 
-                  href="${result.url}" 
-                  class="search-result"
-                  style="
-                    display: block;
-                    padding: 1rem;
-                    margin-bottom: 0.5rem;
-                    background: var(--color-bg-secondary);
-                    border-radius: 8px;
-                    text-decoration: none;
-                    color: var(--color-text);
-                    transition: all 0.2s ease;
-                  "
-                  onmouseover="this.style.background='var(--color-bg-tertiary)'"
-                  onmouseout="this.style.background='var(--color-bg-secondary)'"
-                >
-                  <h3 style="
-                    font-size: 1.125rem;
-                    font-weight: 600;
-                    margin: 0 0 0.5rem 0;
-                    color: var(--color-brand-orange);
-                  ">${result.meta.title}</h3>
-                  <p style="
-                    font-size: 0.875rem;
-                    color: var(--color-text-secondary);
-                    margin: 0;
-                    line-height: 1.5;
-                  ">${result.excerpt}</p>
-                </a>
-              `
-            )
-            .join('');
-        }
-      }
+      const pagefind = await loadPagefind();
+      const search = await pagefind.search(value);
+      const data = await Promise.all(
+        (search?.results ?? []).slice(0, 5).map(async (r) => ({ id: r.id, ...(await r.data()) })),
+      );
+      // Ignore responses for queries the user has already typed past.
+      if (latestQuery.current === value) setResults(data);
     } catch (error) {
       console.error('Search error:', error);
     }
   };
 
+  const resetSearch = () => {
+    setQuery('');
+    setResults([]);
+    latestQuery.current = '';
+  };
+
   return (
     <>
-      {/* Search Button */}
       <button
+        type="button"
         onClick={openSearch}
-        className={className}
-        aria-label="Open search"
+        aria-label="Search articles and projects"
+        className="search-trigger"
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          padding: '0.5rem 1rem',
+          padding: '0.5rem 0.75rem',
           background: 'var(--color-bg-secondary)',
           border: '1px solid var(--color-border)',
           borderRadius: '8px',
@@ -149,30 +113,14 @@ export default function Search({ className = '' }: SearchProps) {
           fontSize: '0.875rem',
           transition: 'all 0.2s ease',
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'var(--color-bg-tertiary)';
-          e.currentTarget.style.borderColor = 'var(--color-brand-orange)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'var(--color-bg-secondary)';
-          e.currentTarget.style.borderColor = 'var(--color-border)';
-        }}
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
-        <span>Search</span>
+        <span className="hidden lg:inline">Search</span>
         <kbd
+          className="hidden lg:inline"
           style={{
             padding: '0.125rem 0.375rem',
             background: 'var(--color-bg)',
@@ -186,156 +134,70 @@ export default function Search({ className = '' }: SearchProps) {
         </kbd>
       </button>
 
-      {/* Search Dialog */}
       <dialog
         ref={dialogRef}
+        aria-label="Search"
+        onClose={resetSearch}
+        onClick={(e) => {
+          // Close when the backdrop (the dialog element itself) is clicked.
+          if (e.target === dialogRef.current) dialogRef.current.close();
+        }}
         style={{
           width: '90%',
           maxWidth: '600px',
           maxHeight: '80vh',
+          margin: '10vh auto auto',
           padding: 0,
-          border: 'none',
+          border: '1px solid var(--color-border)',
           borderRadius: '12px',
           background: 'var(--color-bg)',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
           color: 'var(--color-text)',
         }}
-        onClick={(e) => {
-          // Close if clicking backdrop
-          if (e.target === dialogRef.current) {
-            closeSearch();
-          }
-        }}
       >
         <div style={{ padding: '1.5rem' }}>
-          {/* Search Input */}
-          <div
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onChange={(e) => runSearch(e.target.value)}
+            placeholder="Search articles, projects..."
+            aria-label="Search query"
             style={{
-              position: 'relative',
+              width: '100%',
+              padding: '0.75rem 1rem',
               marginBottom: '1rem',
-            }}
-          >
-            <svg
-              style={{
-                position: 'absolute',
-                left: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--color-text-secondary)',
-              }}
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Search articles, projects..."
-              aria-label="Search"
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem 0.75rem 3rem',
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                color: 'var(--color-text)',
-                fontSize: '1rem',
-                outline: 'none',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-brand-orange)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-border)';
-              }}
-            />
-            {query && (
-              <button
-                onClick={() => {
-                  setQuery('');
-                  if (searchContainerRef.current) {
-                    searchContainerRef.current.innerHTML = '';
-                  }
-                  inputRef.current?.focus();
-                }}
-                aria-label="Clear search"
-                style={{
-                  position: 'absolute',
-                  right: '1rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  padding: '0.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Search Results */}
-          <div
-            ref={searchContainerRef}
-            style={{
-              maxHeight: '60vh',
-              overflowY: 'auto',
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text)',
+              fontSize: '1rem',
             }}
           />
 
-          {/* Help Text */}
-          {!query && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '2rem',
-                color: 'var(--color-text-secondary)',
-                fontSize: '0.875rem',
-              }}
-            >
-              <p style={{ margin: 0 }}>
-                Start typing to search articles and projects...
+          <div style={{ maxHeight: '60vh', overflowY: 'auto' }} aria-live="polite">
+            {status === 'unavailable' ? (
+              <p className="search-hint">Search isn't available in this build. Run a full <code>yarn build</code>.</p>
+            ) : !query.trim() ? (
+              <p className="search-hint">
+                Start typing to search articles and projects. Press <kbd>Esc</kbd> to close.
               </p>
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem' }}>
-                Press <kbd style={{ 
-                  padding: '0.125rem 0.375rem', 
-                  background: 'var(--color-bg-secondary)', 
-                  borderRadius: '4px' 
-                }}>ESC</kbd> to close
-              </p>
-            </div>
-          )}
-
-          {/* No Results */}
-          {query && searchContainerRef.current?.innerHTML === '' && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '2rem',
-                color: 'var(--color-text-secondary)',
-                fontSize: '0.875rem',
-              }}
-            >
-              No results found for "{query}"
-            </div>
-          )}
+            ) : results.length === 0 ? (
+              <p className="search-hint">No results for “{query}”</p>
+            ) : (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {results.map((result) => (
+                  <li key={result.id}>
+                    <a href={result.url} className="search-result">
+                      <h3>{result.meta.title ?? result.url}</h3>
+                      {/* Pagefind excerpts are HTML-escaped text with <mark> highlights. */}
+                      <p dangerouslySetInnerHTML={{ __html: result.excerpt }} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </dialog>
     </>
