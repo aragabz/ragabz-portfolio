@@ -81,7 +81,7 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                 itemRefs.current[index] = el;
               }}
               data-index={index}
-              className="relative pl-12 md:pl-20 pb-12"
+              className="relative pl-12 md:pl-20 pb-8"
               style={{
                 opacity: isVisible ? 1 : 0,
                 transform: isVisible ? 'translateX(0)' : 'translateX(-30px)',
@@ -107,8 +107,8 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
               <div
                 className="border rounded-lg p-6 transition-all duration-300 hover:shadow-xl"
                 style={{
-                  backgroundColor: 'var(--color-surface)',
-                  borderColor: isVisible ? 'var(--color-brand-orange)' : 'var(--color-border)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  borderColor: 'var(--color-border)',
                   transform: 'translateY(0)',
                 }}
                 onMouseEnter={(e) => {
@@ -117,6 +117,7 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
                 }}
               >
                 {/* Header */}
@@ -152,7 +153,7 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
 
                 {/* Company */}
                 <p
-                  className="font-medium mb-4"
+                  className="font-medium mb-3"
                   style={{
                     color: 'var(--color-brand-orange)',
                     opacity: isVisible ? 1 : 0,
@@ -163,7 +164,20 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                   {exp.company}
                 </p>
 
+                {/* Headline achievement, always visible so collapsed roles still say something */}
+                <p
+                  className="mb-4 leading-relaxed-custom"
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    opacity: isVisible ? 1 : 0,
+                    transition: `opacity 0.5s ease ${index * 0.1 + 0.35}s`,
+                  }}
+                >
+                  {achievements[0]}
+                </p>
+
                 {/* Expand/Collapse Toggle */}
+                {achievements.length > 1 && (
                 <button
                   type="button"
                   onClick={() => toggleItem(index)}
@@ -184,8 +198,9 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
-                  {isExpanded ? 'Hide details' : 'Show details'}
+                  {isExpanded ? 'Show less' : `Show ${achievements.length - 1} more`}
                 </button>
+                )}
 
                 {/* Achievements with Staggered Animation */}
                 <div
@@ -196,7 +211,7 @@ export default function EnhancedTimeline({ experiences }: TimelineProps) {
                 >
                   <div className="overflow-hidden">
                 <ul className="space-y-2">
-                  {achievements.map((achievement, achIndex) => (
+                  {achievements.slice(1).map((achievement, achIndex) => (
                     <li
                       key={achIndex}
                       className="flex items-start gap-2"

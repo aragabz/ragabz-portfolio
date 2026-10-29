@@ -1,28 +1,10 @@
 ---
 // Skills Section Component
-const skills = [
-  'Java',
-  'Kotlin',
-  'TypeScript',
-  'Swift',
-  'React Native',
-  'Android',
-  'iOS',
-  'React',
-  'Next.js',
-  'Spring Boot',
-  'Node.js',
-  'PostgreSQL',
-  'CockroachDB',
-  'MongoDB',
-  'Redis',
-  'Docker',
-  'Kafka',
-  'Git',
-  'CI/CD',
-  'Clean Architecture',
-  'MVVM',
-  'API Design',
+const skillGroups = [
+  { title: 'Mobile', skills: ['Kotlin', 'Swift', 'Android', 'iOS', 'React Native'] },
+  { title: 'Backend & Data', skills: ['Java', 'Spring Boot', 'Node.js', 'Kafka', 'PostgreSQL', 'CockroachDB', 'MongoDB', 'Redis'] },
+  { title: 'Web', skills: ['TypeScript', 'React', 'Next.js'] },
+  { title: 'Architecture & Delivery', skills: ['Clean Architecture', 'MVVM', 'API Design', 'Docker', 'CI/CD', 'Git'] },
 ];
 ---
 
@@ -30,14 +12,23 @@ const skills = [
   <div class="max-w-container mx-auto">
     <h2 class="text-4xl md:text-5xl font-bold mb-16 text-center fade-in">Skills & Expertise</h2>
     
-    <div class="flex flex-wrap justify-center gap-3 max-w-3xl mx-auto fade-in fade-in-delay-1">
-      {skills.map(skill => (
-        <span
-          class="px-4 py-2 rounded-full text-sm transition-colors duration-300 cursor-default hover-bg-brand-black hover:text-white"
-          style="background-color: var(--color-brand-gray-light); color: var(--color-brand-gray-dark);"
-        >
-          {skill}
-        </span>
+    <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto fade-in fade-in-delay-1">
+      {skillGroups.map(group => (
+        <div class="rounded-xl border p-6" style="background-color: var(--color-bg-secondary); border-color: var(--color-border);">
+          <h3 class="text-sm font-semibold uppercase tracking-wider mb-4" style="color: var(--color-accent);">
+            {group.title}
+          </h3>
+          <ul class="flex flex-wrap gap-2 list-none m-0 p-0">
+            {group.skills.map(skill => (
+              <li
+                class="px-3 py-1.5 rounded-full text-sm"
+                style="background-color: var(--color-bg); color: var(--color-text-secondary); border: 1px solid var(--color-border);"
+              >
+                {skill}
+              </li>
+            ))}
+          </ul>
+        </div>
       ))}
     </div>
   </div>

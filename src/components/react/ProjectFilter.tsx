@@ -27,7 +27,9 @@ export default function ProjectFilter({ projects }: Props) {
   const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
   const withBase = (path: string) => (path.startsWith('/') ? `${base}${path.slice(1)}` : path);
   
-  const categories = ['All', 'Frontend', 'Backend', 'Full-Stack', 'Open Source'];
+  // Only offer filters that match at least one project; a single category needs no filter bar.
+  const usedCategories = [...new Set(projects.map(p => p.data.category))];
+  const categories = ['All', ...usedCategories];
   
   const filteredProjects = activeFilter === 'All'
     ? projects
@@ -36,6 +38,7 @@ export default function ProjectFilter({ projects }: Props) {
   return (
     <div>
       {/* Filter Buttons */}
+      {usedCategories.length > 1 && (
       <div className="flex flex-wrap gap-3 justify-center mb-12">
         {categories.map(category => (
           <button
@@ -61,9 +64,18 @@ export default function ProjectFilter({ projects }: Props) {
           </button>
         ))}
       </div>
+      )}
 
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* Projects Grid: column count follows the number of projects so the row never has gaps */}
+      <div
+        className={`grid grid-cols-1 gap-8 mx-auto ${
+          filteredProjects.length >= 3
+            ? 'md:grid-cols-2 lg:grid-cols-3'
+            : filteredProjects.length === 2
+              ? 'md:grid-cols-2 max-w-4xl'
+              : 'max-w-md'
+        }`}
+      >
         {filteredProjects.map(project => (
           <div
             key={project.id}

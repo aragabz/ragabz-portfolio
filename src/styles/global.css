@@ -8,7 +8,7 @@
   --letter-spacing-tight-2: -0.02em;
   
   /* Spacing */
-  --spacing-section: 120px;
+  --spacing-section: clamp(4rem, 8vw, 6rem);
   
   /* Max Widths */
   --max-width-container: 1100px;
@@ -198,6 +198,15 @@ a {
   border-color: var(--color-text) !important;
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* About portrait: the photo has a white studio background, so frame it as a
+   circle with an accent ring rather than a white box on the dark theme. */
+.portrait {
+  box-shadow:
+    0 0 0 6px var(--color-bg),
+    0 0 0 8px var(--color-accent),
+    0 24px 48px -12px rgb(0 0 0 / 0.35);
 }
 
 /* Accessibility */

@@ -12,8 +12,11 @@ const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL :
     
     <div class="grid md:grid-cols-2 gap-12 items-center">
       <!-- Photo -->
-      <div class="fade-in" style="width: 90%; margin-inline: auto;">
-        <div class="aspect-square rounded-lg overflow-hidden group hover:shadow-xl" style="background-color: var(--color-brand-gray-light); transition: box-shadow 0.6s cubic-bezier(0.22, 1, 0.36, 1);">
+      <div class="fade-in w-full max-w-[22rem] mx-auto">
+        <div
+          class="portrait aspect-square rounded-full overflow-hidden group"
+          style="background-color: #ffffff;"
+        >
           <Image
             src={profilePhoto}
             alt="Ahmed Ragab"
@@ -21,7 +24,7 @@ const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL :
             sizes="(min-width: 768px) 480px, 90vw"
             format="webp"
             quality={80}
-            class="w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+            class="w-full h-full object-cover object-[center_15%] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
             loading="lazy"
           />
         </div>
