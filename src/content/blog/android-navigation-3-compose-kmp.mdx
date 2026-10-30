@@ -186,8 +186,7 @@ NavDisplay(
     backStack = backStack,
     onBack = { backStack.removeLastOrNull() },
     entryDecorators = listOf(
-        rememberSceneSetupNavEntryDecorator(),
-        rememberSavedStateNavEntryDecorator(),
+        rememberSaveableStateHolderNavEntryDecorator(),
         rememberViewModelStoreNavEntryDecorator(),
     ),
     entryProvider = entryProvider {
@@ -201,10 +200,10 @@ NavDisplay(
 )
 ```
 
-Inside an `entry` block, the composition is wrapped in an entry-scoped `ViewModelStoreOwner`, so plain `viewModel()` resolution lands on the right store automatically. `rememberSavedStateNavEntryDecorator()` additionally gives each entry its own saved-instance state.
+Inside an `entry` block, the composition is wrapped in an entry-scoped `ViewModelStoreOwner`, so plain `viewModel()` resolution lands on the right store automatically. `rememberSaveableStateHolderNavEntryDecorator()` additionally gives each entry its own saved-instance state (`rememberSaveable` scoped to the entry).
 
 <Callout variant="tip">
-Keep the three decorators in the order shown — scene setup first, then saved state, then ViewModel store. Each decorator wraps the previous one, and later ones rely on owners installed by earlier ones.
+Keep the decorators in the order shown — saveable state first, then the ViewModel store. Each decorator wraps the previous one, and later ones rely on owners installed by earlier ones. (Earlier alphas also required a `rememberSceneSetupNavEntryDecorator()`; it was removed before 1.0 and that behavior is now built in.)
 </Callout>
 
 ### Adaptive Layouts: Two Screens at Once
@@ -217,7 +216,7 @@ dependencies {
 }
 ```
 
-You mark entries with pane metadata and hand the strategy to `NavDisplay`; the same single back stack then renders one pane or two depending on window size. This is the use case that motivated the whole redesign — with Navigation 2 it required parallel navigation graphs and fragile synchronization. See the [adaptive layouts guide](https://developer.android.com/guide/navigation/navigation-3/adaptive-layouts) and the recipes repository linked at the end for complete examples.
+You mark entries with pane metadata and hand the strategy to `NavDisplay`; the same single back stack then renders one pane or two depending on window size. This is the use case that motivated the whole redesign — with Navigation 2 it required parallel navigation graphs and fragile synchronization. See the [Scenes and custom layouts guide](https://developer.android.com/guide/navigation/navigation-3/custom-layouts) and the recipes repository linked at the end for complete examples.
 
 ## Part 2 — The Same Navigation in a KMP App
 

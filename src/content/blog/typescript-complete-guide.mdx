@@ -3,7 +3,7 @@ title: "The Complete TypeScript Guide: From Fundamentals to Production"
 date: 2026-08-26
 excerpt: "The full TypeScript spectrum in one guide: types, interfaces, inference, generics, conditional types, mapped types, React/React Native patterns, strict mode, utility types, architecture, config, build tooling, migration, and CI/CD."
 tags: ["TypeScript", "JavaScript", "Type System", "React", "Best Practices"]
-readingTime: 50
+readingTime: 20
 draft: false
 ---
 
@@ -36,7 +36,7 @@ TypeScript isn't just "JavaScript with types" — it's a **type system** that ru
 JavaScript is dynamically typed — variables can hold anything, and the interpreter figures it out at runtime. That flexibility speeds up prototyping but causes bugs that only appear in production:
 
 ```js
-// JavaScript — crashes at runtime
+// JavaScript — no error, just a silent bug
 const user = { name: "Ahmed", age: 30 };
 console.log(user.nmae); // undefined — typo goes unnoticed
 ```
@@ -75,7 +75,7 @@ let userInfo: [string, number, boolean] = ["Ahmed", 30, true];
 // type alias
 type User = { id: string; name: string; email: string; };
 
-// interface
+// interface (an alternative — you can't declare both with the same name)
 interface User { id: string; name: string; email: string; }
 ```
 
@@ -87,7 +87,7 @@ interface User { id: string; name: string; email: string; }
 | Primitive aliases | ❌ No | ✅ Yes |
 | Tuple types | ❌ No | ✅ Yes |
 
-<Callout variant="info">
+<Callout variant="note">
 **Rule of thumb**: Use `interface` for object types that might be extended. Use `type` for everything else (unions, primitives, tuples, complex mapped types).
 </Callout>
 
@@ -114,10 +114,10 @@ When you *do* need annotations: function parameters, recursive functions, comple
 function greet(name: string, age: number): string { return `${name} is ${age}`; }
 
 // Optional parameters (must come last)
-function greet(name: string, age?: number): string { return age ? `${name} is ${age}` : `Hello ${name}`; }
+function greetOptional(name: string, age?: number): string { return age ? `${name} is ${age}` : `Hello ${name}`; }
 
 // Default parameters
-function greet(name: string, greeting = "Hello"): string { return `${greeting}, ${name}`; }
+function greetWithDefault(name: string, greeting = "Hello"): string { return `${greeting}, ${name}`; }
 
 // Rest parameters
 function sum(...numbers: number[]): number { return numbers.reduce((a, b) => a + b, 0); }
@@ -191,12 +191,12 @@ async function fetchUser(id: string): Promise<ApiResponse<User>> {
 
 ```ts
 // Without generics — lose type info
-function firstElement(arr: any[]): any { return arr[0]; }
+function firstElementAny(arr: any[]): any { return arr[0]; }
 
 // With generics — preserve type info
 function firstElement<T>(arr: T[]): T | undefined { return arr[0]; }
-const n = firstElement([1, 2, 3]);     // n is number ✅
-const s = firstElement(["a", "b"]);    // s is string ✅
+const n = firstElement([1, 2, 3]);     // n is number | undefined ✅
+const s = firstElement(["a", "b"]);    // s is string | undefined ✅
 ```
 
 **Read `<T>` as "for some type T provided by the caller."**
@@ -245,12 +245,13 @@ function createStateManager<T>(initial: T) {
 type IsString<T> = T extends string ? true : false;
 type A = IsString<string>;  // true
 type B = IsString<number>;  // false
-type C = IsString<string | number>; // true | false (distributed!)
+type C = IsString<string | number>; // boolean, i.e. true | false (distributed!)
 ```
 
 ### Infer — extract types from patterns
 
 ```ts
+// Simplified versions of the built-in utility types
 type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 type ElementType<T> = T extends (infer U)[] ? U : never;
 type Awaited<T> = T extends Promise<infer U> ? U : T;
@@ -336,7 +337,7 @@ function Button({ label, onPress, variant = "primary", disabled = false }: Butto
 ```tsx
 interface ListProps<T> {
   data: T[];
-  renderItem: (item: T, index: number) => React.ReactNode;
+  renderItem: (item: T, index: number) => React.ReactElement | null;
   keyExtractor: (item: T) => string;
 }
 
@@ -404,11 +405,13 @@ function useAsync<T>(asyncFn: () => Promise<T>): AsyncState<T> {
 
 // Usage — exhaustive switch on status
 function UserProfile({ userId }: { userId: string }) {
-  const state = useAsync(() => fetchUser(userId));
+  // Memoize the fetcher: a new function every render would re-run the effect forever
+  const loadUser = useCallback(() => fetchUser(userId), [userId]);
+  const state = useAsync(loadUser);
   switch (state.status) {
     case "idle": return null;
     case "loading": return <Spinner />;
-    case "success": return <UserCard user={state.data} />;
+    case "success": return <UserCard user={state.data.data} />;
     case "error": return <ErrorMessage error={state.error} />;
   }
 }
@@ -535,7 +538,7 @@ Enable `"strict": true` in `tsconfig.json`:
 
 | Flag | Catches |
 |------|---------|
-| `noImplicitAny` | Variables without explicit types |
+| `noImplicitAny` | Values implicitly typed as `any` (e.g. unannotated parameters) |
 | `strictNullChecks` | `null`/`undefined` not handled |
 | `strictFunctionTypes` | Contravariant parameter checking |
 | `strictPropertyInitialization` | Uninitialized class properties |
@@ -755,7 +758,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npx tsc --noEmit
 ```
@@ -768,9 +771,8 @@ jobs:
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
     }
   },
   "types": "./dist/index.d.ts"

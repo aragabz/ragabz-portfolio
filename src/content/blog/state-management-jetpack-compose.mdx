@@ -1,9 +1,9 @@
 ---
 title: "State Management in Jetpack Compose: Derived State, MVI, and the Case Against Global Redux"
 date: 2026-08-23
-excerpt: "When to use `derivedStateOf`, `remember { mutableStateOf() }`, and MVI patterns versus when Zustand or Redux actually makes sense in a Compose app."
+excerpt: "When to use `derivedStateOf`, `remember { mutableStateOf() }`, and MVI patterns versus when a global Redux-style store actually makes sense in a Compose app."
 tags: ["Android", "Jetpack Compose", "State Management", "Architecture"]
-readingTime: 6
+readingTime: 3
 draft: false
 ---
 
@@ -13,34 +13,35 @@ Compose has its own state model, and knowing which tool fits which problem saves
 
 <Callout variant="tip" title="What you'll learn">
 - When `remember { mutableStateOf() }` is enough vs. when you need `derivedStateOf`
-- How to structure a simple MVI loop with `StateFlow` and `collectAsCompose`
-- Why reaching for global Redux/Zustand often adds unnecessary ceremony
+- How to structure a simple MVI loop with `StateFlow` and `collectAsStateWithLifecycle`
+- Why reaching for a global Redux-style store often adds unnecessary ceremony
 </Callout>
 
 ## Compose‑first state
 
 ```kotlin
 @Composable
-fun Greeting(name: String) {
-    // UI‑only state: recreated instantly on composition
-    val count = remember { mutableStateOf(0) }
-    val upperCase by remember { derivedStateOf { count.value.uppercase() } }
+fun Counter() {
+    // UI‑only state: survives recomposition (use rememberSaveable to survive config changes)
+    var count by remember { mutableStateOf(0) }
+    // Derived state: readers only recompose when the *result* flips
+    val isOverLimit by remember { derivedStateOf { count > 10 } }
 
-    Button(onClick = { count.value++ }) {
-        Text(text = upperCase)
+    Button(onClick = { count++ }, enabled = !isOverLimit) {
+        Text(text = if (isOverLimit) "Limit reached" else "Add")
     }
 }
 ```
 
-`remember { mutableStateOf() }` triggers a recomposition when the reference changes. `derivedStateOf` memoizes the calculation and only recomputes when its inputs actually change — essential for expensive UI calculations.
+`remember { mutableStateOf() }` triggers a recomposition of its readers whenever the value changes (compared with structural equality by default). `derivedStateOf` only notifies readers when its computed result changes — use it when the input changes far more often than the output (scroll position → “show the FAB?”). For an expensive calculation that just depends on parameters, `remember(key) { … }` is the right tool.
 
 ## When global stores make sense
 
 | Situation | Recommended tool |
 |-----------|-----------------|
 | Shared auth token across many distant screens | `AuthRepository` + `ViewModel` + `Hilt` |
-| Complex form validation with cross‑field rules | `Zustand` or `Redux` + `createSelectors` |
-| Time‑travel debugging or persistence quotients | `Redux` tooling (`@Reducer`, `payloads`) |
+| Complex form validation with cross‑field rules | A screen‑level `ViewModel` exposing one `StateFlow<FormState>` |
+| Time‑travel debugging or action logging | A Redux‑style store (e.g. ReduxKotlin) with reducers and middleware |
 
 <Callout variant="warning">
 Avoid putting UI‑only data (e.g. animation progress, transient selections) into a global store — it forces every subscriber to re‑render on *any* store change, destroying Compose’s selective-subscription benefit.
@@ -50,42 +51,52 @@ Avoid putting UI‑only data (e.g. animation progress, transient selections) int
 
 ```kotlin
 // UI
-val (state, dispatch) = useViewModel<MyViewModel>()
-Text(state.title)
-Button(onClick = { dispatch(LoadData) }) { Text("Load") }
+@Composable
+fun MyScreen(viewModel: MyViewModel) {
+    val title by viewModel.title.collectAsStateWithLifecycle()
+    Column {
+        Text(title)
+        Button(onClick = { viewModel.onIntent(MyIntent.LoadData) }) { Text("Load") }
+    }
+}
 
 // Domain
-class MyViewModel : ViewModel() {
+sealed interface MyIntent {
+    data object LoadData : MyIntent
+}
+
+class MyViewModel(private val repository: Repository) : ViewModel() {
     private val _title = MutableStateFlow("Hello")
     val title: StateFlow<String> = _title
         .map { "Updated: $it" }
         .stateIn(
-            scope = CoroutineScope(Dispatchers.Main),
+            scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = "Hello",
         )
 
-    fun loadData() {
-        viewModelScope.launch {
-            val data = repository.fetch()
-            _title.postValue(data)
+    fun onIntent(intent: MyIntent) {
+        when (intent) {
+            MyIntent.LoadData -> viewModelScope.launch {
+                _title.value = repository.fetch()
+            }
         }
     }
 }
 ```
 
-The `stateIn` operator gives you a `StateFlow` that survives configuration changes and scopes its lifecycle to the ViewModel — no manual `saveEnabled` flags needed.
+Because `stateIn` runs in `viewModelScope`, the resulting `StateFlow` lives as long as the ViewModel — which survives configuration changes — and `WhileSubscribed(5000)` stops the upstream shortly after the UI stops collecting.
 
-## When to reach for Zustand/Redux
+## When to reach for a global Redux‑style store
 
-- **Form state** that must survive process death without a `ViewModel` (e.g. a quick survey with no DI).
+- **Cross‑screen workflows** (e.g. a multi‑step checkout) where several screens read and write the same state.
 - **Time‑travel debugging** where you need exact action replay.
-- **State that truly is global** (e.g. theme preferences stored in `SharedPreferences`) and accessed from many unrelated screens.
+- **State that truly is global** (e.g. theme preferences stored in DataStore) and accessed from many unrelated screens.
 
-**Bottom line:** Start with Compose’s `StateFlow`/`mutableStateOf`/`.flow {}` abstractions. Only pull in a global store when the pattern above doesn’t fit your problem shape.
+**Bottom line:** Start with Compose’s `mutableStateOf` and coroutines’ `StateFlow`/`flow {}`. Only pull in a global store when the pattern above doesn’t fit your problem shape.
 
 ## Resources
 
-- [Compose state beyond the basics — Android Devs](https://developer.android.com/ui/compose/state)
-- [MVI architecture — GitHub sample](https://github.com/android/views-architecture-samples)
-- [Zustand docs](https://zustand.docs.pmnd.rs/)
+- [State and Jetpack Compose — Android Devs](https://developer.android.com/develop/ui/compose/state)
+- [State holders and UI state — Android Devs](https://developer.android.com/topic/architecture/ui-layer/stateholders)
+- [Architecture samples — GitHub](https://github.com/android/architecture-samples)

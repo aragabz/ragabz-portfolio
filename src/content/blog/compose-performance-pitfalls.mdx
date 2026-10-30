@@ -1,9 +1,9 @@
 ---
-title: "Compose Performance: avoid Recomposition Pitfalls with `remember`, `saving`, and `Snapshot`"
+title: "Compose Performance: Avoid Recomposition Pitfalls with `remember`, Snapshot State, and Effects"
 date: 2026-08-23
-excerpt: "When `remember` stales, `SnapshotStateList` vs. `StateList`, and using `LaunchedEffect` safely."
+excerpt: "When `remember` goes stale, `SnapshotStateList` vs. a plain list in `mutableStateOf`, and using `LaunchedEffect` safely."
 tags: ["Android", "Jetpack Compose", "Performance"]
-readingTime: 5
+readingTime: 3
 draft: false
 ---
 
@@ -12,8 +12,8 @@ import Callout from '../../components/mdx/Callout.astro';
 Avoidable recomposition is the most common performance bottleneck in Compose. Here’s how to spot and fix it.
 
 <Callout variant="tip" title="What you'll learn">
-- How to compose `remember` pitfalls and stale closures
-- When to use `SnapshotStateList` instead of `MutableStateList`
+- How to spot `remember` pitfalls and stale values
+- When to use `SnapshotStateList` instead of a plain `MutableList` inside `mutableStateOf`
 - Safe patterns for `LaunchedEffect` and `DisposableEffect`
 </Callout>
 
@@ -21,49 +21,51 @@ Avoidable recomposition is the most common performance bottleneck in Compose. He
 
 ```kotlin
 @Composable
-fun BadExample(items: List<String>) {
-    // ❌ Remember captures the *initial* list reference;
-    // adding/removing items does NOT trigger recomposition of the list itself.
-    val remembered by remember { items }
+fun ItemSummary(items: List<String>) {
+    // ❌ No keys: computed once on first composition, then stale
+    // when the caller passes a different list.
+    val staleCount = remember { items.size }
 
-    // ✅ Remember *the derived state* you actually need
-    val itemCount = remember { items.size }
+    // ✅ Key `remember` on its inputs so it recomputes when they change
+    val itemCount = remember(items) { items.size }
 
-    // ✅ Or snapshot the whole list once
-    val snapshot by rememberSnapshotStateList(items)
+    // ✅ For a list you mutate locally, use an observable snapshot list
+    val selected = remember { mutableStateListOf<String>() }
 }
 ```
 
-`rememberSnapshotStateList` creates a `SnapshotStateList` that tracks changes via `SnapshotProtocol` — cheaper than recomposing the whole UI when the list grows/shrinks.
+`mutableStateListOf` creates a `SnapshotStateList`: reads are tracked by the snapshot system, so adding or removing items recomposes only the composables that actually read the list.
 
-### `SnapshotStateList` vs. `MutableStateList`
+### `SnapshotStateList` vs. a plain list in `mutableStateOf`
 
-| Operation | `MutableStateList` (standard) | `SnapshotStateList` |
+| Operation | `mutableStateOf(mutableListOf())` | `SnapshotStateList` (`mutableStateListOf()`) |
 |-----------|------------------------------|---------------------|
-| `add/remove` | Recomposes all subscribers immediately | Batches changes; reads see a consistent snapshot |
-| `size`, `first`, etc. | Same API, but may recompose more often | Optimized for read‑only scenarios |
-| Use case | You need UI to update on every mutation | You only need to read the current state (e.g. recycle view, count) |
+| `add/remove` | Mutates in place — Compose is **not** notified, so the UI goes stale | Recorded as a state write; readers recompose |
+| Replacing the list | `state.value = newList` recomposes readers | Not needed — mutate in place |
+| Use case | Immutable lists you replace wholesale (`state.value = state.value + item`) | Lists you mutate in place in the UI layer |
 
 ```kotlin
-// ✅ Good: read‑only list of selected items
-val selectedIds by rememberSnapshotStateList mutableListOf()
+// ✅ Good: observable list — add/remove notifies readers
+val selectedIds = remember { mutableStateListOf<String>() }
 
-// ❌ Bad: mutating a shared list that many composables subscribe to
+// ❌ Bad: in-place mutation of a plain list is invisible to Compose
 val allItems by remember { mutableStateOf(mutableListOf<String>()) }
+allItems.add("x") // no recomposition
 ```
 
 ### `LaunchedEffect` & `DisposableEffect` best practices
 
 ```kotlin
 @Composable
-fun SafeEffectExample(trigger: String?) {
-    // ✅ Safe: effect only runs when trigger changes; cleanup runs on exit
+fun SafeEffectExample(trigger: String) {
+    // ✅ Safe: restarts when trigger changes; the coroutine is cancelled
+    // when the key changes or the composable leaves composition
     LaunchedEffect(trigger) {
         // one‑off async work
         webSocket.send(trigger)
     }
 
-    // ✅ Safe: runs once on composition, cancels on composition cancel
+    // ✅ Safe: runs once on entering composition; onDispose cancels the job on exit
     DisposableEffect(Unit) {
         val job = CoroutineScope(Dispatchers.IO).launch { /* … */ }
         onDispose { job.cancel() }
@@ -71,8 +73,8 @@ fun SafeEffectExample(trigger: String?) {
 }
 ```
 
-- **Never** capture mutable outer‑scope state inside `LaunchedEffect` without `remember`‑wrapping it; the effect may outlive the scope you expect.
-- **Always** pair `DisposableEffect` with `onDispose` cleanup to avoid leaked coroutines, especially when the composable is removed from the hierarchy unexpectedly.
+- **Use `rememberUpdatedState`** for values (e.g. callbacks) a long‑running effect should always read at their latest, without restarting the effect; otherwise the effect keeps the value it captured when it launched.
+- **Put all cleanup in `onDispose`** — `DisposableEffect` requires it — so listeners and coroutines don’t leak when the composable is removed from the hierarchy unexpectedly.
 
 <Callout variant="note">
 If you find yourself writing `LaunchedEffect(key1, key2, key3)` with more than two keys, consider pulling the logic into a ViewModel or a dedicated side‑effect composable — deep key lists are a code smell for “doing too much in UI composition.”
@@ -81,19 +83,21 @@ If you find yourself writing `LaunchedEffect(key1, key2, key3)` with more than t
 ### Profiling recompositions
 
 ```bash
-# Enable compose logging in your test/dev build
-export ANDROID_COMPILE_COMpose_LOGGING=true
+# 1. In Android Studio, open Layout Inspector on a running debug build and
+#    enable "Show Recomposition Counts" to see recompositions and skips per composable.
 
-# In Logcat, search for "Compose"
-# Look for lines like:
-#  Compose: Recomposed XXX times in YYY ms
-#  Compose: Composition too large: ... consider moving state out
+# 2. Generate Compose compiler stability reports. In build.gradle.kts:
+#      composeCompiler { reportsDestination = layout.buildDirectory.dir("compose_compiler") }
+./gradlew assembleRelease
+
+# Then inspect build/compose_compiler/*-composables.txt for functions
+# that are "restartable" but not "skippable", and *-classes.txt for unstable classes.
 ```
 
-A good rule of thumb: keep individual composables under 15‑20 recompositions per second. If you exceed that, refactor state ownership.
+A good rule of thumb: if a composable’s recomposition count keeps climbing while nothing it displays has changed, refactor state ownership or defer the state read (`derivedStateOf`, lambda‑based modifiers).
 
 ## Resources
 
-- [Compose performance tips — Android Devs](https://developer.android.com/ui/compose/performance)
-- [SnapshotStateList API reference](https://developer.android.com/reference/kotlinx/compose/SnapshotStateList)
-- [LaunchedEffect & DisposableEffect — codelab](https://developer.android.com/codelabs/compose-launched-effect)
+- [Compose performance — Android Devs](https://developer.android.com/develop/ui/compose/performance)
+- [SnapshotStateList API reference](https://developer.android.com/reference/kotlin/androidx/compose/runtime/snapshots/SnapshotStateList)
+- [Side‑effects in Compose — Android Devs](https://developer.android.com/develop/ui/compose/side-effects)

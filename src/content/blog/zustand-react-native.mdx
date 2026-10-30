@@ -3,7 +3,7 @@ title: "State Management in React Native with Zustand"
 date: 2026-08-21
 excerpt: "Learn why Zustand is a great fit for React Native, how to set up your first store, and patterns for async state, persistence, and TypeScript."
 tags: ["React Native", "Zustand", "JavaScript", "State Management"]
-readingTime: 13
+readingTime: 9
 ---
 
 import Callout from '../../components/mdx/Callout.astro';
@@ -27,7 +27,7 @@ Zustand is a tiny (under 1 kB) state management library for React. Its core idea
 npm install zustand
 ```
 
-There is one important difference from other libraries: with Redux you *dispatch* actions and write reducers; with Zustand you just call functions that mutate state directly. No providers, no reducers, no actions objects.
+There is one important difference from other libraries: with Redux you *dispatch* actions and write reducers; with Zustand you just call functions that update state via `set`. No providers, no reducers, no actions objects.
 
 ## Why Zustand in React Native?
 
@@ -35,7 +35,7 @@ React Native presents some specific challenges that Zustand handles well:
 
 - **No Provider nesting** — RN apps are already deep in navigation and theme providers. Zustand works without wrapping your app in anything.
 - **Selective subscriptions** — you subscribe only to the slices of state you use, so a component re-renders only when *its* data changes, not on every store update.
-- **Runs everywhere** — it's plain JS, so it works in the JS thread, in worklets, and in any environment where React runs.
+- **Runs everywhere** — it's plain JS, so it works on the JS thread, outside components, and in any environment where React runs.
 - **Persistence built in** — a `persist` middleware pairs perfectly with `AsyncStorage`, React Native's standard storage.
 
 <Callout variant="warning">
@@ -168,12 +168,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 Components don't care whether the action is sync or async — they just call it:
 
 ```tsx
+import { useShallow } from 'zustand/react/shallow';
+
 const signIn = useAuthStore((s) => s.signIn);
-const { user, loading, error } = useAuthStore((s) => ({
-  user: s.user,
-  loading: s.loading,
-  error: s.error,
-}));
+const { user, loading, error } = useAuthStore(
+  useShallow((s) => ({
+    user: s.user,
+    loading: s.loading,
+    error: s.error,
+  })),
+);
 
 useEffect(() => {
   signIn('me@example.com', 'secret');
@@ -181,8 +185,7 @@ useEffect(() => {
 ```
 
 <Callout variant="warning">
-Be careful with object selectors like the one above: `useAuthStore((s) => ({ user: s.user, ... }))` returns a *new object every render*, which triggers re-renders on any state change. For multiple slices, use `useShallow`:
-`useAuthStore(useShallow((s) => ({ user: s.user, loading: s.loading })))`.
+Be careful with object selectors: without `useShallow`, `useAuthStore((s) => ({ user: s.user, ... }))` returns a *new object on every call*. In Zustand v5 that causes an infinite render loop ("Maximum update depth exceeded"); in v4 it re-rendered on any state change. That's why the example above wraps the selector in `useShallow`, which compares the fields shallowly.
 </Callout>
 
 ## Persisting State
@@ -218,7 +221,7 @@ The `name` is the key under which the whole store is saved. On startup the store
 
 ### Partial persistence
 
-Sometimes you don't want to persist everything — for example, don't persist a token for a user that signed out:
+Sometimes you don't want to persist everything — for example, there's no point saving transient `loading` and `error` flags:
 
 ```ts
 {
@@ -249,7 +252,7 @@ This is the single most common TypeScript gotcha with Zustand. Without the `()` 
 ## Common Pitfalls in React Native
 
 1. **Selecting too much** — subscribing to the whole store defeats Zustand's selective-subscription performance benefit. Pick the smallest slice.
-2. **Calling actions during render** — updating state during a render (other than in an event handler or `useEffect`) can cause stale-closure bugs. Keep mutations in handlers.
+2. **Calling actions during render** — updating state during a render (rather than in an event handler or `useEffect`) can cause render loops and React's "Cannot update a component while rendering a different component" warning. Keep mutations in handlers.
 3. **Forgetting AsyncStorage setup** — on a fresh RN project, `@react-native-async-storage/async-storage` must be installed and, on iOS, `pod install` must be run.
 4. **Storing non-serializable values** — `persist` stores JSON. Dates, functions, and `Map`/`Set` won't survive a restart unless you provide a custom serializer.
 5. **Creating stores inside components** — create stores at module scope, never inside a component body, or you'll recreate state on every render.

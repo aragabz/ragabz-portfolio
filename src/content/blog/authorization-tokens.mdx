@@ -32,19 +32,19 @@ That one distinction drives every trade-off in this post: revocation, performanc
 
 ## Opaque (Reference) Tokens
 
-Opaque tokens are random strings — often 64 to 128 characters of base64-encoded entropy. A real one looks like this:
+Opaque tokens are random strings — typically 32 or more bytes of entropy, base64url- or hex-encoded. A real one looks like this:
 
 ```
-eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.9f4c3f2b1a9d8e7f6c5b4a3d2e1f0c9b8a7d6e5f4b3a2c1d0e9f8a7b6c5d4e3f2a1
+Xq7mR2vL9pK4tB8nW1cZ6hJ3yF0sD5gA-uE_oN2iV8w
 ```
 
-Wait — that starts with `eyJ`, which decodes to `{"typ":"JWT"...}`. Ignore that; a *true* opaque token is just random. It carries no structure, no claims, no metadata you can decode. That's the whole point.
+It carries no structure, no claims, no metadata you can decode. That's the whole point.
 
 ### How it works
 
 1. Client authenticates → server generates a random token, stores `(token, user, scopes, expires_at)` in Redis or a database, and returns the token.
 2. Client sends the token on each request.
-3. Server looks the token up in storage. If it exists and isn't expired, the request proceeds; the stored record tells the server who the user is and what they can do.
+3. Server looks the token up in storage (or, in OAuth setups, asks the authorization server via its introspection endpoint — RFC 7662). If it exists and isn't expired, the request proceeds; the stored record tells the server who the user is and what they can do.
 
 ### Strengths
 
@@ -95,12 +95,13 @@ A signed JWT is readable by anyone who has the token. "Signed" means *tamper-pro
 
 ## JWE (Encrypted Tokens)
 
-JWE (JSON Web Encryption) is the encrypted sibling of JWS. Where a JWT/JWS is signed but readable, a JWE is *encrypted* — the payload is unreadable without the decryption key. JWE tokens typically embed a nested JWS inside the encrypted payload, so you get both integrity and confidentiality:
+JWE (JSON Web Encryption) is the encrypted sibling of JWS. Where a JWT/JWS is signed but readable, a JWE is *encrypted* — the payload is unreadable without the decryption key. JWE tokens often embed a nested JWS inside the encrypted payload, so you get both integrity and confidentiality. In compact form a JWE has five dot-separated parts:
 
 ```
 eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.
-QzlmM2I... (encrypted content encryption key)
-qX3hYg... (ciphertext — an inner signed JWT)
+QzlmM2I... (encrypted content encryption key).
+48V1_ALb... (initialization vector).
+qX3hYg... (ciphertext — an inner signed JWT).
 1RfB1Z_... (auth tag)
 ```
 
@@ -137,7 +138,7 @@ Client ── refresh token ──▶ Auth Server ──▶ new access token
 The pair exists to solve a fundamental tension: you want access tokens short-lived (to limit leak damage) but issuing them shouldn't require a login every time. The refresh token is the long-lived credential that keeps the user signed in, and it can be revoked server-side if it's compromised.
 
 <Callout variant="tip">
-Short access token + revocable refresh token is the standard defense-in-depth combo: the token that crosses your API boundary every second barely outlives a single session, and the token that can't be revoked (a long-lived JWT) never gets issued. Even if your access tokens are opaque or JWT, this pattern holds.
+Short access token + revocable refresh token is the standard defense-in-depth combo: the token that crosses your API boundary on every request expires within minutes, and the token that can't be revoked (a long-lived JWT) never gets issued. Whether your access tokens are opaque or JWT, this pattern holds.
 </Callout>
 
 ## Opaque vs JWT: Direct Comparison
@@ -152,7 +153,7 @@ Short access token + revocable refresh token is the standard defense-in-depth co
 | Offline verification | Impossible | Trivial with the public key |
 | Infrastructure | Session store you must run | Key distribution, no store |
 | Leak impact | Kill the session immediately | Valid until `exp` unless denylisted |
-| Symmetric trust | Centralized (must trust one store) | Distributed (trust the signer) |
+| Trust model | Centralized (must trust one store) | Distributed (trust the signer) |
 
 There is no universally "best" token — the right answer depends on your architecture:
 
@@ -194,7 +195,7 @@ If you need *instant* revocation of the token actually hitting your APIs — thi
 - [ ] Access tokens short-lived; refresh tokens rotated on every use and revocable
 - [ ] Refresh tokens stored securely (server-side or HttpOnly + Secure cookies)
 - [ ] No session state in distributed verification paths unless it's a deliberate denylist
-- [ ] Token size budgeted: keep claims minimal, especially in `Authorization` headers and URLs
+- [ ] Token size budgeted: keep claims minimal, especially in `Authorization` headers and cookies (and never put tokens in URLs)
 - [ ] TLS everywhere; tokens in cookies are marked `HttpOnly` and `Secure`
 
 ## Conclusion

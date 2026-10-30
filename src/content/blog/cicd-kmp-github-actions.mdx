@@ -3,18 +3,18 @@ title: "CI/CD for Kotlin Multiplatform: GitHub Actions for Android, iOS, and Web
 date: 2026-08-23
 excerpt: "Build matrix, test matrices, signing configs, and publishing to Google Play, App Store, and npm from a single workflow."
 tags: ["CI/CD", "GitHub Actions", "Kotlin Multiplatform", "DevOps"]
-readingTime: 9
+readingTime: 3
 draft: false
 ---
 
 import Callout from '../../components/mdx/Callout.astro';
 
-One workflow to rule them all — from unit tests on iOS simulators to publishing APKs and npm packages.
+One workflow to rule them all — from unit tests on iOS simulators to publishing app bundles and npm packages.
 
 <Callout variant="tip" title="What you'll learn">
-- How to set up a `matrix` strategy for Android API levels, iOS versions, and web targets
+- How to set up a `matrix` strategy that runs each KMP target’s tests on the right runner
 - Signing your Android App Bundle and Apple IPA without storing keys in plain text
-- Publishing to Maven Central, Google Play, and npm from a single CI run
+- Publishing to Google Play, the App Store, and npm from a single workflow
 </Callout>
 
 ### High‑level workflow structure
@@ -30,10 +30,22 @@ on:
 
 jobs:
   test:
-    runs-on: macos-latest   # needed for iOS simulators
     strategy:
       matrix:
-        target: [android, ios, desktop, web]
+        include:
+          - target: android
+            os: ubuntu-latest
+            task: ":shared:testDebugUnitTest"
+          - target: ios
+            os: macos-latest   # needed for Kotlin/Native iOS targets and simulators
+            task: ":shared:iosSimulatorArm64Test"
+          - target: desktop
+            os: ubuntu-latest
+            task: ":shared:jvmTest"
+          - target: web
+            os: ubuntu-latest
+            task: ":shared:wasmJsTest"
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK
@@ -41,48 +53,91 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-      - name: Set up Kotlin
-        uses: Kotlin/kotlin-actions/setup@v1
-        with:
-          kotlin-version: '1.9.20'
-      - name: Cache Gradle modules
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle
+      # Kotlin itself comes from the Gradle build; this action caches Gradle state
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Run tests for ${{ matrix.target }}
-        run: ./gradlew :common:test
-        # Additional target‑specific test tasks can be added below
+        run: ./gradlew ${{ matrix.task }}
 
-  release:
+  release-android:
     needs: test
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
     steps:
       - uses: actions/checkout@v4
-      - name: Generate release notes
-        run: ./gradlew :common:generateReleaseNotes
-      - name: Publish Android AAB
-        if: matrix.target == 'android'
-        env:
-          GOOGLE_PLAY_JSON_KEY: ${{ secrets.GOOGLE_PLAY_JSON_KEY }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Decode upload keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > androidApp/upload.jks
+      - name: Build signed AAB
+        env:   # read by signingConfigs in androidApp/build.gradle.kts
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew :androidApp:bundleRelease
+      - name: Publish Android AAB to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_JSON_KEY }}
+          packageName: com.example.app
+          releaseFiles: androidApp/build/outputs/bundle/release/androidApp-release.aab
+          track: internal
+
+  release-ios:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-latest   # xcodebuild only runs on macOS
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4   # the Xcode build phase runs Gradle to build the shared framework
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      # Install the signing certificate and provisioning profile first
+      # (e.g. fastlane match or apple-actions/import-codesign-certs).
+      - name: Archive and export IPA
         run: |
-          ./gradlew :androidApp:bundleRelease
-          ./gradlew appstore-upload --release-file app/build/outputs/bundle/release/app-release.aab
-      - name: Publish iOS IPA
-        if: matrix.target == 'ios'
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Release \
+            -archivePath build/iosApp.xcarchive archive
+          xcodebuild -exportArchive -archivePath build/iosApp.xcarchive \
+            -exportOptionsPlist iosApp/ExportOptions.plist -exportPath build/ipa
+      - name: Publish iOS IPA to App Store Connect
         env:
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
-          xcodebuild -exportArchive -archivePath build/ios_app.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios_app.ipa
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$APPLE_API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_$APPLE_API_KEY_ID.p8
+          xcrun altool --upload-app -t ios -f build/ipa/iosApp.ipa \
+            --apiKey "$APPLE_API_KEY_ID" --apiIssuer "$APPLE_ISSUER_ID"
+
+  publish-npm:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build JS library package   # requires a js() target with binaries.library()
+        run: ./gradlew :shared:jsBrowserProductionLibraryDistribution
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
       - name: Publish to npm (web)
-        if: matrix.target == 'web'
-        run: |
-          npm run build
-          npm publish --access public
+        working-directory: shared/build/dist/js/productionLibrary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+```

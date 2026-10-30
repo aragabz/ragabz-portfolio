@@ -3,7 +3,7 @@ title: "Hibernate vs JPA: The Complete Guide — Differences, Implementation, an
 date: 2026-09-12
 excerpt: "A deep dive into Hibernate and JPA: what they are, how they differ from every perspective (API, architecture, performance, ecosystem), implementation patterns, and clear recommendations on what to use when."
 tags: ["Java", "Hibernate", "JPA", "Spring Boot", "Persistence", "Architecture"]
-readingTime: 25
+readingTime: 16
 draft: false
 ---
 
@@ -67,11 +67,11 @@ graph TB
 ```
 
 Hibernate provides:
-- Full JPA implementation (`Hibernate EntityManager` wraps `Session`)
+- Full JPA implementation (since Hibernate 5.2, `Session` extends `EntityManager`)
 - **Native API**: `Session`, `SessionFactory`, `Transaction` — more powerful than `EntityManager`
 - **HQL** (Hibernate Query Language) — superset of JPQL
-- **Criteria API** (both JPA and native Hibernate variants)
-- **Hibernate-specific features**: custom types, filters, `@NaturalId`, `@Formula`, `@Where`, `@BatchSize`, multi-tenancy, bytecode enhancement, second-level cache integrations, etc.
+- **Criteria API** (JPA Criteria plus Hibernate's `HibernateCriteriaBuilder` extensions; the legacy `org.hibernate.Criteria` API was removed in 6.0)
+- **Hibernate-specific features**: custom types, filters, `@NaturalId`, `@Formula`, `@SQLRestriction`, `@BatchSize`, multi-tenancy, bytecode enhancement, second-level cache integrations, etc.
 - **Tools**: `hbm2ddl` (schema generation), reverse engineering, Hibernate Tools for IDEs
 
 ---
@@ -85,14 +85,14 @@ Hibernate provides:
 | **Core interface** | `EntityManager` | `Session` |
 | **Factory** | `EntityManagerFactory` | `SessionFactory` |
 | **Query language** | JPQL | HQL (superset) |
-| **Criteria API** | `jakarta.persistence.criteria` | `org.hibernate.query.criteria` (legacy) + JPA Criteria |
-| **Type mapping** | Standard annotations only | `@Type`, `@TypeDef`, custom `UserType`, `CompositeUserType` |
+| **Criteria API** | `jakarta.persistence.criteria` | JPA Criteria + `HibernateCriteriaBuilder` extensions (`org.hibernate.query.criteria`) |
+| **Type mapping** | Standard annotations only | `@Type`, `@JdbcTypeCode`, custom `UserType`, `CompositeUserType` |
 | **Fetching** | `FetchType.LAZY/EAGER`, `EntityGraph` | `@BatchSize`, `@Fetch(FetchMode.SUBSELECT/JOIN)`, `@LazyToOne` |
 | **Caching** | `shared-cache-mode` in `persistence.xml` | Rich second-level cache SPI (Ehcache, Infinispan, Redis, Caffeine) |
 | **Schema gen** | Standard `jakarta.persistence.schema-generation` | `hibernate.hbm2ddl.auto`, `hbm2ddl.import_files` |
-| **Multi-tenancy** | Not standardized | `MultiTenancyStrategy` (DATABASE, SCHEMA, DISCRIMINATOR) |
+| **Multi-tenancy** | Not standardized | `MultiTenantConnectionProvider` + `CurrentTenantIdentifierResolver` (database/schema), `@TenantId` (discriminator) |
 
-**Key insight**: `EntityManager` is a thin wrapper around `Session`. You can always unwrap:
+**Key insight**: with Hibernate as the provider, the `EntityManager` *is* a `Session` (`Session` extends `EntityManager`). You can always unwrap:
 
 ```java
 Session session = entityManager.unwrap(Session.class);
@@ -105,9 +105,9 @@ Session session = entityManager.unwrap(Session.class);
 | **Proxy mechanism** | Not specified | Bytecode enhancement (build-time) or runtime proxies (ByteBuddy) |
 | **Dirty checking** | Not specified | Snapshot-based (default) or bytecode-enhanced (faster) |
 | **Connection handling** | `EntityManager` lifecycle | `Session` lifecycle + `ConnectionProvider` SPI |
-| **Batch processing** | `jakarta.persistence.batch` (hint) | `hibernate.jdbc.batch_size`, `hibernate.order_inserts/updates`, `@BatchSize` |
+| **Batch processing** | Not standardized | `hibernate.jdbc.batch_size`, `hibernate.order_inserts/updates`, `@BatchSize` |
 | **Statement inspection** | Not available | `StatementInspector` SPI |
-| **Custom SQL** | `@NamedNativeQuery` | `@SQLInsert`, `@SQLUpdate`, `@SQLDelete`, `@Loader`, `@LoaderNamedQuery` |
+| **Custom SQL** | `@NamedNativeQuery` | `@SQLInsert`, `@SQLUpdate`, `@SQLDelete`, `@SQLSelect`, `@HQLSelect` |
 | **Identity generation** | `GenerationType` enum | `SequenceStyleGenerator`, `IdentifierGenerator` SPI, custom generators |
 
 ### 3. Query Languages: JPQL vs HQL
@@ -121,50 +121,46 @@ SELECT u FROM User u JOIN FETCH u.roles WHERE u.active = true
 
 **HQL** (Hibernate-specific, more powerful):
 ```java
-// Same as JPQL but also supports:
+// Everything JPQL supports, plus extras such as:
 SELECT u FROM User u WHERE u.email = :email
 // 1. Components/embeddables in SELECT
 SELECT u.name FROM User u
 // 2. Polymorphic queries (implicit)
-FROM User  -- returns User + all subclasses
+FROM User  // SELECT clause optional; returns User + all subclasses
 // 3. Collection expressions
 SELECT u FROM User u WHERE size(u.roles) > 0
 // 4. Indexed collections
-SELECT u FROM User u JOIN u.roles r WITH r.name = 'ADMIN' INDEX r
+SELECT u FROM User u JOIN u.roles r WHERE index(r) = 0
 // 5. Entity joins without association
-SELECT u, p FROM User u, Profile p WHERE u.id = p.userId
-// 6. DML-style bulk operations
-UPDATE User u SET u.active = false WHERE u.lastLogin < :date
-DELETE FROM User u WHERE u.active = false
+SELECT u, p FROM User u JOIN Profile p ON u.id = p.userId
+// 6. INSERT ... SELECT (JPQL only has bulk UPDATE/DELETE)
+INSERT INTO ArchivedUser (id, email) SELECT u.id, u.email FROM User u WHERE u.active = false
 ```
 
 **When HQL matters**: complex reporting queries, bulk updates/deletes, polymorphic fetches, collection filtering.
 
 ### 4. Type System & Custom Mapping
 
-**JPA**: Limited to standard mappings (`@Basic`, `@Embedded`, `@ElementCollection`, enums via `@Enumerated`, LOBs via `@Lob`).
+**JPA**: Limited to standard mappings (`@Basic`, `@Embedded`, `@ElementCollection`, enums via `@Enumerated`, LOBs via `@Lob`) plus single-column `AttributeConverter`s via `@Convert`.
 
 **Hibernate**: Full type system extensibility.
 
 ```java
-// Custom type mapping JSON to a PostgreSQL jsonb column
-@Type(JsonBinaryType.class)
+// Map JSON to a PostgreSQL jsonb column (Hibernate 6+, no extra library)
+@JdbcTypeCode(SqlTypes.JSON)
 @Column(columnDefinition = "jsonb")
 private UserPreferences preferences;
 
 // Enum as string (not ordinal) — JPA supports this via @Enumerated(STRING)
-// But Hibernate adds:
-@Type(PostgreSQLEnumType.class)
+// But Hibernate adds native database enum types (6.2+):
+@Enumerated(EnumType.STRING)
+@JdbcTypeCode(SqlTypes.NAMED_ENUM)
 @Column(columnDefinition = "user_status")
 private UserStatus status;
 
-// Custom composite type (multiple columns → one object)
-@Type(AddressType.class)
-@Columns(columns = {
-    @Column(name = "street"),
-    @Column(name = "city"),
-    @Column(name = "zip")
-})
+// Custom composite type (multiple columns → one object) via CompositeUserType
+@Embedded
+@CompositeType(AddressType.class)
 private Address address;
 ```
 
@@ -180,30 +176,30 @@ public class Order {
     // Batch loading for collections (solves N+1 without JOIN FETCH)
     @OneToMany(mappedBy = "order")
     @BatchSize(size = 20)
-    @Fetch(FetchMode.SUBSELECT)  // Single subselect for all orders
+    @Fetch(FetchMode.SUBSELECT)  // Single subselect for all orders (takes precedence over @BatchSize)
     private List<OrderLine> lines;
 
-    // Lazy one-to-one (JPA makes this eager by default without bytecode enhancement)
+    // Inverse-side one-to-one: FetchType.LAZY is ignored without bytecode enhancement
     @OneToOne(mappedBy = "order", fetch = FetchType.LAZY)
-    @LazyToOne(LazyToOneOption.NO_PROXY)  // Requires bytecode enhancement
+    @LazyToOne(LazyToOneOption.NO_PROXY)  // Deprecated in 6.2, removed in 7.0 — enhancement alone suffices
     private Invoice invoice;
 
     // Filter collection at load time
     @OneToMany(mappedBy = "order")
-    @Where(clause = "deleted = false")
+    @SQLRestriction("deleted = false")  // formerly @Where (removed in 7.0)
     private List<OrderLine> activeLines;
 }
 ```
 
 <Callout variant="tip">
-`@BatchSize` + `@Fetch(SUBSELECT)` is often the best default for collections — it avoids N+1 without the cartesian product explosion of `JOIN FETCH`.
+`@BatchSize` or `@Fetch(SUBSELECT)` is often the best default for collections — it avoids N+1 without the cartesian product explosion of `JOIN FETCH`.
 </Callout>
 
 ### 6. Caching
 
 **JPA**: Defines *that* caching exists (`shared-cache-mode`: `ALL`, `NONE`, `ENABLE_SELECTIVE`, `DISABLE_SELECTIVE`, `UNSPECIFIED`) and `@Cacheable`.
 
-**Hibernate**: Implements a full **two-level cache** with SPI for providers.
+**Hibernate**: Implements a full **second-level cache** with SPI for providers.
 
 ```xml
 <!-- persistence.xml or Spring Boot properties -->
@@ -229,7 +225,7 @@ private Set<Category> categories;
 **Cache concurrency strategies**:
 - `READ_ONLY` — immutable reference data (fastest)
 - `READ_WRITE` — general purpose
-- `NONSTRICT_READ_WRITE` — rare concurrent reads, eventual consistency OK
+- `NONSTRICT_READ_WRITE` — rare concurrent writes, eventual consistency OK
 - `TRANSACTIONAL` — JTA environments, full ACID
 
 ### 7. Schema Generation & Migration
@@ -252,8 +248,8 @@ Never use `hibernate.hbm2ddl.auto=update` in production. It doesn't handle data 
 | **Complex queries** | JPQL → Hibernate AST → SQL | HQL → same AST → SQL (same) |
 | **Bulk operations** | Limited (JPQL UPDATE/DELETE) | Rich (HQL DML, `ScrollableResults`, `StatelessSession`) |
 | **Streaming large results** | `Query.getResultStream()` (JPA 2.2+) | `ScrollableResults`, `StatelessSession` (lower memory) |
-| **Batch inserts** | Hint: `jakarta.persistence.batch.size` | `hibernate.jdbc.batch_size`, `order_inserts`, `order_updates` |
-| **Read-only projections** | DTO via `NEW` constructor | `ResultTransformer`, `Tuple`, `AliasToBeanResultTransformer` |
+| **Batch inserts** | Not standardized | `hibernate.jdbc.batch_size`, `order_inserts`, `order_updates` |
+| **Read-only projections** | DTO via `NEW` constructor | `TupleTransformer` (replaces the deprecated `ResultTransformer`), `Tuple` |
 
 **StatelessSession** (Hibernate-only): No persistence context, no dirty checking, no cascading — ideal for bulk imports/exports.
 
@@ -261,8 +257,7 @@ Never use `hibernate.hbm2ddl.auto=update` in production. It doesn't handle data 
 try (StatelessSession session = sessionFactory.openStatelessSession()) {
     Transaction tx = session.beginTransaction();
     for (int i = 0; i < 100_000; i++) {
-        session.insert(new Event("Event " + i, new Date()));
-        if (i % 50 == 0) session.flush(); // manual flush
+        session.insert(new Event("Event " + i, new Date())); // executed immediately, no flush needed
     }
     tx.commit();
 }
@@ -356,22 +351,18 @@ public class HibernateUserRepository {
         }
     }
     
-    // Bulk insert with StatelessSession
-    @Transactional
+    // Bulk insert with StatelessSession (manages its own transaction)
     public void bulkInsertUsers(List<User> users) {
         try (StatelessSession session = sessionFactory.openStatelessSession()) {
             Transaction tx = session.beginTransaction();
-            int batchSize = 50;
-            for (int i = 0; i < users.size(); i++) {
-                session.insert(users.get(i));
-                if (i % batchSize == 0) session.flush();
+            for (User user : users) {
+                session.insert(user);
             }
             tx.commit();
         }
     }
     
-    // Custom SQL for complex update
-    @Transactional
+    // Custom SQL for complex update (manages its own transaction)
     public int archiveOldOrders(Instant before) {
         try (Session session = sessionFactory.openSession()) {
             Transaction tx = session.beginTransaction();
@@ -404,17 +395,19 @@ public class OrderService {
         return order;
     }
     
-    // Use Hibernate native for streaming large report
-    public Stream<OrderSummary> streamOrderSummary(Instant from, Instant to) {
-        try (Session session = sessionFactory.openSession()) {
-            return session.createQuery(
+    // Use Hibernate native for streaming large report.
+    // The stream must be consumed before the Session closes, so process it here.
+    public void forEachOrderSummary(Instant from, Instant to, Consumer<OrderSummary> action) {
+        try (Session session = sessionFactory.openSession();
+             Stream<OrderSummary> rows = session.createQuery(
                 "SELECT new com.example.dto.OrderSummary(o.id, o.customer.email, o.total, o.createdAt) " +
                 "FROM Order o WHERE o.createdAt BETWEEN :from AND :to", 
                 OrderSummary.class)
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .setHint("org.hibernate.fetchSize", 100) // JDBC fetch size
-                .getResultStream(); // streams, doesn't load all in memory
+                .getResultStream()) { // streams, doesn't load all in memory
+            rows.forEach(action);
         }
     }
 }
@@ -430,11 +423,11 @@ public class OrderService {
 | **New Quarkus/Micronaut project** | Panache (JPA) / Micronaut Data (JPA) | Framework-native, same benefits |
 | **Legacy Hibernate codebase** | Keep Hibernate native | Migration cost > benefit; unwrap `Session` when needed |
 | **Complex reporting/analytics** | Hibernate HQL + `StatelessSession` | Bulk DML, streaming, custom SQL, no persistence context overhead |
-| **Multi-tenant SaaS** | Hibernate native | `MultiTenancyStrategy` not in JPA spec |
-| **Custom type mapping (JSON, GIS, enum variants)** | Hibernate `@Type` | JPA has no extensible type system |
+| **Multi-tenant SaaS** | Hibernate native | Multi-tenancy (`@TenantId`, `MultiTenantConnectionProvider`) not in JPA spec |
+| **Custom type mapping (JSON, GIS, enum variants)** | Hibernate `@Type` / `@JdbcTypeCode` | JPA only has single-column `AttributeConverter`s |
 | **Second-level caching critical** | Hibernate native | Rich cache SPI; JPA only defines `@Cacheable` |
 | **Team wants zero vendor lock-in** | Pure JPA + Spring Data | Swappable provider (EclipseLink, etc.) — rare in practice |
-| **Kotlin project** | Spring Data JPA + Kotlin extensions | `kotlin-jpa` plugin handles open classes, data classes work |
+| **Kotlin project** | Spring Data JPA + Kotlin extensions | `kotlin-jpa` (no-arg) + `kotlin-allopen` plugins; avoid data classes for entities |
 | **GraalVM native image** | Hibernate 6.2+ / Spring Data JPA | Both support native; Hibernate has better reflection config |
 
 ---
@@ -442,7 +435,7 @@ public class OrderService {
 ## Common Misconceptions
 
 ### ❌ "JPA is slower than Hibernate"
-**False.** JPA *is* Hibernate (when Hibernate is the provider). The `EntityManager` delegates to `Session`. Zero overhead.
+**False.** JPA *is* Hibernate (when Hibernate is the provider). The `EntityManager` *is* the `Session`. Zero overhead.
 
 ### ❌ "Using JPA means I can switch providers easily"
 **Theoretically true, practically rare.** Switching from Hibernate to EclipseLink requires:
@@ -456,10 +449,10 @@ In 15+ years of Java consulting, I've seen **zero** successful production provid
 </Callout>
 
 ### ❌ "Hibernate native API is deprecated"
-**False.** `Session`/`SessionFactory` are fully supported, actively maintained, and *required* for features like `StatelessSession`, `MultiTenancy`, custom types, and advanced fetching.
+**False.** `Session`/`SessionFactory` are fully supported, actively maintained, and *required* for features like `StatelessSession`, multi-tenancy, custom types, and advanced fetching.
 
 ### ❌ "JPA Criteria API is type-safe"
-**It's verbose and error-prone.** The JPA Criteria API uses string-based path navigation (`root.get("name")`). Hibernate's native Criteria (deprecated) and JPA Criteria are both widely disliked. Prefer:
+**Only with the static metamodel, and it's verbose either way.** Without the generated metamodel (`User_.name`), the JPA Criteria API uses string-based path navigation (`root.get("name")`). Hibernate's legacy native Criteria (removed in 6.0) and JPA Criteria are both widely disliked. Prefer:
 - **QueryDSL** (type-safe, but separate dependency)
 - **Spring Data JPA derived queries** (method name → query)
 - **HQL/JPQL with `@Query`** (readable, refactorable with IDE)
@@ -523,14 +516,13 @@ spring:
         jdbc:
           batch_size: 50          # Batch inserts/updates
           batch_versioned_data: true
+          time_zone: UTC          # Consistent timestamps
         order_inserts: true
         order_updates: true
         cache:
           use_second_level_cache: true
           region:
             factory_class: org.hibernate.cache.jcache.internal.JCacheRegionFactory
-        java:
-          time_zone: UTC          # Consistent timestamps
     open-in-view: false           # Avoid OSIV anti-pattern
   
   flyway:
@@ -567,7 +559,7 @@ public class User {
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @BatchSize(size = 20)
     @Fetch(FetchMode.SUBSELECT)
-    @Where(clause = "deleted = false")
+    @SQLRestriction("deleted = false")
     @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     private Set<Order> orders = new HashSet<>();
     
@@ -585,10 +577,10 @@ public class User {
 
 | Test Type | Approach |
 |-----------|----------|
-| **Unit tests** | Mock `EntityManager` / `JpaRepository` with `@Mock` / `@MockBean` |
+| **Unit tests** | Mock `EntityManager` / `JpaRepository` with `@Mock` / `@MockitoBean` |
 | **Integration tests** | `@DataJpaTest` (H2/PostgreSQL Testcontainers) — tests repositories, queries, constraints |
 | **Spring Boot tests** | `@SpringBootTest` + Testcontainers — full context, real DB |
-| **Query validation** | `hibernate.jpql.strict_compliance=true` in test properties |
+| **Query validation** | `hibernate.jpa.compliance.query=true` in test properties |
 
 ```java
 @DataJpaTest
@@ -597,6 +589,7 @@ public class User {
 class UserRepositoryTest {
     
     @Container
+    @ServiceConnection
     static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgres:16");
     
     @Autowired

@@ -3,7 +3,7 @@ title: "Migrating from Navigation 2 to Navigation 3: What Actually Changed"
 date: 2026-08-23
 excerpt: "Map the conceptual shift (NavController → back stack, graph → entryProvider, string args → @Serializable NavKey) and when the rewrite is worth it."
 tags: ["Android", "Jetpack Compose", "Navigation", "Migration"]
-readingTime: 8
+readingTime: 4
 draft: false
 ---
 
@@ -36,14 +36,14 @@ The table above is excerpted from the official Android migration guide — keep 
 1. **Delete the `NavHost` / `NavGraph` XML** (if using the legacy Navigation graph) and replace the composable with a plain `NavDisplay` + `entryProvider`.
 2. **Replace the route string** with a `@Serializable data class implementing NavKey`:
    ```kotlin
-   // Nav2: "user_profile/{id}" + Bundle("id" to intent)
+   // Nav2: "user_profile/{userId}" + navArgument("userId") { type = NavType.StringType }
    // Nav3:
    @Serializable
    data class UserProfile(val userId: String) : NavKey
    ```
 3. **Update the navigation call**:
    ```kotlin
-   // Nav2: navController.navigate("user_profile/{id}", args)
+   // Nav2: navController.navigate("user_profile/$userId")
    // Nav3:
    backStack.add(UserProfile(userId))
    ```
@@ -55,11 +55,10 @@ The table above is excerpted from the official Android migration guide — keep 
        }
    }
    ```
-5. **Add the three entry decorators** if you need ViewModels or saved state:
+5. **Add the entry decorators** if you need ViewModels or saved state:
    ```kotlin
    NavDisplay(..., entryDecorators = listOf(
-       rememberSceneSetupNavEntryDecorator(),
-       rememberSavedStateNavEntryDecorator(),
+       rememberSaveableStateHolderNavEntryDecorator(),
        rememberViewModelStoreNavEntryDecorator(),
    ))
    ```
@@ -85,13 +84,9 @@ Both artifacts are independent — you can have `androidx.navigation:navigation-
 | App with < 10 Nav2 screens, no deep‑link complexity | Migrate opportunistically; convert one screen per sprint |
 | Large existing Nav2 graph, heavy deep‑link usage, or complex nested graphs | Stay on Nav2 for now; the rewrite cost may outweigh benefits until you hit the pain points (adaptive layouts, ViewModel scoping, etc.) |
 
-### Resources
-
-- [Official migration guide — Android Devs](https://developer.android.com/guide/navigation/navigation-3/migration-guide)
-- [Concept mapping blog post — Android Devs](https://android-developers.googleblog.com/2025/11/migrating-from-navigation-2-to-navigation-3.html)
-- [Nav3 recipes — GitHub samples](https://github.com/android/nav3-recipes) (search “migration” folder)
-
 ## Resources
 
+- [Official migration guide — Android Devs](https://developer.android.com/guide/navigation/navigation-3/migration-guide)
+- [Nav3 recipes — GitHub samples](https://github.com/android/nav3-recipes)
 - [Navigation 3 guide — Android Developers](https://developer.android.com/guide/navigation/navigation-3)
 - [Navigation 3 releases](https://developer.android.com/jetpack/androidx/releases/navigation3)

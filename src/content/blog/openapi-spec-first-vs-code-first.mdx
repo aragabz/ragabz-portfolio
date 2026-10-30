@@ -131,17 +131,17 @@ openapi-generator generate \
 This produces:
 
 ```kotlin
-// Generated — ProductController.kt
-interface ProductController : ProductApi {
+// Generated — ProductsApi.kt (Spring MVC mapping annotations omitted)
+interface ProductsApi {
 
-    override fun listProducts(limit: kotlin.Int?): ResponseEntity<List<Product>> {
+    fun listProducts(limit: kotlin.Int?): ResponseEntity<List<Product>> {
         // You implement this
-        throw UnsupportedOperationException("Not yet implemented")
+        return ResponseEntity(HttpStatus.NOT_IMPLEMENTED)
     }
 
-    override fun createProduct(createProductRequest: CreateProductRequest): ResponseEntity<Product> {
+    fun createProduct(createProductRequest: CreateProductRequest): ResponseEntity<Product> {
         // You implement this
-        throw UnsupportedOperationException("Not yet implemented")
+        return ResponseEntity(HttpStatus.NOT_IMPLEMENTED)
     }
 }
 ```
@@ -161,10 +161,10 @@ data class Product(
 Then you write your actual implementation:
 
 ```kotlin
-@Service
-class ProductServiceImpl(
+@RestController
+class ProductController(
     private val productRepository: ProductRepository
-) : ProductController {
+) : ProductsApi {
 
     override fun listProducts(limit: kotlin.Int?): ResponseEntity<List<Product>> {
         val products = productRepository.findAll().take(limit ?: 20)
@@ -183,8 +183,8 @@ class ProductServiceImpl(
 - **Contract-first design.** You think about the API surface before writing any code. This forces clarity about what the API *does* before you get attached to an implementation.
 - **Multi-team alignment.** Frontend, mobile, and backend teams can work in parallel once the spec is agreed on. No waiting for "the API to be ready."
 - **Client generation is trivial.** Generate TypeScript, Python, Swift, or Java clients from the same spec. Contract drift between server and client is impossible.
-- **Documentation is automatic.** Swagger UI, Redoc, and ReDoc render directly from the spec. No annotations polluting your code.
-- **Contract testing.** Tools like Schemathesis can fuzz the spec to find inconsistencies before you deploy.
+- **Documentation is automatic.** Swagger UI and Redoc render directly from the spec. No annotations polluting your code.
+- **Contract testing.** Tools like Schemathesis can fuzz your running API against the spec to find inconsistencies before you deploy.
 
 ### Weaknesses
 
@@ -299,7 +299,7 @@ The spec is automatically available at:
 - **Spec is an afterthought.** You design the API as you code, not before. By the time the spec is generated, the design decisions are baked in. If the API shape is wrong, you refactor code — not just a YAML file.
 - **Annotations pollute your code.** `@Operation`, `@ApiResponse`, `@Parameter` — your controllers become a mix of business logic and documentation. The signal-to-noise ratio drops.
 - **Contract-first workflows break down.** Frontend teams can't start until the backend code exists. You can't do contract testing before implementation.
-- **Spec quality depends on annotation diligence.** If someone skips `@Schema` on a DTO field, that field is invisible in the spec. The spec is only as good as your team's discipline.
+- **Spec quality depends on annotation diligence.** If someone skips `@Schema` on a DTO field, that field shows up with no description, example, or constraints beyond what can be inferred. The spec is only as good as your team's discipline.
 - **Harder to generate non-Java clients.** Generating a TypeScript client from a Kotlin-annotated spec is possible, but the Kotlin types don't always map cleanly.
 
 ## Approach 3: Hybrid — Spec + Minimal Generation
@@ -322,7 +322,7 @@ openapi-generator generate \
   -i openapi.yaml \
   -g kotlin \
   -o generated/models \
-  --additional-properties=library=non-virtual
+  --global-property=models,modelDocs=false,modelTests=false
 ```
 
 This gives you clean data classes with no Spring coupling:
@@ -382,7 +382,9 @@ The mitigation: add a CI check that regenerates DTOs from the spec and fails if 
 # In your CI pipeline
 - name: Check spec-code sync
   run: |
-    openapi-generator generate -i openapi.yaml -g kotlin -o /tmp/check
+    openapi-generator generate -i openapi.yaml -g kotlin -o /tmp/check \
+      --global-property=models,modelDocs=false,modelTests=false \
+      --additional-properties=dateLibrary=java8
     diff -r /tmp/check/src/main/kotlin/ generated/src/main/kotlin/
 ```
 
@@ -449,8 +451,12 @@ openApiGenerate {
     generatorName.set("kotlin")
     inputSpec.set("${projectDir}/openapi.yaml")
     outputDir.set("${projectDir}/generated")
+    globalProperties.set(mapOf(
+        "models" to "",            // generate models only
+        "modelDocs" to "false",
+        "modelTests" to "false"
+    ))
     additionalProperties.set(mapOf(
-        "library" to "non-virtual",
         "dateLibrary" to "java8"
     ))
 }
@@ -476,9 +482,9 @@ The approaches are the same regardless of language, but the tooling differs:
 |----------|---------------------|-------------------|
 | **Kotlin/Spring** | `openapi-generator` kotlin-spring | `springdoc-openapi` |
 | **Java/Spring** | `openapi-generator` spring | `springdoc-openapi` |
-| **TypeScript/Express** | `openapi-generator` typescript-node | `tsoa` |
-| **Python/FastAPI** | `openapi-generator` python | FastAPI native (auto-generates spec) |
-| **Go/Gin** | `openapi-generator` go-server | `swaggo/swag` |
+| **TypeScript/Express** | `openapi-generator` nodejs-express-server | `tsoa` |
+| **Python/FastAPI** | `openapi-generator` python-fastapi | FastAPI native (auto-generates spec) |
+| **Go/Gin** | `openapi-generator` go-gin-server | `swaggo/swag` |
 
 FastAPI deserves special mention: it generates the OpenAPI spec from your type hints automatically. It's the closest thing to "code-first that just works" because the Python type system is the spec. But even with FastAPI, many teams still use a separate spec for client generation and contract testing.
 

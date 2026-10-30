@@ -3,7 +3,7 @@ title: "The Complete Guide to Spring Boot + Kotlin + Coroutines"
 date: 2026-12-26
 excerpt: "From your first suspend endpoint to production readiness: parallel calls, transactions, streaming, testing, resilience, and observability — everything in one place."
 tags: ["Spring Boot", "Kotlin", "Coroutines", "Backend", "Production"]
-readingTime: 50
+readingTime: 35
 draft: false
 ---
 
@@ -62,11 +62,12 @@ plugins {
     kotlin("jvm") version "2.4.0"
     kotlin("plugin.spring") version "2.4.0"
     id("org.springframework.boot") version "4.1.0"
+    id("io.spring.dependency-management") version "1.1.7"
 }
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // Coroutines — versions managed by Spring Boot's BOM
@@ -156,13 +157,13 @@ class DemoController {
 }
 ```
 
-Fire 100 concurrent requests:
+Fire 1,000 concurrent requests — more than the pool has threads:
 
 ```bash
-seq 100 | xargs -P 100 -I{} curl -s http://localhost:8080/demo > /dev/null
+seq 1000 | xargs -P 1000 -I{} curl -s http://localhost:8080/demo > /dev/null
 ```
 
-All 100 complete in roughly **one delay window** (~600ms total), not 100 × 500ms. A 200-thread pool just served 100 concurrent slow requests without breaking a sweat — because threads were returned between suspension points. Try the same with `Thread.sleep(500)` instead of `delay(500)` and watch serialization begin.
+All 1,000 complete in roughly **one delay window** (~600ms total), not five back-to-back waves of 500ms. A 200-thread pool just served 1,000 concurrent slow requests without breaking a sweat — because threads were returned between suspension points. Try the same with `Thread.sleep(500)` instead of `delay(500)` and watch serialization begin.
 
 <Callout variant="warning">
 `delay` suspends, `Thread.sleep` blocks. Every blocking API you call inside a suspend function (classic JDBC, `RestClient`, file I/O) reintroduces the original problem. The next section covers exactly what to do about it.
@@ -492,7 +493,6 @@ A platform-managed transaction is bound to a thread via ThreadLocal. If executio
 @Service
 class OrderService(
     private val orderRepository: OrderRepository,   // plain Spring Data JPA
-    private val inventoryClient: InventoryClient,
 ) {
     // DB work below contains no suspension points → single-thread transaction ✓
     @Transactional
@@ -501,11 +501,18 @@ class OrderService(
         orderRepository.flush()
         return order
     }
+}
 
-    // Remote calls stay OUTSIDE the transaction:
+// Remote calls stay OUTSIDE the transaction — and in a separate bean,
+// so the call to placeOrder goes through the transactional proxy:
+@Service
+class OrderFacade(
+    private val orderService: OrderService,
+    private val inventoryClient: InventoryClient,
+) {
     suspend fun reserveAndPlace(cmd: PlaceOrderCommand): Order {
         inventoryClient.reserve(cmd.skus)                // network I/O here...
-        return placeOrder(cmd)                           // ...not inside tx
+        return orderService.placeOrder(cmd)              // ...not inside tx
     }
 }
 ```
@@ -673,7 +680,7 @@ fun generateReport(@RequestBody spec: ReportSpec): Flow<Progress> = flow {
     val rows = reportRepository.loadRows(spec)
     rows.chunked(1000).forEachIndexed { i, chunk ->
         processChunk(chunk)
-        emit(Progress.percent(((i + 1) * 1000f / rows.size).toInt()))
+        emit(Progress.percent(minOf(100, (i + 1) * 1000 * 100 / rows.size)))
     }
     emit(Progress.done(reportId = saveReport()))
 }
@@ -690,10 +697,11 @@ When the client disconnects:
 ```kotlin
 fun tailLogs(file: Path): Flow<String> = flow {
     file.useLines { lines ->
-        // ... follow the file ...
-        emit(line)   // if nobody's listening anymore, this throws CancellationException
+        for (line in lines) {
+            emit(line)   // if nobody's listening anymore, this throws CancellationException
+        }
     }
-}
+}.flowOn(Dispatchers.IO)   // blocking file reads stay off shared threads
 ```
 
 No "is the client still there?" polling. No leaked background jobs appending to dead sockets. Structured concurrency does it because *collecting is scoped*.
@@ -711,7 +719,7 @@ Since `marketFeed.stream(symbol)` is cold, each connected client triggers its ow
 A shared broadcast:
 
 ```kotlin
-@Singleton
+@Component
 class TickerHub {
     private val _ticks = MutableSharedFlow<PriceTick>(replay = 0)
     val ticks: SharedFlow<PriceTick> = _ticks.asSharedFlow()
@@ -757,10 +765,15 @@ What if the consumer is slower than production? Flows use a simple contract: **t
 When you intentionally want decoupling, say so explicitly:
 
 ```kotlin
+// Absorb bursts, still bounded:
 feed.stream(symbol)
-    .buffer(capacity = 10)          // absorb bursts, still bounded
-    .conflate()                     // keep only latest when consumer lags — ideal for prices!
-    .onEach { pushToClient(it) }
+    .buffer(capacity = 10)
+    .collect { pushToClient(it) }
+
+// Keep only the latest when the consumer lags — ideal for prices!
+feed.stream(symbol)
+    .conflate()
+    .collect { pushToClient(it) }
 ```
 
 `.conflate()` is perfect for tick data: if the UI can't render 40 updates/second, show the freshest one rather than queuing stale ones.
@@ -776,9 +789,9 @@ Async code has a reputation for untestability — races, sleeps-in-tests, suites
 ```kotlin
 dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-    testImplementation("io.mockk:mockk")                 // mocking
-    testImplementation("app.cash.turbine:turbine")       // Flow assertions
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("io.mockk:mockk:1.14.11")         // mocking (not in Boot's BOM)
+    testImplementation("app.cash.turbine:turbine:1.2.1") // Flow assertions (not in Boot's BOM)
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 }
 ```
 
@@ -846,7 +859,7 @@ class UserControllerIntegrationTest(
 ) {
     @Test
     fun `returns user`() = runBlocking {          // NOT runTest here
-        mockMvc.get("/api/users/42").andExpect {
+        mockMvc.get("/api/users/42").asyncDispatch().andExpect {   // suspend handler → async request
             status { isOk() }
             jsonPath("$.name") { value("Ahmed Ragab") }
         }
@@ -946,7 +959,7 @@ ReportService(fakeRepo, ioDispatcher = UnconfinedTestDispatcher())
 
 @Test
 fun `streams three events then completes`() = runBlocking {
-    webTestClient.get().uri("/api/prices/AAPL")
+    webTestClient.get().uri("/api/prices/AAPL/events")
         .accept(MediaType.TEXT_EVENT_STREAM)
         .exchange()
         .expectStatus().isOk
@@ -999,8 +1012,8 @@ suspend fun dashboard(userId: Long): Dashboard =
     withTimeout(1500) {                      // overall budget
         coroutineScope {
             val user = async { withTimeout(500) { users.get(userId) } }
-            val recs = async { withTimeout(1200) { recs.forUser(userId) } }
-            Dashboard(user.await(), recs.await())
+            val recommendations = async { withTimeout(1200) { recs.forUser(userId) } }
+            Dashboard(user.await(), recommendations.await())
         }
     }
 ```
@@ -1031,9 +1044,9 @@ suspend fun <T> retryWithBackoff(
             throw e   // never swallow cancellation — always rethrow it
         } catch (e: Throwable) {
             if (!retryOn(e)) throw e
-            val jittered = currentDelay * (0.5 + Random.nextDouble())   // full jitter
+            val jittered = currentDelay * (0.5 + Random.nextDouble())   // ±50% jitter
             delay(jittered)
-            currentDelay = min(currentDelay * factor, maxDelay)
+            currentDelay = minOf(currentDelay * factor, maxDelay)
         }
     }
     return block()   // last attempt, exception propagates naturally
@@ -1075,9 +1088,9 @@ The JVM standard is Resilience4j, whose Kotlin module supports suspend functions
 
 ```kotlin
 dependencies {
-    implementation("io.github.resilience4j:resilience4j-kotlin")
-    implementation("io.github.resilience4j:resilience4j-circuitbreaker")
-    implementation("org.springframework.boot:spring-boot-starter-aop")
+    implementation("io.github.resilience4j:resilience4j-kotlin:2.4.0")
+    implementation("io.github.resilience4j:resilience4j-spring-boot4:2.4.0")   // YAML config + annotations
+    implementation("org.springframework.boot:spring-boot-starter-aspectj")
 }
 ```
 
@@ -1102,9 +1115,9 @@ class RecommendationService(
     private val breaker: CircuitBreaker,
 ) {
     suspend fun forUser(userId: Long): List<Rec> =
-        CircuitBreaker.decorateSuspendFunction(breaker) {
+        breaker.executeSuspendFunction {
             recClient.forUser(userId)
-        }.invoke()
+        }
 }
 ```
 
@@ -1133,6 +1146,7 @@ class Bulkheads {
     val payments = Semaphore(30)     // payment provider tolerates 30 concurrent
     val search = Semaphore(50)
     val emails = Semaphore(10)       // SMTP relay chokes easily
+    val pricing = Semaphore(20)
 }
 
 suspend fun sendReceipt(order: Order) =
@@ -1156,7 +1170,7 @@ class PricingGateway(
     @CircuitBreaker(name = "pricing", fallbackMethod = "stale")
     suspend fun quote(symbol: String): Quote =
         retryWithBackoff(maxAttempts = 3, retryOn = ::isTransient) {
-            bulkheads.search.withPermit {
+            bulkheads.pricing.withPermit {
                 withTimeoutOrNull(700.milliseconds) {
                     client.quote(symbol)
                 } ?: throw TransientException("timeout")
@@ -1174,7 +1188,7 @@ Reading order tells the whole story: bounded concurrency → bounded time → bo
 
 ## Production Checklist
 
-Seven sections of building — endpoints, fan-outs, transactions, streams, tests, defenses. This section covers what separates a demo from a service: **seeing inside it in production**, choosing the right runtime model deliberately, and shutting down without dropping requests.
+Eight sections of building — endpoints, fan-outs, transactions, streams, tests, defenses. This section covers what separates a demo from a service: **seeing inside it in production**, choosing the right runtime model deliberately, and shutting down without dropping requests.
 
 ### Observability across thread hops
 
@@ -1185,13 +1199,15 @@ Thread-per-request debugging assumed "one thread = one request." Coroutines brok
 Wire `MDCContext()` into every launch point so `requestId` survives suspension:
 
 ```kotlin
-@Singleton
+@Component
 class AppScope : CoroutineScope by CoroutineScope(
     SupervisorJob() +
     Dispatchers.Default +
-    CoroutineName("app") +
-    MDCContext()          // snapshot at launch time
+    CoroutineName("app")
 )
+
+// MDCContext() snapshots the caller's MDC when it is created — so create it per launch:
+appScope.launch(MDCContext()) { /* requestId present here */ }
 ```
 
 Better still, set the request ID where the request enters:
@@ -1249,7 +1265,7 @@ Three viable stacks now exist on the JVM:
 | | MVC + coroutines | WebFlux + coroutines | MVC + virtual threads |
 |--|------------------|----------------------|------------------------|
 | Mental model | Sequential suspend code | Event loops + suspend | Plain blocking code, cheap threads |
-| JDK requirement | Any | Any | JDK 21+ (`spring.threads.virtual.enabled=true`) |
+| JDK requirement | JDK 17+ (Boot baseline) | JDK 17+ (Boot baseline) | JDK 21+ (`spring.threads.virtual.enabled=true`) |
 | Blocking libraries | Wrap in `Dispatchers.IO` | Must isolate or rewrite | Just call them |
 | Streaming/SSE scale | Good | Best | Good |
 | Ecosystem fit | Existing Spring Data JPA world | R2DBC/reactive clients | Legacy-friendly |
@@ -1275,12 +1291,12 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 25   # matches what the DB truly serves
-resilience4j.bulkhead.instances.db-max-concurrent: 25
+resilience4j.bulkhead.instances.db.max-concurrent-calls: 25
 ```
 
 ### Graceful shutdown
 
-Coroutines make shutdown semantics explicit: cancel the application scope, await completion, then stop taking traffic. Give long-lived streams or background workers one owned `ApplicationCoroutineScope`:
+Coroutines make shutdown semantics explicit: stop taking traffic, let in-flight work drain, then cancel the application scope. Give long-lived streams or background workers one owned `ApplicationCoroutineScope`:
 
 ```kotlin
 @Component
@@ -1323,11 +1339,11 @@ You've completed the arc from why coroutines to running them in production. Natu
 - **Kafka/Rabbit listeners** as coroutine consumers — same context-propagation rules apply
 - **Ktor** if you want the framework built coroutine-first from day one
 - **Kotlin Multiplatform**: share these service patterns client-side with KMP
-- Deepen the language foundation with [Zero to Hero](/blog/kotlin-series-01-getting-started) and the [version evolution series](/blog/kotlin-versions-k2-era)
+- Deepen the language foundation with [Zero to Hero](/blog/kotlin-zero-to-hero-guide) and the [version evolution guide](/blog/kotlin-version-differences-guide)
 
 ## Resources
 
 - [Spring Framework docs — Kotlin coroutines support](https://docs.spring.io/spring-framework/reference/languages/kotlin/coroutines.html)
 - [kotlinx.coroutines guide](https://kotlinlang.org/docs/coroutines-guide.html)
 - [Resilience4j documentation](https://resilience4j.readme.io)
-- [Virtual Threads and Spring Boot](https://spring.io/blog/2024/10/21/embracing-virtual-threads-spring-boot-3-2)
+- [Embracing Virtual Threads (Spring blog)](https://spring.io/blog/2022/10/11/embracing-virtual-threads)

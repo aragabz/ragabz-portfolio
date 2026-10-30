@@ -3,7 +3,7 @@ title: "Building Production-Ready APIs with Spring Boot and Kotlin"
 date: 2026-08-17
 excerpt: "A complete guide to building REST APIs with Spring Boot and Kotlin, covering project structure, request validation with Jakarta Bean Validation, and error handling."
 tags: ["Kotlin", "Spring Boot", "Backend", "Validation"]
-readingTime: 15
+readingTime: 10
 ---
 
 import Callout from '../../components/mdx/Callout.astro';
@@ -39,10 +39,10 @@ The minimal set of dependencies in `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("tools.jackson.module:jackson-module-kotlin")
 }
 ```
 
@@ -53,7 +53,7 @@ If you prefer Maven, the same dependencies in `pom.xml`:
 ```xml
 <dependency>
     <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-web</artifactId>
+    <artifactId>spring-boot-starter-webmvc</artifactId>
 </dependency>
 <dependency>
     <groupId>org.springframework.boot</groupId>
@@ -64,12 +64,12 @@ If you prefer Maven, the same dependencies in `pom.xml`:
     <artifactId>kotlin-reflect</artifactId>
 </dependency>
 <dependency>
-    <groupId>com.fasterxml.jackson.module</groupId>
+    <groupId>tools.jackson.module</groupId>
     <artifactId>jackson-module-kotlin</artifactId>
 </dependency>
 ```
 
-`kotlin-reflect` and `jackson-module-kotlin` are essential — Spring's auto-configuration and Jackson's JSON (de)serialization both rely on them. Spring Initializr adds them for you automatically.
+`kotlin-reflect` and `jackson-module-kotlin` are essential — Spring's auto-configuration and Jackson's JSON (de)serialization both rely on them. Spring Initializr adds them for you automatically. (These are Spring Boot 4 coordinates; on Boot 3.x the web starter is `spring-boot-starter-web` and the Jackson module's group is `com.fasterxml.jackson.module`.)
 
 ### The Application Entry Point
 
@@ -162,7 +162,7 @@ data class CreatePostRequest(
 )
 ```
 
-The `@field:` target prefix is critical in Kotlin. Because `data class` constructor parameters generate both a constructor parameter and a property, you must explicitly point the annotation at the field to avoid `Target mismatch` errors.
+The `@field:` target prefix is critical in Kotlin. Because `data class` constructor parameters generate both a constructor parameter and a property, an un-targeted annotation can land on the constructor parameter only, where Bean Validation never looks — the rules are then silently ignored. Pointing it explicitly at the field avoids that.
 
 ### Activating validation in the controller
 
@@ -195,7 +195,7 @@ class PostController(private val postService: PostService) {
 Two things to note:
 
 1. `@Valid` triggers validation on the request body. If validation fails, Spring throws `MethodArgumentNotValidException` — which we'll handle centrally below.
-2. The service and DTOs are injected via constructor; no `@Autowired` field injection needed in Kotlin.
+2. The service is injected via the constructor; no `@Autowired` field injection needed in Kotlin.
 
 ### Common validation annotations
 
@@ -212,7 +212,7 @@ Two things to note:
 
 ### Validating path variables and query params
 
-It's not just bodies. You can validate `@PathVariable` and `@RequestParam` values too — but you must add `@Validated` on the controller class for those to take effect.
+It's not just bodies. You can validate `@PathVariable` and `@RequestParam` values too. Since Spring Framework 6.1, Spring MVC applies these constraints with its built-in method validation (failures raise `HandlerMethodValidationException`); the classic approach shown here adds `@Validated` on the controller class, which validates through an AOP proxy instead.
 
 ```kotlin
 @RestController
@@ -230,7 +230,7 @@ class PostController(private val postService: PostService) {
 }
 ```
 
-For path/query validation, failures throw `ConstraintViolationException` instead of `MethodArgumentNotValidException`, so your handler must cover both.
+With `@Validated`, path/query failures throw `ConstraintViolationException` instead of `MethodArgumentNotValidException`, so your handler must cover both.
 
 ### Validation in the service layer
 
@@ -343,7 +343,9 @@ package com.example.blogapi.post
 
 import org.springframework.data.jpa.repository.JpaRepository
 
-interface PostRepository : JpaRepository<Post, Long>
+interface PostRepository : JpaRepository<Post, Long> {
+    fun existsByTitle(title: String): Boolean
+}
 ```
 
 The entity:
@@ -355,7 +357,7 @@ import jakarta.persistence.*
 
 @Entity
 @Table(name = "posts")
-data class Post(
+class Post(
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
@@ -366,6 +368,8 @@ data class Post(
     val content: String,
 )
 ```
+
+This needs `spring-boot-starter-data-jpa` plus the `kotlin("plugin.jpa")` Gradle plugin, which generates the no-arg constructor JPA requires. Avoid `data class` for entities — its generated `equals`/`hashCode` don't play well with Hibernate proxies and lazy loading.
 
 The service with a couple of business rules:
 
@@ -464,8 +468,8 @@ Start with `start.spring.io`, keep your controllers thin, and let validation be 
 ## Resources
 
 - [Spring Initializr](https://start.spring.io/)
-- [Spring Boot Reference — Validation](https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html)
+- [Spring Framework Reference — Java Bean Validation](https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html)
 - [Jakarta Bean Validation Specification](https://jakarta.ee/specifications/bean-validation/)
-- [Kotlin + Spring documentation](https://kotlinlang.org/docs/spring-boot.html)
+- [Kotlin + Spring documentation](https://kotlinlang.org/docs/jvm-get-started-spring-boot.html)
 
 Happy coding! 🚀

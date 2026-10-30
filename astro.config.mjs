@@ -7,6 +7,21 @@ import tailwindcss from '@tailwindcss/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { base, site } from './site.config.mjs';
 
+// Markdown/MDX links like `[x](/blog/slug)` are written root-relative; prefix
+// them with the deploy base so they keep working on GitHub Pages project sites.
+function rehypeBaseLinks() {
+  const prefix = base.endsWith('/') ? base : base + '/';
+  /** @param {any} node hast node */
+  const walk = (node) => {
+    const href = node.properties?.href;
+    if (node.tagName === 'a' && typeof href === 'string' && href.startsWith('/') && !href.startsWith('//')) {
+      node.properties.href = prefix + href.slice(1);
+    }
+    node.children?.forEach(walk);
+  };
+  return walk;
+}
+
 // https://astro.build/config
 export default defineConfig({
   site,
@@ -50,6 +65,7 @@ export default defineConfig({
     },
   },
   markdown: {
+    rehypePlugins: [rehypeBaseLinks],
     shikiConfig: {
       theme: 'github-dark',
       wrap: true,

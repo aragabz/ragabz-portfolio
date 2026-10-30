@@ -3,7 +3,7 @@ title: "Kotlin Version Differences: From 1.0 to 2.4 — The Complete Evolution G
 date: 2026-10-31
 excerpt: "Ten years of Kotlin in one guide: the K2 compiler rewrite, guard conditions, non-local break/continue, multi-dollar interpolation, context parameters, explicit backing fields, and everything that shaped the language from 1.0 to 2.4."
 tags: ["Kotlin", "Versions", "Language Features", "Migration"]
-readingTime: 35
+readingTime: 15
 draft: false
 ---
 
@@ -39,13 +39,13 @@ Kotlin 1.0 shipped in February 2016; by 2.0 (May 2024) the language had grown en
 | 1.0 | 2016 | First stable release |
 | 1.1 | 2017 | Coroutines (experimental), type aliases, JS backend matured |
 | 1.2 | 2017 | Multiplatform projects (experimental), array extensions in stdlib |
-| 1.3 | 2018 | **Coroutines stable**, `when` on subjects without `var`, contracts API |
+| 1.3 | 2018 | **Coroutines stable**, `when` subject captured in a `val`, contracts API (experimental) |
 | 1.4 | 2020 | SAM conversions for Kotlin interfaces, trailing commas, IR-based JS backend preview |
-| 1.5 | 2021 | Sealed interfaces, JVM records support, inline value classes stable, IR backend default for JS |
-| 1.6–1.8 | 2022 | Stable exhaustive `when` over enums/sealed/Boolean, JVM target 18+, recursive generic generics cleanup |
+| 1.5 | 2021 | Sealed interfaces, JVM records support, inline value classes stable, new JVM IR backend default |
+| 1.6–1.8 | 2021–2022 | Exhaustive `when` statements over enums/sealed/Boolean enforced, definitely non-nullable types (`T & Any`), new Kotlin/Native memory manager, JS IR backend stable |
 | 1.9 | 2023 | **Data objects stable**, enum entries (`Direction.entries`), K2 compiler beta for all targets |
 
-If you learned Kotlin before ~2020, coroutines were experimental and sealed hierarchies couldn't be interfaces — two things treated as bedrock in modern Kotlin.
+If you learned Kotlin before late 2018, coroutines were experimental; before 2021, sealed hierarchies couldn't be interfaces — two things treated as bedrock in modern Kotlin.
 
 ---
 
@@ -66,7 +66,7 @@ K2 is a new **frontend** built around FIR (Frontend Intermediate Representation)
 - **IDE sharing** — IntelliJ's code analysis runs the *same* engine as the compiler, so "works in IDE but fails to build" mismatches largely disappear
 
 <Callout variant="note">
-"Compiler rewrite" sounds scary, but your source code is untouched. Kotlin maintains strict binary and source compatibility guarantees — code that compiled on 1.9 compiles on 2.x with at most deprecation warnings.
+"Compiler rewrite" sounds scary, but your source code is untouched. Kotlin maintains strict binary and source compatibility guarantees — virtually all code that compiled on 1.9 compiles on 2.x, with at most deprecation warnings or a few documented edge-case changes.
 </Callout>
 
 ### Smarter smart casts
@@ -84,7 +84,7 @@ fun process(obj: Any) {
 
 // 2) Variables captured before a lambda boundary
 fun example(list: List<Int>) {
-    var sum: Int? = null
+    var sum: Int? = list.firstOrNull()
     if (sum == null) return
     list.forEach { println(sum + it) }   // K2 smart-casts sum inside the lambda
 }
@@ -190,7 +190,7 @@ when (user) {
 }
 ```
 
-Exhaustiveness checking still works — the compiler verifies every case remains reachable.
+Exhaustiveness checking still works — the compiler verifies every case is covered.
 
 ### Non-local `break` and `continue`
 
@@ -220,7 +220,7 @@ for (row in rows) {
 }
 ```
 
-Plain `break` targets the innermost *enclosing loop* even across the lambda boundary. Labels still work for outer loops (`break@rows`). This finally closes one of Java-lambda-migration's most common complaints.
+Plain `break` targets the innermost *enclosing loop* even across the lambda boundary. Labels still work for outer loops (`break@outer` on an `outer@ for`). This finally closes one of Java-lambda-migration's most common complaints.
 
 ### Multi-dollar string interpolation
 
@@ -241,7 +241,7 @@ val script = $$"echo $HOME costs $$amount"
 println(script)   // echo $HOME costs 42
 ```
 
-Rules: `$$"..."` treats single `$` as literal text; `$$x` performs interpolation. Need both literal `${'$$'}` sequences AND interpolation in one string? Go to `$$$`. Rarely needed — but when you need it, nothing else comes close.
+Rules: `$$"..."` treats single `$` as literal text; `$$x` performs interpolation. Need literal `$$` sequences AND interpolation in one string? Go to `$$$`. Rarely needed — but when you need it, nothing else comes close.
 
 ### Context parameters (experimental, 2.2)
 
@@ -288,7 +288,7 @@ Referenced externally as `Inventory.Sku`. Small feature, real benefit: aliases l
 
 Every addition above followed the same pipeline — understanding it removes upgrade anxiety:
 
-1. **Experimental**: requires explicit `@OptIn(ExperimentalXyz::class)` per file/module; behavior may change arbitrarily between releases
+1. **Experimental**: requires an explicit opt-in — a compiler flag such as `-Xcontext-parameters` for language features, or `@OptIn(ExperimentalXyz::class)` for APIs; behavior may change arbitrarily between releases
 2. **Beta**: shape settled; still opt-in but migration paths guaranteed
 3. **Stable**: on by default at the new language version; older `-language-version` pins keep old behavior during transition
 
@@ -307,7 +307,7 @@ Upgrading the *compiler* never silently injects unstable semantics into your sou
 Genuinely low-friction:
 
 1. Bump plugin version; rebuild. The three 2.2-stabilized features activate automatically because they were additive syntax.
-2. Search for `@OptIn(ExperimentalStdlibApi` and similar markers — many can simply be deleted once you're on the matching language version.
+2. Remove the preview compiler flags (`-Xwhen-guards`, `-Xnon-local-break-continue`, `-Xmulti-dollar-interpolation`) — they're no longer needed once you're on the matching language version.
 3. Replace any context-receiver usage (compiler will warn).
 4. Watch for stricter diagnostics — K2-era releases tightened some resolution rules.
 
@@ -322,7 +322,7 @@ After the K2 rewrite and the language wave, Kotlin entered a **stabilization era
 Two independent tracks since 2023:
 
 - **Language releases** (`2.3.0`, `2.4.0`) every ~6 months — may add/stabilize language features
-- **Tooling releases** (`2.3.20`, `2.4.10`) between them — bugfixes, platform support, tooling; **never** change language semantics
+- **Tooling releases** (`2.3.20`, `2.4.10`) between them — bugfixes, platform support, tooling; they don't stabilize language features (though they can ship experimental previews)
 
 Practical consequence: you can adopt `X.Y.20` maintenance releases fearlessly mid-quarter, while planning `X.(Y+1).0` upgrades deliberately.
 
@@ -330,7 +330,7 @@ Practical consequence: you can adopt `X.Y.20` maintenance releases fearlessly mi
 
 #### Stabilized: nested type aliases & smarter `when` exhaustiveness
 
-**Data-flow-based exhaustiveness checking** for `when` became stable — the compiler now understands guards and complex conditions when deciding whether your `when` covers all cases:
+**Data-flow-based exhaustiveness checking** for `when` became stable — the compiler now takes earlier checks and early returns into account when deciding whether your `when` covers all cases:
 
 ```kotlin
 sealed interface Event {
@@ -338,42 +338,44 @@ sealed interface Event {
     data object Refresh : Event
 }
 
-fun handle(e: Event) = when (e) {
-    is Click if e.x >= 0 -> move(e)
-    is Click -> clamp(e)          // compiler PROVES remaining clicks land here
-    Refresh -> reload()
-}                                  // exhaustive — no else required
-```
-
-#### Enabled by default: explicit backing fields
-
-Properties can now declare their storage explicitly — including a backing field of a *different type* than the exposed property:
-
-```kotlin
-import java.util.UUID
-
-class Order {
-    val id: String
-        field: UUID = UUID.randomUUID()   // stores a UUID…
-        get() = field.toString()           // …exposes a String
+fun handle(e: Event) {
+    if (e is Event.Refresh) return reload()
+    return when (e) {
+        is Event.Click -> move(e)  // compiler knows Refresh was handled above
+    }                              // exhaustive — no else required
 }
 ```
 
-Before this, the workaround was a second private property (`private val _id`), doubling naming noise across millions of lines of Kotlin. The `field` keyword finally owns first-class storage.
+#### Experimental: explicit backing fields
+
+Properties can now declare their storage explicitly — including a backing field of a *more specific type* than the exposed property (opt in with `-Xexplicit-backing-fields`):
+
+```kotlin
+class CityViewModel {
+    val city: StateFlow<String>
+        field = MutableStateFlow("")       // stores a MutableStateFlow…
+
+    fun updateCity(newCity: String) {
+        city.value = newCity               // …smart-cast inside the class; read-only outside
+    }
+}
+```
+
+Before this, the workaround was a second private property (`private val _city`), doubling naming noise across millions of lines of Kotlin. The `field` keyword finally owns first-class storage.
 
 #### Experimental: unused return value checker
 
 A whole category of bugs — calling a function and silently discarding its result — becomes visible:
 
 ```kotlin
-val errors = mutableListOf<String>()
+val name = "kotlin"
 
-errors.add("missing id")    // ⚠️ warning: return value unused
-                            // add() returns Boolean — did you mean contains()?
-val added = errors.add("x") // ✅ explicit
+name.uppercase()                 // ⚠️ warning: return value unused — strings are immutable
+val shout = name.uppercase()     // ✅ result used
+val _ = name.uppercase()         // ✅ explicitly ignored
 ```
 
-It's driven by annotations (stdlib functions like `add`, `checkNotNull`, builders are annotated) and rolls out gradually.
+It's driven by annotations (`@MustUseReturnValues`, with `@IgnorableReturnValue` to opt out; most of the stdlib is annotated), is enabled with `-Xreturn-value-checker=check`, and rolls out gradually.
 
 #### Standard library: time and identity
 
@@ -387,11 +389,11 @@ It's driven by annotations (stdlib functions like `add`, `checkNotNull`, builder
 | JVM | Java 25 bytecode support |
 | Kotlin/Native | Up to **40% faster release builds**, C/Obj-C import reaches Beta |
 | Swift export | Enums export as native Swift enums; variadic function support |
-| Kotlin/Wasm | New exception-handling proposal on by default |
+| Kotlin/Wasm | New exception-handling proposal on by default for `wasmWasi` |
 
 #### The breaking-changes corner
 
-`-language-version=1.8` support ended (and 1.9 became JVM-only), the ancient `kotlin-android-extensions` plugin now hard-fails configuration, and Ant build support was removed.
+`-language-version=1.8` support ended (and 1.9 became JVM-only), using the `kotlin-android` plugin with AGP 9+ is now a configuration error (AGP's built-in Kotlin support makes it unnecessary), and Ant build support was removed.
 
 ### Kotlin 2.3.20 (March 2026)
 
@@ -409,8 +411,8 @@ val (currency2, amount2) = price      // compiles fine. Silently swapped. 💥
 Name-based destructuring binds components **by property name**, so reordering a data class can never silently corrupt call sites:
 
 ```kotlin
-// experimental preview (2.3.20+) — syntax still evolving before stabilization
-val [amount = amt, currency = cur] = price
+// experimental preview (2.3.20+, -Xname-based-destructuring) — syntax may still change
+(val amt = amount, val cur = currency) = price
 // amt ← price.amount, cur ← price.currency — regardless of declaration order
 ```
 
@@ -436,7 +438,7 @@ Also in 2.4:
 | JVM | Java 26 support; annotations preserved in metadata by default |
 | Kotlin/Native | **Swift packages as dependencies**; CMS garbage collector on by default |
 | Kotlin/Wasm | Incremental compilation by default; WebAssembly **Component Model** support |
-| Kotlin/JS | Value classes exportable; ES2015-level output |
+| Kotlin/JS | Value classes exportable; ES2015 features in inlined JS stable |
 | Build | Gradle 9.5 compatibility; Maven auto-aligns Java↔JVM targets |
 
 The multiplatform story is quietly becoming the main event: Swift package integration and the Wasm Component Model position Kotlin as a first-class citizen beyond Android and server.
@@ -456,7 +458,7 @@ Pin this one:
 | **2.0** | May 2024 | **K2 compiler stable** (~2× faster builds) |
 | 2.1 | Nov 2024 | Guards, non-local break/continue, `$$` interpolation (experimental) |
 | 2.2 | Jun 2025 | Those three stable; context parameters & nested aliases arrive |
-| 2.3 | Dec 2025 | Nested aliases stable; explicit backing fields; unused-return checker; Java 25 |
+| 2.3 | Dec 2025 | Nested aliases stable; explicit backing fields & unused-return checker (experimental); Java 25 |
 | 2.3.20 | Mar 2026 | Name-based destructuring preview |
 | 2.4 | Jun 2026 | Context params & backing fields stable; Swift packages; Java 26 |
 
@@ -468,7 +470,7 @@ For a typical JVM/backend project on 2.0–2.2 moving to 2.4.x:
 
 1. **Bump the plugin version**, rebuild, triage warnings first — deprecations removed in 2.3 will announce themselves loudly.
 2. **Delete obsolete workarounds**: `_field` companion properties → explicit backing fields; manual parameter threading → consider context parameters where it genuinely simplifies.
-3. **Enable the unused-return checker** in CI before turning it on locally — cheap early wins.
+3. **Enable the (still experimental) unused-return checker** in CI before turning it on locally — cheap early wins.
 4. **Android projects**: verify AGP compatibility matrix alongside; Compose compiler ships with Kotlin now, so one version bump covers both.
 5. **Libraries**: compile against the *lowest* language version you promise to support; consumers on older compilers stay compatible thanks to binary-compatibility guarantees.
 

@@ -3,7 +3,7 @@ title: "Kotlin from Zero to Hero: The Complete Guide"
 date: 2026-10-10
 excerpt: "The entire Kotlin language in one guide: setup, variables, control flow, functions, lambdas, null safety, OOP, data classes, collections, generics, coroutines, Flow, testing, and idiomatic best practices."
 tags: ["Kotlin", "Kotlin Series", "Beginners", "Backend"]
-readingTime: 50
+readingTime: 25
 draft: false
 ---
 
@@ -347,7 +347,7 @@ A lambda is an anonymous function you pass around as a value:
 val sum: (Int, Int) -> Int = { a, b -> a + b }
 
 operate(4, 5) { a, b -> a * b }        // trailing lambda
-operate(4, 5, ::sumOf)                  // method reference
+operate(4, 5, ::sumOf)                  // function reference
 ```
 
 When the lambda has exactly one parameter you can skip naming it and use the implicit `it`:
@@ -355,7 +355,7 @@ When the lambda has exactly one parameter you can skip naming it and use the imp
 ```kotlin
 val names = listOf("Ali", "Omar", "Sara")
 val lengths = names.map { it.length }          // [3, 4, 4]
-val longOnes = names.filter { it.length > 3 }  // [Omar]
+val longOnes = names.filter { it.length > 3 }  // [Omar, Sara]
 ```
 
 Chained together, this is the fluent collection style:
@@ -472,8 +472,8 @@ fun describe(x: Any) {
 ### `lateinit`: deferred initialization
 
 ```kotlin
-class OrderController @Inject constructor() {
-    private lateinit var paymentService: PaymentService
+class OrderController {
+    @Inject lateinit var paymentService: PaymentService   // field injection
 
     fun submit(order: Order): Receipt = pay(paymentService, order)
 }
@@ -487,14 +487,14 @@ What happens when Java code hands Kotlin a `String` that might be null? Java typ
 
 ```kotlin
 // Java: public String getConfig(String key) { ... }
-val config = javaClass.getConfig("timeout")
+val config = javaConfig.getConfig("timeout")
 config.length   // compiles — but NPEs if Java returned null!
 ```
 
 Best practice: immediately assign to explicitly typed variables:
 
 ```kotlin
-val config: String? = javaClass.getConfig("timeout")   // assume nullable
+val config: String? = javaConfig.getConfig("timeout")   // assume nullable
 val len = config?.length ?: 0
 ```
 
@@ -670,8 +670,8 @@ val byCategory = products.groupBy { it.category }
 val byName = products.associateBy { it.name }
 
 // Slicing
-list.take(3)
-list.partition { it.price > 100 }   // Pair(over100, rest)
+products.take(3)
+products.partition { it.price > 100 }   // Pair(over100, rest)
 
 // Aggregation
 products.sumOf { it.price }
@@ -730,7 +730,7 @@ interface Consumer<in T> {       // contravariant: only CONSUMES T
 - **`out T`** (covariance): `Producer<Dog>` can be used as `Producer<Animal>` — safe because T never enters, only exits.
 - **`in T`** (contravariance): `Consumer<Animal>` works wherever a `Consumer<Dog>` is needed — safe because T only goes in.
 
-Mnemonic: **PECS** — Producer `out`, Consumer `in`.
+Mnemonic: Java's **PECS** (Producer Extends, Consumer Super) becomes Producer `out`, Consumer `in`.
 
 **`reified` generics at runtime:**
 
@@ -917,7 +917,7 @@ class MoneyTest {
 class StackSpec : FunSpec({
     test("popping empty stack throws") {
         val stack = Stack<Int>()
-        shouldThrowExactly<NoSuchElementException> { stack.pop() }
+        shouldThrowExactly<EmptyStackException> { stack.pop() }
     }
 })
 ```
@@ -925,7 +925,7 @@ class StackSpec : FunSpec({
 Property-based testing generates hundreds of random inputs and verifies invariants:
 
 ```kotlin
-checkAll(arb.int()) { n ->
+checkAll(Arb.int()) { n ->
     listOf(n).reversed().reversed() shouldBe listOf(n)
 }
 ```
@@ -970,7 +970,7 @@ class OrderServiceTest {
 
     @Test
     fun `submitting order notifies customer`() = runTest {
-        every { repository.save(any()) } returns Order(id = "#42", status = "NEW")
+        every { repository.save(any()) } returns Order(id = "#42", items = listOf("tea"), status = "NEW")
         coEvery { notifier.notifyCustomer(any(), any()) } just runs
 
         service.submit(Order(id = "", items = listOf("tea")))
@@ -985,7 +985,7 @@ Prefer hand-written fakes when they're simple — over-mocking couples tests to 
 ```kotlin
 class InMemoryOrderRepository : OrderRepository {
     private val orders = mutableMapOf<String, Order>()
-    override fun save(order: Order) { orders[order.id] = order }
+    override fun save(order: Order): Order = order.also { orders[it.id] = it }
     override fun findById(id: String): Order? = orders[id]
 }
 ```

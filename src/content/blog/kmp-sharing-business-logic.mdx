@@ -1,9 +1,9 @@
 ---
 title: "KMP: Sharing Business Logic, Not Just UI — A Real‑World Example"
 date: 2026-08-23
-excerpt: "Shared models, DI (Koin/Dagger‑hilt‑multiplatform), network layer (Ktor/Retrofit), and serialization strategies across Android, iOS, desktop, and web."
+excerpt: "Shared models, DI with Koin, a Ktor network layer, and kotlinx.serialization strategies across Android, iOS, desktop, and web."
 tags: ["Kotlin Multiplatform", "KMP", "Android", "iOS", "Networking"]
-readingTime: 8
+readingTime: 4
 draft: false
 ---
 
@@ -14,16 +14,17 @@ The promise of Kotlin Multiplatform is one source of truth for your app's logic 
 <Callout variant="tip" title="What you'll learn">
 - How to set up a `commonMain` module with Koin for DI
 - Writing a shared Ktor client that works on JVM, iOS, and WasmJS
-- Serialization strategies: Kotlin Serialization vs. Moshi per platform
+- Serialization strategies: kotlinx.serialization in `commonMain` (and why Moshi stays JVM‑only)
 </Callout>
 
 ### Multi‑module project layout
 
 ```text
 my-app/
-├── commonMain/          # Shared Kotlin code (models, DI, networking)
-├── androidApp/          # Android UI (Compose) + main {}
-├── iosApp/              # Xcode project wrapping Compose UI
+├── shared/
+│   └── src/commonMain/  # Shared Kotlin code (models, DI, networking)
+├── androidApp/          # Android UI (Compose) + MainActivity
+├── iosApp/              # Xcode project consuming the shared framework
 ├── desktopApp/          # JVM desktop (optional)
 └── webApp/              # WasmJS entry point
 ```
@@ -31,93 +32,96 @@ my-app/
 ### Shared models & DI with Koin
 
 ```kotlin
-// commonMain — data models
+// commonMain
+import org.koin.core.module.dsl.viewModel
+import org.koin.dsl.module
+
+// Data models
 @Serializable
 data class User(val id: Int, val name: String, val email: String)
 
-// Koin module (commonMain)
-import koin.android.ext.koinViewModel
-import org.koin.dsl.module
-
+// Koin module
 val commonModule = module {
-    single { User(0, "unknown", "") }
+    single { httpClient }
+    single<UserApi> { KtorUserApi(get()) }
+    single { UserRepository(get()) }
     viewModel { UserViewModel(get()) }
 }
 
-// UserViewModel in commonMain
+// UserViewModel (androidx.lifecycle ViewModel is multiplatform)
 class UserViewModel(private val repo: UserRepository) : ViewModel() {
-    private val _uiState = MutableStateFlow UiState.Loading()
-    val uiState: StateFlow<UiState> = _uiState.stateIn(
-        scope = CoroutineScope(Dispatchers.Main),
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = UiState.Loading(),
-    )
+    private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     fun load() {
         viewModelScope.launch {
-            val u = repo.getUser()
-            _uiState.postValue(u)
+            _uiState.value = UiState.Success(repo.getUser())
         }
     }
 }
 ```
 
-Koin’s `single` works across all targets because it resolves at runtime via reflection — no code‑gen step required.
+Koin works across all targets because its DSL is plain Kotlin lambdas resolved at runtime — no reflection and no code‑gen step required.
 
 ### Shared Ktor client
 
 ```kotlin
 // commonMain — Ktor setup
-val httpClient: HttpClient = HttpClient(CORS) {
+val httpClient: HttpClient = HttpClient {
     install(ContentNegotiation) {
-        json(JsonSerializer) // Kotlin Serialization serializers
+        json(Json { ignoreUnknownKeys = true }) // kotlinx.serialization
     }
-    install(DefaultHeaders) { headers("Accept" to "application/json") }
+    defaultRequest {
+        header(HttpHeaders.Accept, ContentType.Application.Json)
+    }
 }
 
-// iOS / WasmJS expect the same artifact; no expect/actual needed for the client itself.
+// Add one engine per platform (ktor-client-okhttp in androidMain, ktor-client-darwin
+// in iosMain, ktor-client-js in wasmJsMain); HttpClient {} picks it up automatically,
+// so no expect/actual is needed for the client itself.
 ```
 
-On iOS, Ktor is distributed as an framework — just add the same dependency version in `iosApp/build.gradle.kts` and the shared `commonMain` client works unchanged.
+On iOS, add `ktor-client-darwin` to `iosMain` in the shared module’s `build.gradle.kts`; the Xcode project just links the shared framework, and the `commonMain` client works unchanged.
 
 ### Serialization per platform
 
 ```kotlin
-// commonMain — expect/actual for serializers
-expect class UserSerializer : KSerializer<User>
-actual object UserSerializer : KSerializer<User> {
-    override val descriptor = DescriptorSerializer.descriptor
-    override fun serialize(serializing: SerializingBuffer, value: User) = ...
-    override fun deserialize(deserializing: DeserializingBuffer): User = ...
+// commonMain — one Json configuration shared by Ktor and local storage
+val AppJson = Json {
+    ignoreUnknownKeys = true   // tolerate new server fields
+    explicitNulls = false
 }
 
-// iOS actual implementation (generated by Kotlin Serialization plugin)
-actual object UserSerializer : KSerializer<User> { ... }
+@Serializable
+data class UserDto(
+    val id: Int,
+    @SerialName("full_name") val name: String,
+    val email: String,
+)
 ```
 
-The `expect/actual` pattern lets you keep the *interface* in `commonMain` while the *byte‑code* is provided per‑platform by the Kotlin Serialization plugin (installed in each module).
+The kotlinx.serialization compiler plugin generates serializers at compile time for every target, so there’s no `expect/actual` and no reflection — the same `@Serializable` class works on JVM, iOS, and Wasm. Keep reflection‑based libraries like Moshi or Gson out of `commonMain`; they only run on the JVM.
 
 <Callout variant="warning">
-On web (WasmJS), the serializer module must be manually registered in `jsSerialize` / `jsDeserialize` hooks; otherwise the app crashes on deserialization. Add `KotlinSerializer.Registry` to your `index.js` entry point.
+On iOS and web there is no reflection, so open polymorphic hierarchies (an `interface` or `abstract class` with subclasses in other modules) must be registered explicitly in a `SerializersModule`; otherwise deserialization fails at runtime with a `SerializationException`. Sealed hierarchies are handled by the plugin automatically.
 </Callout>
 
 ### Testing the shared layer
 
 ```kotlin
-// commonMain test
+// commonTest
 class UserRepositoryTest {
-    @Test fun `load user from repo returns expected model`() = runTest {
-        val repo = UserRepository(FakeDao(), FakeApi())
-        repo.load()
-        assertEquals(User(1, "Alice", "alice@test"), repo.uiState.value)
+    @Test fun loadUserFromRepoReturnsExpectedModel() = runTest {
+        val repo = UserRepository(FakeUserApi(User(1, "Alice", "alice@test")))
+        assertEquals(User(1, "Alice", "alice@test"), repo.getUser())
     }
 }
 ```
 
-Since the repo lives in `commonMain`, the same test suite runs on Android, iOS test targets, and CI pipelines — one source of truth for logic correctness.
+Since the repo lives in `commonMain` and the test in `commonTest`, the same test suite runs on Android, iOS test targets, and CI pipelines — one source of truth for logic correctness.
 
 ## Resources
 
-- [KMP quickstart — Kotlinlang](https://kotlinlang.org/docs/multiplatform-setup.html)
+- [KMP quickstart — Kotlinlang](https://kotlinlang.org/docs/multiplatform/quickstart.html)
 - [Koin multiplatform guide](https://insert-koin.io/docs/reference/multiplatform/)
-- [Ktor multiplatform](https://ktor.io/docs/multiplatform.html)
+- [Ktor multiplatform client](https://ktor.io/docs/client-create-multiplatform-application.html)

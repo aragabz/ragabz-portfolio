@@ -3,7 +3,7 @@ title: "Mastering Airflow DAGs and Operators"
 date: 2026-08-16
 excerpt: "Go beyond the basics: design robust DAGs, choose the right operators, pass data between tasks with XComs, and use dynamic task mapping."
 tags: ["Apache Airflow", "Python", "ETL", "Data Engineering"]
-readingTime: 14
+readingTime: 9
 ---
 
 import Callout from '../../components/mdx/Callout.astro';
@@ -44,8 +44,7 @@ Both `transform_a` and `transform_b` wait for `extract`, and `load` waits for bo
 Sometimes the next step depends on a condition. Use `@task.branch`:
 
 ```python
-from airflow.decorators import task
-from airflow.models.baseoperator import chain
+from airflow.sdk import task
 
 @task.branch
 def choose_branch(x: int):
@@ -100,7 +99,7 @@ Under the hood this creates a `PythonOperator`. The TaskFlow version is shorter,
 Some operators don't have a TaskFlow equivalent and are worth learning:
 
 ```python
-from airflow.operators.bash import BashOperator
+from airflow.providers.standard.operators.bash import BashOperator
 
 run_script = BashOperator(
     task_id="run_script",
@@ -117,7 +116,7 @@ Use `BashOperator` when you already have battle-tested scripts or command-line t
 Sensors are tasks that *wait*. They poll until their condition is true or they time out:
 
 ```python
-from airflow.sensors.filesystem import FileSensor
+from airflow.providers.standard.sensors.filesystem import FileSensor
 
 wait_for_file = FileSensor(
     task_id="wait_for_file",
@@ -131,7 +130,7 @@ wait_for_file = FileSensor(
 Common sensors: `FileSensor`, `ExternalTaskSensor`, `SqlSensor`, `HttpSensor`, and `@task.sensor` for custom ones.
 
 <Callout variant="warning">
-Sensors that poll forever block scheduler slots. Prefer `mode="reschedule"` over the default `"poke"` for long waits, set a sensible `timeout`, and prefer event-driven triggers (like the EventBridge/Kafka triggers) when available.
+Sensors that poll forever block worker slots. Prefer `mode="reschedule"` over the default `"poke"` for long waits, set a sensible `timeout`, and prefer event-driven triggers (like the EventBridge/Kafka triggers) when available.
 </Callout>
 
 ## Passing Data with XComs
@@ -152,7 +151,7 @@ def report(total: int):              # pulled automatically
 report(compute())
 ```
 
-Classic operators push XComs explicitly:
+You can also push and pull XComs explicitly through the task instance:
 
 ```python
 @task
@@ -177,7 +176,7 @@ Pass only small summaries through XComs (counts, paths, status). For real data, 
 
 ## Scheduling, Catchup, and Backfills
 
-The schedule controls when a DAG is *created*. In Airflow, `schedule` values like `@daily` create one DAG run per day after `start_date`:
+The schedule controls when a DAG *run* is created. In Airflow, `schedule` values like `@daily` create one DAG run per day after `start_date`:
 
 ```python
 @dag(
@@ -190,17 +189,17 @@ def backfill_demo(): ...
 
 With `catchup=True`, Airflow creates a run for *every* missed interval between `start_date` and now. That's a **backfill** — perfect when you've been collecting data for months and want to process it all retroactively.
 
-If you need a one-off historical run, `airflow dags backfill` is more controlled:
+If you need a one-off historical run, `airflow backfill create` is more controlled:
 
 ```bash
-airflow dags backfill --start-date 2026-01-01 --end-date 2026-01-07 backfill_demo
+airflow backfill create --dag-id backfill_demo --from-date 2026-01-01 --to-date 2026-01-07
 ```
 
 <Callout variant="note">
-Remember that `start_date` is evaluated in **UTC** by default. For business pipelines, set a `timezone` on the DAG so "daily" means "daily in your local timezone".
+Remember that a naive `start_date` is interpreted in **UTC** by default. For business pipelines, use a timezone-aware `start_date` (e.g. `pendulum.datetime(2026, 1, 1, tz="Europe/Vienna")`) so "daily" means "daily in your local timezone".
 </Callout>
 
-## Reliability: Retries, Timeouts, and SLA
+## Reliability: Retries, Timeouts, and Deadlines
 
 Production pipelines fail. The difference between a good and a bad pipeline is how it fails.
 
@@ -228,24 +227,30 @@ def long_running(): ...
 
 Set `execution_timeout` on tasks that touch external systems. A hung task that never times out can silently stall your whole schedule.
 
-### SLA monitoring
+### Deadline alerts (formerly SLAs)
 
 ```python
+from airflow.sdk import AsyncCallback, DeadlineAlert, DeadlineReference
+
 @dag(
     schedule="@daily",
-    sla_miss_callback=notify_on_miss,
+    deadline=DeadlineAlert(
+        reference=DeadlineReference.DAGRUN_QUEUED_AT,
+        interval=timedelta(hours=1),
+        callback=AsyncCallback(notify_on_miss),
+    ),
 )
-def sla_demo(): ...
+def deadline_demo(): ...
 ```
 
-When a task runs past its `sla`, Airflow fires `sla_miss_callback` — a great hook for paging your team.
+Airflow 3 removed SLAs (`sla`, `sla_miss_callback`). Their replacement, **Deadline Alerts** (experimental, Airflow 3.1+), fires the callback when a DAG run hasn't finished within `interval` of the reference point — a great hook for paging your team.
 
 ## Dynamic Task Mapping: DAGs That Scale Themselves
 
 Often you don't know at parse time how many instances of a task you need — maybe there are 10 files today and 5,000 tomorrow. **Dynamic task mapping** creates one task instance per element of a mapped input:
 
 ```python
-from airflow.decorators import task
+from airflow.sdk import task
 
 @task
 def process_file(path: str) -> dict:

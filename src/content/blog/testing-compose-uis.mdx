@@ -1,9 +1,9 @@
 ---
-title: "Testing Compose UIs: Unit Tests, TestRule, and Screenshot Testing with Accompanist"
+title: "Testing Compose UIs: Unit Tests, TestRule, and Screenshot Testing with Roborazzi"
 date: 2026-08-23
-excerpt: "createComposeRule, testing SideEffects, and pixel-diff workflows for regression guardrails."
+excerpt: "createComposeRule, testing side effects, and pixel-diff workflows for regression guardrails."
 tags: ["Testing", "Jetpack Compose", "Android"]
-readingTime: 7
+readingTime: 4
 draft: false
 ---
 
@@ -13,8 +13,8 @@ A solid test suite gives you confidence to refactor Compose UIs without fear of 
 
 <Callout variant="tip" title="What you'll learn">
 - How to create and configure `createComposeRule`
-- Testing `SideEffect`s, `remember`, and `state {}` in isolation
-- Pixel‑diff regression testing with Accompanist and PixelTest
+- Testing `SideEffect`s and `remember`ed state in isolation
+- Pixel‑diff regression testing with Roborazzi
 </Callout>
 
 ### Basic compose test rule
@@ -23,82 +23,89 @@ A solid test suite gives you confidence to refactor Compose UIs without fear of 
 @get:Rule
 val composeTestRule = createComposeRule()
 
-@Test fun `greeter composable shows entered name`() = composeTestRule.setUp {
-    // Compose rule automatically starts/ stops the dispatcher
+@Test fun `greeter composable shows entered name`() {
     composeTestRule.setContent {
         Greeting("Android")
     }
 
-    // Use the codelab‑provided matcher to find text
-    composeOnView(withText("Android")).check(matches(isDisplayed()))
+    // Find the node by its text via semantics and assert on it
+    composeTestRule.onNodeWithText("Android").assertIsDisplayed()
 }
 ```
 
-`composeTestRule` provides `DispatchingTestRule` under the hood, so `SystemClock` and `CoroutineScope` behave predictably inside `@Test`.
+`composeTestRule` drives a test clock (`mainClock`) and, by default, waits for the UI to be idle before every finder and assertion, so recompositions and animations settle predictably inside `@Test`. Set `composeTestRule.mainClock.autoAdvance = false` to step through time manually.
 
 ### Testing `SideEffect` and `remember`
 
 ```kotlin
-@Test fun `side effect applies correct font scaling`() = composeTestRule.setUp {
-    // Arrange: set a system font scaling factor
-    val scaling = 1.5f
-    doReturn(scaling).when(Resources).configuration.fontScale
+@Test fun `remembered counter survives recomposition and side effect reports it`() {
+    val reported = mutableListOf<Int>()
 
-    // Act: compose a composable that reads the config
     composeTestRule.setContent {
-        Text("Size dependent")
+        var count by remember { mutableStateOf(0) }
+        val label = "Count: $count"           // read here so this scope recomposes
+        SideEffect { reported += count }       // runs after every successful composition
+        Button(onClick = { count++ }) { Text(label) }
     }
 
-    // Assert: read the composed via semantics or measure
-    val size = composeTestRule.getComposition().remembered mutableStateOf(0f)
-    // (custom matcher example)
-    composeOnView(withText("Size dependent")).check(matches(isDisplayed()))
+    // Act: click through the semantics tree
+    composeTestRule.onNodeWithText("Count: 0").performClick()
+
+    // Assert: state was kept and the side effect saw both compositions
+    composeTestRule.onNodeWithText("Count: 1").assertIsDisplayed()
+    assertEquals(listOf(0, 1), reported)
 }
 ```
 
-For `remember`‑based state, use `composeTestRule.clearComposition()` between tests to avoid cross‑test contamination.
+The rule creates a fresh composition for every test and disposes it afterwards, so `remember`‑based state never leaks between tests.
 
 <Callout variant="warning">
-Never call `composeTestRule.clearSetUp()` mid‑test — it resets the composition and dispatches a composition change, which can flake your assertions. Always teardown in the `@After` block or let the rule handle it on test completion.
+Never call `setContent` twice in one test — the rule throws an `IllegalStateException`. To exercise a state change, drive it through the UI (clicks, text input) or through hoisted state you pass in, and let the rule handle teardown on test completion.
 </Callout>
 
-### Pixel‑diff regression with Accompanist + PixelTest
+### Pixel‑diff regression with Roborazzi
 
 ```kotlin
-@Test fun `ui regression: home screen snapshot matches baseline`() = composeTestRule.setUp {
-    composeTestRule.setContent {
-        HomeScreen() // your root composable
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class HomeScreenScreenshotTest {
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    @Test fun `ui regression: home screen snapshot matches baseline`() {
+        composeTestRule.setContent {
+            HomeScreen() // your root composable
+        }
+
+        // Record with ./gradlew recordRoborazziDebug, compare with verifyRoborazziDebug
+        composeTestRule.onRoot().captureRoboImage(
+            roborazziOptions = RoborazziOptions(
+                compareOptions = RoborazziOptions.CompareOptions(
+                    changeThreshold = 0.01f, // 1 % pixel diff allowed
+                ),
+            ),
+        )
     }
-
-    // Take a snapshot of the current composition
-    val composableSnapshot = composeTestRule.takeSnapshot()
-
-    // Compare against a baseline PNG stored in test/resources
-    val result = PixelTest.compare(
-        composableSnapshot,
-        Baseline.HOME_SCREEN,   // references test/resources/baseline/home_screen.png
-        tolerance = 0.01f     // 1 % pixel diff allowed
-    )
-
-    assertTrue(result.isAccepted, { "Regression detected: ${result.diffImagePath}" })
 }
 ```
 
-- Store baselines version‑controlled (e.g. `test/baselines/`) alongside the test.
-- Run `PixelTest` in CI as a `fail-fast` step — any visual change (intentional or not) will block the merge.
-- Adjust `tolerance` per‑screen: tighter on exact‑layout screens (forms), looser on decorative or animated screens.
+Roborazzi runs on the JVM with Robolectric, so screenshot tests are plain local unit tests — no emulator needed.
+
+- Store baselines version‑controlled (e.g. point `roborazzi { outputDir }` at `src/test/screenshots/`) alongside the test.
+- Run `./gradlew verifyRoborazziDebug` in CI as a `fail-fast` step — any visual change (intentional or not) will block the merge until the baseline is re‑recorded.
+- Adjust `changeThreshold` per‑screen: tighter on exact‑layout screens (forms), looser on decorative or animated screens.
 
 ### Common testing pitfalls
 
 | Pitfall | Fix |
 |---------|-----|
-| `CoroutineScope` not disposed → leaked jobs | Use `composeTestRule.clearSetUp()` in `@After` or `use DisposeOnCompositionDestroy()` |
-| Test order dependence (state leakage) | Isolate each test with `composeTestRule.setUp { }` / `composeTestRule tearDown { }` |
-| Pixel diff flakes on animated UIs | Increase `tolerance` or snapshot only static parts of the UI (use `ScreenshotTarget.Window` with `includeVisibleRegionsOnly = true`) |
+| Coroutines launched with `GlobalScope` leak across tests | Use `rememberCoroutineScope()` or `LaunchedEffect` — they’re cancelled when the rule disposes the composition |
+| Test order dependence (state leakage) | Keep state in composables or injected fakes, never in shared singletons; the rule gives each test a fresh composition |
+| Pixel diff flakes on animated UIs | Set `mainClock.autoAdvance = false` and capture at a fixed frame, raise `changeThreshold`, or capture only static nodes instead of `onRoot()` |
 
 ## Resources
 
-- [Compose testing — Android Devs](https://developer.android.com/training/testing/ui/compose)
-- [createComposeRule API reference](https://developer.android.com/reference/androidx/test/core/createComposeRule)
-- [Accompanist PixelTest — GitHub](https://github.com/accompanist/pixel-test)
-- [Compose test rules codelab](https://developer.android.com/codelabs/compose-testing)
+- [Test your Compose layout — Android Devs](https://developer.android.com/develop/ui/compose/testing)
+- [Compose UI test JUnit4 API reference](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/junit4/package-summary)
+- [Roborazzi — GitHub](https://github.com/takahirom/roborazzi)
+- [Testing in Jetpack Compose codelab](https://developer.android.com/codelabs/jetpack-compose-testing)

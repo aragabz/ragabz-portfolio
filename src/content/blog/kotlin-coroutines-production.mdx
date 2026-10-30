@@ -1,7 +1,7 @@
 ---
 title: "Kotlin Coroutines in Production: Error‑Handling Patterns, Timeout, and Cancellation"
 date: 2026-08-23
-excerpt: "try/cancel, supervisorStrategy, flow { catch }, and structured concurrency to avoid leaks."
+excerpt: "Cancellation-aware try/catch, SupervisorJob vs. CoroutineExceptionHandler, retryWhen/catch on Flow, and structured concurrency to avoid leaks."
 tags: ["Android", "Kotlin", "Coroutines"]
 readingTime: 5
 draft: false
@@ -12,12 +12,12 @@ import Callout from '../../components/mdx/Callout.astro';
 Production‑ready coroutine patterns that keep your app stable under failure conditions.
 
 <Callout variant="tip" title="What you'll learn">
-- How to structure `try / cancel` blocks for graceful degradation
-- `supervisorStrategy` vs. `CoroutineExceptionHandler` — which one actually protects you
-- `flow { catch }` and `retryWhen` for resilient data pipelines
+- How to structure cancellation-aware `try / catch` blocks for graceful degradation
+- `SupervisorJob` vs. `CoroutineExceptionHandler` — which one actually protects you
+- `catch` and `retryWhen` for resilient `Flow` pipelines
 </Callout>
 
-### Structured `try / cancel` blocks
+### Cancellation-aware `try / catch` blocks
 
 ```kotlin
 suspend fun fetchUser(id: Int): User {
@@ -25,11 +25,10 @@ suspend fun fetchUser(id: Int): User {
         try {
             // Simulate a network call that can be cancelled
             val result = repository.fetch(id)
-            // 👇 Cancel‑aware: re‑throw CancellationException to propagate
-            // the cancellation up the call stack rather than swallowing it.
             result.also { /* log success */ }
         } catch (e: CancellationException) {
-            // 👇 Propagate cancellation — the caller can decide to retry or abort
+            // 👇 Cancel‑aware: re‑throw CancellationException so cancellation
+            // propagates instead of being swallowed
             throw e
         } catch (e: Exception) {
             // 👇 All other failures (network timeout, deserialization, etc.)
@@ -40,73 +39,77 @@ suspend fun fetchUser(id: Int): User {
 }
 ```
 
-- **`CancellationException`** is the mechanism for cooperative cancellation; never catch it unless you truly mean "handle the cancellation gracefully."
+- **`CancellationException`** is the mechanism for cooperative cancellation; never swallow it — if you catch it (or a broad `Exception`/`Throwable`), re‑throw it.
 - **`catch (e: Exception)`** catches everything else (IOExceptions, JSON errors). Decide per‑call whether to propagate or return a fallback.
 
-### `supervisorStrategy` vs. `CoroutineExceptionHandler`
+### `SupervisorJob` vs. `CoroutineExceptionHandler`
 
-| Scope | `supervisorStrategy` | `CoroutineExceptionHandler` |
+| | `SupervisorJob` / `supervisorScope` | `CoroutineExceptionHandler` |
 |-------|----------------------|----------------------------|
-| Applies to | A whole `CoroutineScope` / `CoroutineContext` | A single launched `CoroutineScope` |
-| Effect on parent | Crashes the child **without** propagating to parent (default) | Passes the exception to the parent by default |
-| Typical use | Top‑level `ViewModel` scope, `LifecycleScope` | Individual `launch { }` where you want a custom handler |
-| Example | ```kotlin val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main) ``` | ```kotlin launch("coroutine") { ... CoroutineExceptionHandler(Unit) { /* … */ } } ``` |
+| What it does | A failing child does **not** cancel its parent or siblings | Last‑resort callback for an *uncaught* exception — it doesn't recover or prevent cancellation |
+| Where it takes effect | The scope/job whose children should fail independently | Only in a root coroutine's context (the scope or a top‑level `launch`); ignored in nested children and by `async` |
+| Typical use | `viewModelScope` and `lifecycleScope` (already supervisor‑based), app‑level scopes | Logging/crash reporting for top‑level `launch { }` |
+| Example | `CoroutineScope(SupervisorJob() + Dispatchers.Main)` | `CoroutineExceptionHandler { _, throwable -> log(throwable) }` |
 
-**Rule of thumb:** Use `supervisorStrategy` at the outermost scope (Application or ViewModel) to prevent a single failing coroutine from taking down the whole UI thread. Reserve `CoroutineExceptionHandler` for low‑level jobs where you have a specific recovery strategy.
+**Rule of thumb:** Use a `SupervisorJob` at the outermost scope (Application or ViewModel) so one failing coroutine doesn't cancel all its siblings. Add a `CoroutineExceptionHandler` to that root context for logging; for actual recovery, use `try / catch` inside the coroutine.
 
 ```kotlin
-// ✅ Top‑level scope with supervisor
-val coroutineScope = CoroutineScope(
+// ✅ Top‑level scope with supervisor + last‑resort handler
+val appScope = CoroutineScope(
     SupervisorJob() + Dispatchers.Main +
-        CoroutineExceptionHandler(Unit) { /* optional fallback */ }
+        CoroutineExceptionHandler { _, throwable -> logError("Uncaught", throwable) }
 )
 
-// ✅ Launched job with its own handler
-launch(coroutineScope) {
-    riskyOperation()
-} catch (exception: Exception) {
-    // This handler only sees exceptions from THIS job if not supervised
+// ✅ Recovery for THIS job happens inside it
+appScope.launch {
+    try {
+        riskyOperation()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        // handle/fallback; siblings in appScope are unaffected either way
+    }
 }
 ```
 
-### `flow { catch }` and `retryWhen` for resilient pipelines
+### `retryWhen` and `catch` for resilient pipelines
 
 ```kotlin
-val userStream = repository.userStream()
-    .retryWhen { attempts ->
-        attempts.lastOrNull()?.let { err ->
-            // Retry only on transient errors; give up after 3 attempts
-            attempts.size >= 3
-        } ?: false
+val userStream: Flow<UserUiState> = repository.userStream()
+    .map<User, UserUiState> { UserUiState.Loaded(it) }
+    .retryWhen { cause, attempt ->
+        // Retry only on transient errors; give up after 3 retries
+        cause is IOException && attempt < 3
     }
     .catch { exception ->
-        when (exception) {
-            is IOException -> "Network timeout — will retry"
+        val message = when (exception) {
+            is IOException -> "Network error — tap to retry"
             is JsonSyntaxException -> "Data corruption — abort"
             else -> "Unexpected error — log and abort"
         }
+        emit(UserUiState.Error(message))
     }
 ```
 
 - `retryWhen` gives you control over *when* to retry (attempt count, exception type, back‑off logic).
-- `catch` transforms the sealed error into a UI‑friendly message; the upstream can decide to show a retry button or go to an error screen.
+- `catch` turns the error into a UI‑friendly state; the UI can decide to show a retry button or go to an error screen.
 
 <Callout variant="note">
-Never use `flow { }` builder for hot streams that already exist (e.g., repository `Flow`s). Use `catch` as an operator on the existing flow instead — it preserves the original producer and only taps into error handling.
+Don't wrap an existing `Flow` (e.g., a repository stream) in a new `flow { }` builder with `try / catch` around `collect` just to handle errors. Use `catch` as an operator on the existing flow instead — it preserves the original producer and only taps into error handling. Note that `catch` only sees **upstream** exceptions, not ones thrown inside your `collect { }`.
 </Callout>
 
-### avoiding coroutine leaks
+### Avoiding coroutine leaks
 
 1. **Always tie coroutine scopes to a lifecycle owner:** `viewModelScope`, `lifecycleScope`, or an explicit `CoroutineScope(job)` that you cancel in `onCleared()` / `onDestroy()`.
 2. **Never launch inside a `remember` block** unless the job is explicitly tied to the `remember` key's lifecycle.
-3. **Use `withTimeout()`** for IO operations that might hang:
+3. **Use `withTimeout()` / `withTimeoutOrNull()`** for IO operations that might hang — `withTimeout` throws `TimeoutCancellationException`, `withTimeoutOrNull` returns `null` instead:
    ```kotlin
    val result = withTimeoutOrNull(5_000) { repository.fetch(id) }
    ```
-4. **Prefer `CoroutineScope(Dispatchers.Main).launch { }`** for UI‑only work; avoid mixing `Dispatchers.IO` and `Dispatchers.Main` in the same unsupervised block.
+4. **Avoid ad‑hoc `CoroutineScope(Dispatchers.Main).launch { }`** — nothing cancels that scope, so it leaks. Launch UI work from the lifecycle scope (`viewModelScope.launch { }`) and switch to `Dispatchers.IO` with `withContext` only around blocking calls.
 
 ## Resources
 
 - [Coroutines guide — Kotlinlang](https://kotlinlang.org/docs/coroutines-guide.html)
-- [Supervisor strategy — Android Devs](https://developer.android.com/kotlin/coroutines#supervisor)
-- [Flow operators cheat sheet — Medium](https://medium.com/@konfir/flow-operators-cheat-sheet-470e2c5e3c7e)
+- [Coroutine exceptions handling & supervision — Kotlinlang](https://kotlinlang.org/docs/exception-handling.html)
+- [Asynchronous Flow — Kotlinlang](https://kotlinlang.org/docs/flow.html)

@@ -3,7 +3,7 @@ title: "Apache Airflow for Beginners: From Zero to Your First DAG"
 date: 2026-08-15
 excerpt: "Learn what Apache Airflow is, understand its core building blocks, install it locally, and write and run your very first DAG."
 tags: ["Apache Airflow", "Data Engineering", "Python", "ETL"]
-readingTime: 12
+readingTime: 8
 ---
 
 import Callout from '../../components/mdx/Callout.astro';
@@ -45,10 +45,10 @@ Before writing anything, get familiar with these building blocks:
 | **Operator** | A template for a task type (`BashOperator`, `PythonOperator`, sensors, etc.) |
 | **Scheduler** | The component that decides when tasks run and triggers them |
 | **Executor** | How tasks are actually executed (locally, in a cluster, on Kubernetes, ...) |
-| **Webserver** | The UI for inspecting and managing DAGs |
-| **Metadata database** | Where Airflow stores DAG state, task runs, logs, and variables |
+| **API server** | Serves the web UI and REST API for inspecting and managing DAGs (the "webserver" in Airflow 2) |
+| **Metadata database** | Where Airflow stores DAG state, task runs, connections, and variables |
 
-The typical architecture: the **scheduler** reads your DAG files, and whenever a task's schedule and dependencies are satisfied, it hands the task to the **executor**, which runs it and records the result back in the **metadata database**.
+The typical architecture: the **DAG processor** parses your DAG files into the metadata database, and whenever a task's schedule and dependencies are satisfied, the **scheduler** hands the task to the **executor**, which runs it and records the result back in the **metadata database**.
 
 ### When should you use Airflow?
 
@@ -74,7 +74,10 @@ source .venv/bin/activate
 
 # Install Airflow (check https://pypi.org/project/apache-airflow/ for the latest)
 export AIRFLOW_HOME="$PWD/airflow"
-pip install "apache-airflow[standalone]"
+AIRFLOW_VERSION=3.3.2  # pin the release you want
+PYTHON_VERSION="$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+pip install "apache-airflow==${AIRFLOW_VERSION}" \
+  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
 ```
 
 Then simply run:
@@ -83,10 +86,10 @@ Then simply run:
 airflow standalone
 ```
 
-`airflow standalone` boots everything you need for local development: the metadata database (SQLite), the scheduler, the webserver, and a bunch of example DAGs. You'll see a login and password printed in the terminal — use them to sign in at `http://localhost:8080`.
+`airflow standalone` boots everything you need for local development: the metadata database (SQLite), the scheduler, the DAG processor, the API server (which serves the UI), the triggerer, and a bunch of example DAGs. You'll see a login and password printed in the terminal — use them to sign in at `http://localhost:8080`.
 
 <Callout variant="tip">
-Alternatively, install a single component at a time: `airflow db migrate` to initialize the database, then `airflow scheduler` and `airflow webserver` in separate terminals. And if you prefer containers, the official `apache/airflow` Docker image or the Astro CLI are great options.
+Alternatively, run each component separately: `airflow db migrate` to initialize the database, then `airflow scheduler`, `airflow dag-processor`, and `airflow api-server` in separate terminals. And if you prefer containers, the official `apache/airflow` Docker image or the Astro CLI are great options.
 </Callout>
 
 ## Your First DAG
@@ -96,7 +99,7 @@ DAGs live in the `dags/` folder under `AIRFLOW_HOME` (or wherever you configure 
 ```python
 from datetime import datetime, timedelta
 
-from airflow.decorators import dag, task
+from airflow.sdk import dag, task
 
 
 @dag(
@@ -107,9 +110,9 @@ from airflow.decorators import dag, task
 )
 def hello_pipeline():
     @task
-    def extract():
+    def extract() -> int:
         print("Extracting data...")
-        return {"value": 42}
+        return 42
 
     @task
     def transform(value: int) -> int:
@@ -135,7 +138,7 @@ Let's walk through the key parts:
 | Piece | What it does |
 |-------|-------------|
 | `schedule="@daily"` | Runs once per day. Accepts cron strings too |
-| `start_date` | When scheduling starts. Required for `@dag` |
+| `start_date` | When scheduling starts |
 | `catchup=False` | Don't backfill missed runs from `start_date` up to now |
 | `@task` | Turns the function into an Airflow task |
 | `extract()` → `transform(data)` → `load(transformed)` | Creates task dependencies automatically |
@@ -149,14 +152,14 @@ Refresh the web UI and you'll see `hello_pipeline` in the DAG list. Click it to 
 - The **Code view** — the Python source of the DAG
 - **Logs** per task instance — click a green square, then *Log*
 
-Trigger it manually with the *Run* button and watch the states go from *queued* → *running* → *success*.
+Trigger it manually with the *Trigger* button and watch the states go from *queued* → *running* → *success*.
 
 ## Understanding DAG Structure vs. Execution
 
-One thing that confuses beginners: **the DAG file is read by the scheduler on every schedule tick.** The code that runs at import time is the *definition* of the pipeline; the code inside `@task` functions runs when the scheduler decides each task is ready.
+One thing that confuses beginners: **the DAG file is re-parsed periodically (every 30 seconds by default) by the DAG processor.** The code that runs at import time is the *definition* of the pipeline; the code inside `@task` functions runs when the scheduler decides each task is ready.
 
 ```python
-# This runs at DAG parse time (every scheduler tick) — keep it light!
+# This runs at DAG parse time (every parse cycle) — keep it light!
 print("Parsing DAG")
 
 @dag(...)
@@ -168,13 +171,13 @@ def my_dag():
 ```
 
 <Callout variant="warning">
-Never put heavy logic at DAG-parse time. If parsing takes too long, the scheduler gets slower for *all* DAGs. Keep top-level code minimal — imports, constant definitions, and the DAG structure itself.
+Never put heavy logic at DAG-parse time. If parsing takes too long, DAG processing gets slower for *all* DAGs. Keep top-level code minimal — imports, constant definitions, and the DAG structure itself.
 </Callout>
 
 ## Common Pitfalls for Beginners
 
-1. **Forgetting to assign the DAG to a variable** — the decorator returns a DAG object, so you must call it (`hello_pipeline()`), otherwise Airflow never registers it.
-2. **Ignoring `catchup`** — by default Airflow backfills every missed schedule between `start_date` and now. For new DAGs, that's often not what you want; set `catchup=False`.
+1. **Forgetting to call the DAG function** — the `@dag`-decorated function only builds the DAG when called, so you must call it (`hello_pipeline()`), otherwise Airflow never registers it.
+2. **Ignoring `catchup`** — since Airflow 3 the default is `catchup=False`, but in Airflow 2 (or if `catchup_by_default` is enabled) Airflow backfills every missed schedule between `start_date` and now. Set `catchup` explicitly so the behavior doesn't depend on version or config.
 3. **Mutating data between tasks** — tasks communicate through **XComs** (small messages), not shared Python state. Each task may run on a different worker with no memory in common.
 4. **Too many tiny tasks** — every task has overhead. If two steps always run together with no need for retries between them, consider merging them.
 5. **Not pinning versions in production** — install Airflow with a pinned version, never a floating `latest`.

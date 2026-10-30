@@ -3,7 +3,7 @@ title: "Graceful Shutdown in Microservices: Draining Traffic Before the Containe
 date: 2026-08-18
 excerpt: "A practical guide to shutting down microservices safely: stop new traffic, finish in-flight requests, and drain connection pools before the container exits."
 tags: ["Microservices", "Spring Boot", "Kubernetes", "DevOps"]
-readingTime: 14
+readingTime: 9
 ---
 
 import Callout from '../../components/mdx/Callout.astro';
@@ -29,11 +29,12 @@ When Kubernetes decides to kill your pod (scale-down, rollout, node drain, OOM),
 2. preStop hook runs (if defined) — extra time to prepare
 3. SIGTERM sent to the main process
 4. Service endpoints removed → load balancer stops routing new traffic
-5. Grace period (default 30s) counts down
+   (actually starts in parallel with step 1, not after SIGTERM)
+5. Grace period (default 30s, started at step 1) runs out
 6. If process still alive → SIGKILL
 ```
 
-The critical detail: steps 3 and 4 happen **almost simultaneously**. The pod keeps its IP and is *still reachable* until the endpoints controller propagates. That's why relying on "just catch SIGTERM" isn't enough — the load balancer may keep sending you requests for a second or two after termination begins.
+The critical detail: endpoint removal (step 4) is asynchronous and races with steps 2–3 — without a preStop hook, SIGTERM and endpoint removal happen **almost simultaneously**. The pod keeps its IP and is *still reachable* until the endpoints controller propagates. That's why relying on "just catch SIGTERM" isn't enough — the load balancer may keep sending you requests for a second or two after termination begins.
 
 That overlap window is exactly what graceful shutdown must handle.
 
@@ -71,7 +72,7 @@ The `sleep 10` is a deliberate overlap buffer, not a magic number. It should cov
 
 ### Deregister before you drain
 
-On cloud providers with their own load balancers (AWS ALB/NLB, GCP, Azure), the pod may sit behind a cloud LB that has its own registration. Deregister from that LB *first* (via the controller), then drain, then exit. With the Kubernetes ingress/Service model, the readiness probe handles this for you.
+On cloud providers with their own load balancers (AWS ALB/NLB, GCP, Azure), the pod may sit behind a cloud LB that has its own registration. Deregister from that LB *first* (via the controller), then drain, then exit. With the Kubernetes ingress/Service model, Kubernetes removes the terminating pod from the Service endpoints for you.
 
 ## Step 2: Let Active HTTP Requests Finish
 
@@ -84,14 +85,14 @@ SIGTERM arriving doesn't mean the app must die instantly. The app should:
 
 ### Spring Boot: one property
 
-For Spring Boot 2.3+, graceful shutdown is built in — you just turn it on:
+For Spring Boot 2.3+, graceful shutdown is built in — you just turn it on (since Spring Boot 3.4 it's on by default, but being explicit doesn't hurt):
 
 ```properties
 server.shutdown=graceful
 spring.lifecycle.timeout-per-shutdown-phase=25s
 ```
 
-That's it. Spring Boot stops accepting new requests and waits up to the timeout for in-flight ones to finish before closing. Non-graceful (default) behavior just kills the server immediately.
+That's it. Spring Boot stops accepting new requests and waits up to the timeout for in-flight ones to finish before closing. With `server.shutdown=immediate` (the default before 3.4), the server just stops immediately.
 
 ### Every framework has a version of this
 
@@ -131,7 +132,7 @@ The pool needs to stop handing out new connections *after* the current requests 
 HikariDataSource dataSource = ...;
 
 // Stop accepting new connection requests, then wait for active ones
-dataSource.getHikariPoolMXBean().suspend();
+dataSource.getHikariPoolMXBean().suspendPool(); // requires allowPoolSuspension=true
 while (dataSource.getHikariPoolMXBean().getActiveConnections() > 0) {
     Thread.sleep(100);
 }
@@ -147,8 +148,9 @@ With Spring Boot's graceful shutdown, HikariCP is closed in the right order for 
 **Message queue consumers**: don't just close the broker connection — commit or acknowledge the current message first, stop consuming, then close.
 
 ```kotlin
-// Kafka consumer graceful stop
-consumer.stop()          // stop polling new records
+// Kafka consumer graceful stop (on the polling thread; from another
+// thread, call consumer.wakeup() to break out of poll())
+running = false          // stop polling new records
 consumer.commitSync()    // commit what you've processed
 consumer.close()         // then close cleanly
 ```
