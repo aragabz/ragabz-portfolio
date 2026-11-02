@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Icon } from '@iconify/react';
+import '../../utils/icons';
 
 interface MobileMenuProps {
   links?: Array<{ href: string; label: string }>;

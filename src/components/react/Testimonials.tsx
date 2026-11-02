@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import '../../utils/icons';
 import { StaggerContainer, StaggerItem } from './Animated';
 
 interface Testimonial {
