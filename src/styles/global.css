@@ -319,3 +319,35 @@ dialog::backdrop {
   font-size: 0.875rem;
   color: var(--color-text-secondary);
 }
+
+/* Blog post difficulty badge (LevelBadge.astro, BlogFilter.tsx) */
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+.level-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.level-dots > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.25;
+}
+
+.level-dots > span.is-on {
+  opacity: 1;
+}

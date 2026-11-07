@@ -1,5 +1,6 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
+import { LEVELS } from './utils/levels';
 
 const projects = defineCollection({
   loader: glob({ pattern: '**/*.yaml', base: './src/content/projects' }),
@@ -30,6 +31,9 @@ const blog = defineCollection({
     readingTime: z.number().optional(),
     draft: z.boolean().default(false),
     author: z.string().optional(),
+    level: z.enum(LEVELS).optional(),
+    series: z.string().optional(),
+    seriesOrder: z.number().int().positive().optional(),
   }),
 });
 

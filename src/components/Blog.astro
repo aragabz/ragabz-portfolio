@@ -1,10 +1,11 @@
 ---
-import { getVisibleBlogPosts } from '../utils/blog';
+import { getVisibleBlogPosts, byNewest } from '../utils/blog';
+import LevelBadge from './LevelBadge.astro';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 
 const blogPosts = (await getVisibleBlogPosts())
-  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+  .sort(byNewest)
   .slice(0, 3);
 
 function formatDate(date: Date) {
@@ -23,48 +24,39 @@ function formatDate(date: Date) {
       <p style="color: var(--color-brand-gray-dark);">Thoughts on software development, tech, and learning</p>
     </div>
     
-    <div class="grid md:grid-cols-2 gap-8">
+    <ul class="max-w-[860px] mx-auto border-t" style="border-color: var(--color-border);">
       {blogPosts.map((post, index) => (
-        <article class={`bg-[var(--color-bg-secondary)] border rounded-lg overflow-hidden card-hover fade-in fade-in-delay-${Math.min(index + 1, 3)} ${index === 0 ? 'md:col-span-2' : ''}`} style="border-color: var(--color-brand-gray-light);">
-          <div class="p-6">
-            <div class="flex items-center gap-3 text-sm mb-3" style="color: var(--color-brand-gray-dark);">
-              <time datetime={post.data.date.toISOString()}>
-                {formatDate(post.data.date)}
-              </time>
-              <span>•</span>
-              <span>{post.data.readingTime || 5} min read</span>
-            </div>
-            
-            <h3 class="text-xl font-semibold mb-3 hover-text-brand-orange transition-colors">
-              <a href={`${base}blog/${post.id}`}>
+        <li class={`group relative border-b py-6 md:grid md:grid-cols-[9rem_1fr] md:gap-8 fade-in fade-in-delay-${Math.min(index + 1, 3)}`} style="border-color: var(--color-border);">
+          <div class="flex md:flex-col gap-x-3 gap-y-1 text-sm mb-2 md:mb-0 md:pt-1" style="color: var(--color-text-tertiary);">
+            <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+            <span class="md:hidden" aria-hidden="true">•</span>
+            <span>{post.data.readingTime || 5} min read</span>
+          </div>
+
+          <div class="min-w-0">
+            <h3 class="text-xl font-semibold mb-2 transition-colors group-hover:text-[var(--color-accent-strong)]">
+              <a href={`${base}blog/${post.id}`} class="after:absolute after:inset-0 after:content-['']">
                 {post.data.title}
               </a>
             </h3>
-            
-            <p class="mb-4 leading-relaxed-custom" style="color: var(--color-brand-gray-dark);">
+
+            <p class="mb-3 leading-relaxed-custom line-clamp-2" style="color: var(--color-text-secondary);">
               {post.data.excerpt}
             </p>
-            
-            <div class="flex flex-wrap gap-2 mb-4">
+
+            <div class="flex flex-wrap items-center gap-2">
+              {post.data.level && <LevelBadge level={post.data.level} />}
               {post.data.tags.slice(0, 3).map(tag => (
-                <span class="text-xs px-3 py-1 rounded-full" style="background-color: var(--color-brand-gray-light); color: var(--color-brand-gray-dark);">
+                <span class="text-xs px-3 py-1 rounded-full border" style="background: var(--color-bg-tertiary); border-color: var(--color-border); color: var(--color-text-secondary);">
                   {tag}
                 </span>
               ))}
             </div>
-            
-            <a 
-              href={`${base}blog/${post.id}`}
-              class="text-sm font-medium hover-text-brand-orange transition-colors"
-              style="color: var(--color-accent-strong);"
-            >
-              Read More →
-            </a>
           </div>
-        </article>
+        </li>
       ))}
-    </div>
-    
+    </ul>
+
     {blogPosts.length === 0 && (
       <p class="text-center" style="color: var(--color-brand-gray-dark);">Coming soon! Stay tuned for articles.</p>
     )}

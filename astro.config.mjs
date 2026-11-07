@@ -7,15 +7,16 @@ import tailwindcss from '@tailwindcss/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { base, site } from './site.config.mjs';
 
-// Markdown/MDX links like `[x](/blog/slug)` are written root-relative; prefix
+// Markdown/MDX links and images like `[x](/blog/slug)` are written root-relative; prefix
 // them with the deploy base so they keep working on GitHub Pages project sites.
 function rehypeBaseLinks() {
   const prefix = base.endsWith('/') ? base : base + '/';
   /** @param {any} node hast node */
   const walk = (node) => {
-    const href = node.properties?.href;
-    if (node.tagName === 'a' && typeof href === 'string' && href.startsWith('/') && !href.startsWith('//')) {
-      node.properties.href = prefix + href.slice(1);
+    const attr = node.tagName === 'a' ? 'href' : node.tagName === 'img' ? 'src' : null;
+    const url = attr && node.properties?.[attr];
+    if (attr && typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) {
+      node.properties[attr] = prefix + url.slice(1);
     }
     node.children?.forEach(walk);
   };

@@ -3,6 +3,8 @@ import { render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Navbar from '../../components/Navbar.astro';
 import RelatedPosts from '../../components/RelatedPosts.astro';
+import LevelBadge from '../../components/LevelBadge.astro';
+import SeriesNav from '../../components/SeriesNav.astro';
 import { getVisibleBlogPosts } from '../../utils/blog';
 
 export async function getStaticPaths() {
@@ -17,6 +19,12 @@ const { post } = Astro.props;
 const { Content, headings } = await render(post);
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 const articleURL = new URL(Astro.url.pathname, Astro.site);
+const { series } = post.data;
+const seriesPosts = series
+  ? (await getVisibleBlogPosts())
+      .filter((p) => p.data.series === series)
+      .sort((a, b) => (a.data.seriesOrder ?? 0) - (b.data.seriesOrder ?? 0))
+  : [];
 
 interface TocNode {
   depth: number;
@@ -88,7 +96,7 @@ function formatDate(date: Date) {
 
       <!-- Article Header -->
       <header class="mb-14 max-w-[720px]">
-        <p class="eyebrow">Blog</p>
+        <p class="eyebrow">{series ?? 'Blog'}</p>
 
         <h1 data-pagefind-meta="title" class="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.08] font-bold tracking-tight mb-8" style="color: var(--color-text);">
           {post.data.title}
@@ -107,7 +115,8 @@ function formatDate(date: Date) {
           )}
         </div>
 
-        <div class="flex flex-wrap gap-2 mt-6">
+        <div class="flex flex-wrap items-center gap-2 mt-6">
+          {post.data.level && <LevelBadge level={post.data.level} />}
           {post.data.tags.map(tag => (
             <span class="tag">
               {tag}
@@ -118,8 +127,16 @@ function formatDate(date: Date) {
 
       <!-- Article Body + TOC -->
       <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:gap-16">
-        <div class="blog-content max-w-[720px]" data-pagefind-body>
-          <Content />
+        <div class="max-w-[720px] min-w-0">
+          {series && seriesPosts.length > 1 && (
+            <SeriesNav series={series} posts={seriesPosts} currentId={post.id} variant="outline" />
+          )}
+          <div class="blog-content" data-pagefind-body>
+            <Content />
+          </div>
+          {series && seriesPosts.length > 1 && (
+            <SeriesNav series={series} posts={seriesPosts} currentId={post.id} variant="pager" />
+          )}
         </div>
 
         {toc.length > 0 && (
@@ -532,6 +549,38 @@ function formatDate(date: Date) {
       border-radius: 0.75rem;
       margin: 2.5rem 0;
       border: 1px solid var(--color-border);
+    }
+
+    .blog-content details {
+      margin: 1rem 0;
+      padding: 0.875rem 1.125rem;
+      border: 1px solid var(--color-border);
+      border-radius: 0.75rem;
+      background: var(--color-bg-secondary);
+    }
+
+    .blog-content details[open] {
+      padding-bottom: 0.25rem;
+    }
+
+    .blog-content summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .blog-content summary::marker {
+      color: var(--color-accent-strong);
+    }
+
+    .blog-content details[open] > summary {
+      margin-bottom: 0.75rem;
+    }
+
+    .blog-content img[src$=".svg"] {
+      width: 100%;
+      height: auto;
+      border: none;
     }
 
     .blog-content hr {

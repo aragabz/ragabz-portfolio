@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { LEVELS, LEVEL_LABELS, type Level } from '../../utils/levels';
+import { TOPICS, LANGUAGES } from '../../utils/blogFacets';
 
 interface Post {
   id: string;
@@ -9,7 +11,22 @@ interface Post {
     readingTime?: number;
     tags: string[];
     draft?: boolean;
+    level?: Level;
+    topics: string[];
+    languages: string[];
   };
+}
+
+type FacetKey = 'topic' | 'language' | 'level';
+type Filters = Record<FacetKey, string>;
+const ALL = 'all';
+const NO_FILTERS: Filters = { topic: ALL, language: ALL, level: ALL };
+
+function matchesFacet(post: Post, key: FacetKey, value: string) {
+  if (value === ALL) return true;
+  if (key === 'topic') return post.data.topics.includes(value);
+  if (key === 'language') return post.data.languages.includes(value);
+  return post.data.level === value;
 }
 
 interface BlogFilterProps {
@@ -21,23 +38,29 @@ const POSTS_PER_PAGE = 9;
 
 export default function BlogFilter({ posts, base }: BlogFilterProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTag, setActiveTag] = useState('All');
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Filter posts based on search query and active tag
-  const filteredPosts = useMemo(() => {
-    return posts.filter(post => {
-      const matchesTag = activeTag === 'All' || post.data.tags.includes(activeTag);
-      
-      const searchLower = searchQuery.toLowerCase().trim();
-      const matchesSearch = !searchLower || 
-        post.data.title.toLowerCase().includes(searchLower) ||
-        post.data.excerpt.toLowerCase().includes(searchLower) ||
-        post.data.tags.some(tag => tag.toLowerCase().includes(searchLower));
+  const searchLower = searchQuery.toLowerCase().trim();
+  const matchesSearch = (post: Post) => !searchLower ||
+    post.data.title.toLowerCase().includes(searchLower) ||
+    post.data.excerpt.toLowerCase().includes(searchLower) ||
+    post.data.tags.some(tag => tag.toLowerCase().includes(searchLower));
 
-      return matchesTag && matchesSearch;
-    });
-  }, [posts, searchQuery, activeTag]);
+  // Posts matching the search and every facet except `skip` — used for per-option counts.
+  const matchingExcept = (skip?: FacetKey) => posts.filter(post =>
+    matchesSearch(post) &&
+    (Object.keys(filters) as FacetKey[]).every(key => key === skip || matchesFacet(post, key, filters[key]))
+  );
+
+  const filteredPosts = useMemo(() => matchingExcept(), [posts, searchLower, filters]);
+
+  const facets: { key: FacetKey; label: string; options: { value: string; label: string }[] }[] = [
+    { key: 'topic', label: 'Topic', options: TOPICS.filter(t => posts.some(p => p.data.topics.includes(t))).map(t => ({ value: t, label: t })) },
+    { key: 'language', label: 'Language', options: LANGUAGES.filter(l => posts.some(p => p.data.languages.includes(l))).map(l => ({ value: l, label: l })) },
+    { key: 'level', label: 'Level', options: LEVELS.filter(l => posts.some(p => p.data.level === l)).map(l => ({ value: l, label: LEVEL_LABELS[l] })) },
+  ];
+  const hasActiveFilters = (Object.keys(filters) as FacetKey[]).some(key => filters[key] !== ALL);
 
   // Pagination
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
@@ -49,7 +72,7 @@ export default function BlogFilter({ posts, base }: BlogFilterProps) {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeTag]);
+  }, [searchLower, filters]);
 
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -138,85 +161,134 @@ export default function BlogFilter({ posts, base }: BlogFilterProps) {
         </div>
       </div>
 
-      {/* Blog Cards Grid */}
+      {/* Facet filters: topic, language, level */}
+      <div className="space-y-3">
+        {facets.filter(f => f.options.length > 0).map(facet => {
+          const pool = matchingExcept(facet.key);
+          return (
+            <div key={facet.key} className="flex flex-col sm:flex-row sm:items-start gap-2">
+              <span
+                id={`facet-${facet.key}`}
+                className="text-xs font-semibold uppercase tracking-wider sm:w-20 sm:pt-2 shrink-0"
+                style={{ color: 'var(--color-text-tertiary)' }}
+              >
+                {facet.label}
+              </span>
+              <div className="flex flex-wrap gap-2" role="group" aria-labelledby={`facet-${facet.key}`}>
+                {[{ value: ALL, label: 'All' }, ...facet.options].map(option => {
+                  const active = filters[facet.key] === option.value;
+                  const count = option.value === ALL
+                    ? pool.length
+                    : pool.filter(post => matchesFacet(post, facet.key, option.value)).length;
+                  const disabled = count === 0 && !active;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setFilters(f => ({ ...f, [facet.key]: option.value }))}
+                      aria-pressed={active}
+                      disabled={disabled}
+                      className="text-sm px-3 py-1.5 rounded-full border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{
+                        background: active ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
+                        borderColor: active ? 'var(--color-accent)' : 'var(--color-border)',
+                        color: active ? '#ffffff' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {option.label}
+                      <span className="ml-1.5 text-xs" style={{ opacity: 0.75 }}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={() => setFilters(NO_FILTERS)}
+            className="text-sm font-medium sm:ml-[5.5rem] hover-text-brand-orange transition-colors"
+            style={{ color: 'var(--color-accent-strong)' }}
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Blog post list */}
       {filteredPosts.length > 0 ? (
         <>
-          <div className="grid md:grid-cols-2 gap-8">
+          <ul className="border-t" style={{ borderColor: 'var(--color-border)' }}>
             {paginatedPosts.map((post) => (
-              <article
+              <li
                 key={post.id}
-                className="card-hover blog-card flex flex-col"
-                style={{
-                  background: 'var(--color-bg-secondary)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  height: '100%',
-                  transition: 'all 0.3s ease',
-                }}
+                className="blog-row group relative border-b py-6 md:grid md:grid-cols-[9rem_1fr] md:gap-8"
+                style={{ borderColor: 'var(--color-border)' }}
               >
-                <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <div className="flex items-center gap-3 text-sm mb-3" style={{ color: 'var(--color-text-tertiary)' }}>
-                    <time dateTime={post.data.date}>
-                      {formatDate(post.data.date)}
-                    </time>
-                    <span>•</span>
-                    <span>{post.data.readingTime || 5} min read</span>
-                    {post.data.draft && (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: 'var(--color-brand-orange)',
-                          color: '#ffffff',
-                        }}
-                      >
-                        Draft
-                      </span>
-                    )}
-                  </div>
-                  
-                  <h3 className="text-xl font-bold mb-3 hover-text-brand-orange transition-colors">
-                    <a href={`${base}blog/${post.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="flex md:flex-col gap-x-3 gap-y-1 text-sm mb-2 md:mb-0 md:pt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <time dateTime={post.data.date}>{formatDate(post.data.date)}</time>
+                  <span className="md:hidden" aria-hidden="true">•</span>
+                  <span>{post.data.readingTime || 5} min read</span>
+                  {post.data.draft && (
+                    <span
+                      className="self-start text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: 'var(--color-brand-orange)', color: '#ffffff' }}
+                    >
+                      Draft
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <h3 className="text-xl font-bold mb-2 transition-colors group-hover:text-[var(--color-accent-strong)]">
+                    <a
+                      href={`${base}blog/${post.id}`}
+                      className="after:absolute after:inset-0 after:content-['']"
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                    >
                       {post.data.title}
                     </a>
                   </h3>
-                  
-                  <p className="mb-4 leading-relaxed-custom flex-1" style={{ color: 'var(--color-text-secondary)' }}>
+
+                  <p className="mb-3 leading-relaxed-custom line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
                     {post.data.excerpt}
                   </p>
-                  
-                  <div className="flex flex-wrap gap-2 mb-5">
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {post.data.level && (
+                      <span className="level-badge" title={`Level: ${LEVEL_LABELS[post.data.level]}`}>
+                        <span className="level-dots" aria-hidden="true">
+                          {LEVELS.map((level, i) => (
+                            <span key={level} className={i <= LEVELS.indexOf(post.data.level!) ? 'is-on' : undefined} />
+                          ))}
+                        </span>
+                        {LEVEL_LABELS[post.data.level]}
+                      </span>
+                    )}
                     {post.data.tags.slice(0, 3).map(tag => (
-                      <span 
+                      <span
                         key={tag}
                         className="text-xs px-3 py-1 rounded-full border"
-                        style={{ 
-                          background: 'var(--color-bg-tertiary)', 
+                        style={{
+                          background: 'var(--color-bg-tertiary)',
                           borderColor: 'var(--color-border)',
-                          color: 'var(--color-text-secondary)' 
+                          color: 'var(--color-text-secondary)'
                         }}
                       >
                         {tag}
                       </span>
                     ))}
                     {post.data.tags.length > 3 && (
-                      <span className="text-xs px-3 py-1 rounded-full" style={{ color: 'var(--color-text-tertiary)' }}>
+                      <span className="text-xs px-1 py-1" style={{ color: 'var(--color-text-tertiary)' }}>
                         +{post.data.tags.length - 3} more
                       </span>
                     )}
                   </div>
-                  
-                  <a 
-                    href={`${base}blog/${post.id}`}
-                    className="inline-flex items-center gap-2 text-sm font-semibold hover-text-brand-orange transition-colors"
-                    style={{ color: 'var(--color-accent-strong)' }}
-                  >
-                    Read More →
-                  </a>
                 </div>
-              </article>
+              </li>
             ))}
-          </div>
+          </ul>
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
@@ -284,7 +356,7 @@ export default function BlogFilter({ posts, base }: BlogFilterProps) {
           </svg>
           <h3 className="text-lg font-bold mb-2">No matching articles found</h3>
           <p style={{ color: 'var(--color-text-secondary)' }}>
-            Try adjusting your search query.
+            Try adjusting your search or filters.
           </p>
         </div>
       )}
