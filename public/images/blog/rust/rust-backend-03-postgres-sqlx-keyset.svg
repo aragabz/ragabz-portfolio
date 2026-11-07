@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">OFFSET pagination versus keyset pagination</title>
+  <desc id="d">Fetching the third page of 20 orders. With OFFSET 40, Postgres reads 60 rows and discards the first 40, and the work grows with page depth. With keyset pagination, the index seeks directly to the row after the cursor and reads only the 20 rows returned, so every page costs the same.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Fetching page 3 of a customer's orders</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Each cell is one index entry, newest first. Same result, very different work.</text>
+  <text x="32" y="108" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">OFFSET 40 LIMIT 20</text>
+  <rect x="40" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="52" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="64" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="76" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="88" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="100" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="112" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="124" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="136" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="148" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="160" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="172" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="184" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="196" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="208" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="220" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="232" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="244" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="256" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="268" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="280" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="292" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="304" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="316" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="328" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="340" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="352" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="364" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="376" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="388" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="400" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="412" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="424" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="436" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="448" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="460" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="472" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="484" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="496" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="508" y="124" width="10" height="28" rx="2" fill="#f78166" fill-opacity="0.55"/>
+  <rect x="520" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="532" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="544" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="556" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="568" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="580" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="592" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="604" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="616" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="628" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="640" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="652" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="664" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="676" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="688" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="700" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="712" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="724" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="736" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <rect x="748" y="124" width="10" height="28" rx="2" fill="#79c0ff" fill-opacity="0.95"/>
+  <text x="40" y="174" fill="#f78166" font-size="12" font-family="Inter, system-ui, sans-serif">40 rows read and thrown away</text>
+  <text x="520" y="174" fill="#79c0ff" font-size="12" font-family="Inter, system-ui, sans-serif">20 rows returned</text>
+  <text x="40" y="198" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Page 500 reads 10,000 rows. A new order arriving shifts every row by one: duplicates or gaps.</text>
+  <text x="32" y="248" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">WHERE (created_at, id) &lt; (cursor) LIMIT 20</text>
+  <rect x="40" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="52" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="64" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="76" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="88" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="100" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="112" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="124" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="136" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="148" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="160" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="172" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="184" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="196" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="208" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="220" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="232" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="244" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="256" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="268" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="280" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="292" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="304" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="316" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="328" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="340" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="352" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="364" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="376" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="388" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="400" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="412" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="424" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="436" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="448" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="460" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="472" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="484" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="496" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="508" y="264" width="10" height="28" rx="2" fill="#30363d" fill-opacity="1"/>
+  <rect x="520" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="532" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="544" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="556" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="568" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="580" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="592" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="604" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="616" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="628" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="640" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="652" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="664" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="676" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="688" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="700" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="712" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="724" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="736" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <rect x="748" y="264" width="10" height="28" rx="2" fill="#7ee787" fill-opacity="0.95"/>
+  <path d="M 46 312 C 200 352, 380 352, 514 300" fill="none" stroke="#7ee787" stroke-width="2" stroke-dasharray="6 4"/>
+  <polygon points="508,298 520,296 514,308" fill="#7ee787"/>
+  <text x="200" y="366" fill="#7ee787" font-size="12" font-family="Inter, system-ui, sans-serif">index seek straight to the cursor position</text>
+  <text x="40" y="394" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Never read</text>
+  <text x="520" y="394" fill="#7ee787" font-size="12" font-family="Inter, system-ui, sans-serif">20 rows read, 20 returned</text>
+  <text x="32" y="436" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Needs a unique tie-breaker (id) and an index on (customer_id, created_at DESC, id DESC).</text>
+</svg>

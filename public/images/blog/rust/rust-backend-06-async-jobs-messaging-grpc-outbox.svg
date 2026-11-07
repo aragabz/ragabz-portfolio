@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Transactional outbox in orders-api</title>
+  <desc id="d">The HTTP handler writes the order row and an outbox row in one Postgres transaction. A separate relay task reads unpublished outbox rows with FOR UPDATE SKIP LOCKED, publishes them to Kafka, and marks them published. A crash between publish and mark causes a duplicate, never a lost event.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b949e"/></marker>
+  </defs>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">One transaction, then an asynchronous relay</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">The request never talks to Kafka. The database is the only thing it must agree with.</text>
+
+  <rect x="32" y="100" width="170" height="70" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="117" y="130" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">POST /orders</text>
+  <text x="117" y="152" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">axum handler</text>
+
+  <rect x="250" y="88" width="250" height="160" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="266" y="114" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Postgres transaction</text>
+  <rect x="266" y="128" width="218" height="40" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <text x="280" y="153" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">INSERT INTO orders</text>
+  <rect x="266" y="178" width="218" height="40" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <text x="280" y="203" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">INSERT INTO outbox</text>
+  <text x="266" y="238" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">COMMIT: both rows or neither</text>
+
+  <line x1="202" y1="135" x2="246" y2="135" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <rect x="560" y="100" width="208" height="70" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="664" y="130" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Outbox relay task</text>
+  <text x="664" y="152" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">polls every 500 ms</text>
+
+  <rect x="560" y="300" width="208" height="70" rx="10" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="664" y="330" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Kafka</text>
+  <text x="664" y="352" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">topic orders.events</text>
+
+  <path d="M556 150 C 530 170, 520 190, 504 200" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="508" y="232" fill="#d2a8ff" font-size="13" font-family="Inter, system-ui, sans-serif">1. SELECT ... SKIP LOCKED</text>
+  <line x1="730" y1="172" x2="730" y2="296" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="560" y="270" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">2. publish, await ack</text>
+  <path d="M556 330 C 420 330, 380 290, 380 252" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="300" y="362" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">3. SET published_at = now()</text>
+
+  <rect x="32" y="388" width="736" height="36" rx="8" fill="#161b22" stroke="#f78166" stroke-width="1.2"/>
+  <text x="48" y="411" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">Crash after 2 but before 3: the batch is published again. Consumers must be idempotent.</text>
+</svg>

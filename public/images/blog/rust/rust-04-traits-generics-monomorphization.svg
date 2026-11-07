@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-labelledby="t d">
+  <title id="t">Monomorphization of a generic function</title>
+  <desc id="d">One generic definition, largest of T where T is PartialOrd plus Copy, is compiled into three separate specialized functions for i32, f64 and Cents. Each copy is optimized on its own. The trade-off is more compile time and a larger binary, compared with type erasure on the JVM where one body serves all types.</desc>
+  <rect width="800" height="400" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">One generic definition, one machine-code copy per type</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">The compiler specializes generic code for every concrete type it is called with.</text>
+  <rect x="32" y="100" width="300" height="120" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="52" y="128" fill="#d2a8ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Source: written once</text>
+  <text x="52" y="156" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">fn largest&lt;T&gt;(items: &amp;[T])</text>
+  <text x="52" y="178" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">  where T: PartialOrd + Copy</text>
+  <text x="52" y="204" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">type-checked once, at the definition</text>
+  <line x1="332" y1="160" x2="440" y2="130" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="332" y1="160" x2="440" y2="200" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="332" y1="160" x2="440" y2="270" stroke="#8b949e" stroke-width="1.5"/>
+  <rect x="440" y="104" width="328" height="52" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="460" y="128" fill="#79c0ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">largest::&lt;i32&gt;</text>
+  <text x="460" y="146" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">integer compare, may be vectorized</text>
+  <rect x="440" y="174" width="328" height="52" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="460" y="198" fill="#79c0ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">largest::&lt;f64&gt;</text>
+  <text x="460" y="216" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">float compare instructions</text>
+  <rect x="440" y="244" width="328" height="52" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="460" y="268" fill="#79c0ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">largest::&lt;Cents&gt;</text>
+  <text x="460" y="286" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">derived Ord inlined, no calls left</text>
+  <rect x="32" y="250" width="300" height="46" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="52" y="278" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Call sites pick T: i32, f64, Cents</text>
+  <rect x="32" y="322" width="360" height="56" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="52" y="346" fill="#7ee787" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Runtime: direct calls, full inlining</text>
+  <text x="52" y="366" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">no boxing, no vtable, no type checks</text>
+  <rect x="408" y="322" width="360" height="56" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="428" y="346" fill="#f78166" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Cost: compile time and binary size</text>
+  <text x="428" y="366" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">JVM erasure: one body, boxed values</text>
+</svg>

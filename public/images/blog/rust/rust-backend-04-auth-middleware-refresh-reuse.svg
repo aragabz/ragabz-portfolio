@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">Refresh token reuse detection</title>
+  <desc id="d">A token family over time. The client exchanges R1 for R2. An attacker who stole R1 replays it. Because R1 is already used, the server revokes the whole family, so R2 stops working too and the user must log in again.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">One token family, one stolen token</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Every refresh token works once. A second use means two parties hold a copy.</text>
+  <line x1="60" y1="120" x2="760" y2="120" stroke="#30363d" stroke-width="2"/>
+  <text x="32" y="104" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">time</text>
+  <circle cx="110" cy="120" r="6" fill="#79c0ff"/>
+  <circle cx="300" cy="120" r="6" fill="#79c0ff"/>
+  <circle cx="500" cy="120" r="6" fill="#f78166"/>
+  <circle cx="680" cy="120" r="6" fill="#f78166"/>
+  <text x="110" y="148" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">login</text>
+  <text x="300" y="148" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">client refreshes</text>
+  <text x="500" y="148" fill="#f78166" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">attacker replays R1</text>
+  <text x="680" y="148" fill="#f78166" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">client refreshes</text>
+  <rect x="40" y="180" width="140" height="74" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="110" y="208" fill="#e6edf3" font-size="14" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">R1 issued</text>
+  <text x="110" y="230" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">family F, active</text>
+  <rect x="220" y="180" width="160" height="74" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="300" y="208" fill="#e6edf3" font-size="14" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">R1 used, R2 issued</text>
+  <text x="300" y="230" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">same family F</text>
+  <rect x="410" y="180" width="180" height="74" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="500" y="208" fill="#e6edf3" font-size="14" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">R1 already used</text>
+  <text x="500" y="230" fill="#f78166" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">revoke all of family F</text>
+  <rect x="610" y="180" width="144" height="74" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="680" y="208" fill="#e6edf3" font-size="14" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">R2 rejected</text>
+  <text x="680" y="230" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">401, log in again</text>
+  <line x1="180" y1="217" x2="214" y2="217" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="380" y1="217" x2="404" y2="217" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="590" y1="217" x2="604" y2="217" stroke="#8b949e" stroke-width="1.5"/>
+  <text x="32" y="300" fill="#d2a8ff" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Why revoke the whole family?</text>
+  <text x="32" y="326" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">The server cannot tell whether the replay came from the thief or the real client.</text>
+  <text x="32" y="348" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Killing every token in the family ends the thief's session at the cost of one re-login.</text>
+  <rect x="32" y="372" width="736" height="60" rx="10" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="48" y="398" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">UPDATE refresh_tokens SET used_at = now()</text>
+  <text x="48" y="418" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"> WHERE token_hash = $1 AND used_at IS NULL ...  -- zero rows means reuse</text>
+</svg>

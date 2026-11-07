@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Which library changes break downstream code</title>
+  <desc id="d">Changes that are major, meaning breaking: removing or renaming a public item, adding a variant to an exhaustive enum, adding a public field to a struct without non_exhaustive, adding a trait method without a default, adding a bound to a generic, changing a function signature. Changes that are minor: adding a new public item, adding a variant to a non_exhaustive enum, adding a trait method with a default (with a caveat about name collisions), adding a method to a sealed trait, relaxing a bound. cargo-semver-checks catches many of these automatically.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Is this change a major or a minor version bump?</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">For a 1.x crate. Under 0.x, Cargo treats 0.y as the major version.</text>
+  <rect x="32" y="90" width="356" height="300" rx="12" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="52" y="120" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Major: breaks some caller</text>
+  <text x="52" y="154" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Remove or rename a pub item</text>
+  <text x="52" y="186" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a variant to an exhaustive enum</text>
+  <text x="52" y="218" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a pub field to an exhaustive struct</text>
+  <text x="52" y="250" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a trait method with no default</text>
+  <text x="52" y="282" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a bound to a generic parameter</text>
+  <text x="52" y="314" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Change a pub fn signature</text>
+  <text x="52" y="346" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Stop implementing Send, Sync, or a trait</text>
+  <rect x="412" y="90" width="356" height="300" rx="12" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="432" y="120" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Minor: callers keep compiling</text>
+  <text x="432" y="154" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a new pub fn, type or module</text>
+  <text x="432" y="186" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a variant to a #[non_exhaustive] enum</text>
+  <text x="432" y="218" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a field to a #[non_exhaustive] struct</text>
+  <text x="432" y="250" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add any method to a sealed trait</text>
+  <text x="432" y="282" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Add a defaulted trait method *</text>
+  <text x="432" y="314" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Relax a bound on a generic</text>
+  <text x="432" y="346" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Implement a new trait for a type *</text>
+  <text x="432" y="372" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">* minor, but can cause method-name clashes</text>
+  <rect x="32" y="410" width="736" height="40" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="52" y="435" fill="#79c0ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">cargo semver-checks</text>
+  <text x="222" y="435" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">compares your public API to the last release and flags many of these</text>
+</svg>

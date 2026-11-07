@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" role="img" aria-labelledby="t d">
+  <title id="t">The Rust adoption ladder</title>
+  <desc id="d">Five incremental ways to introduce Rust, ordered by blast radius. Internal tooling and CLIs are lowest risk, then a sidecar, then a library called over FFI, then a new service, and finally rewriting an existing hot path. Each rung lists what it proves to the organization.</desc>
+  <rect width="800" height="520" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Climb one rung at a time</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Each rung raises the blast radius. Move up only when the previous one proved what it was meant to prove.</text>
+  <line x1="40" y1="480" x2="40" y2="100" stroke="#30363d" stroke-width="2"/>
+  <polygon points="40,92 34,104 46,104" fill="#30363d"/>
+  <text x="52" y="104" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">blast radius</text>
+  <rect x="64" y="404" width="300" height="64" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="80" y="430" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">1. Internal tooling and CLIs</text>
+  <text x="80" y="452" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Proves: toolchain, CI, reviews work</text>
+  <rect x="160" y="324" width="300" height="64" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="176" y="350" fill="#79c0ff" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">2. Sidecar next to a JVM service</text>
+  <text x="176" y="372" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Proves: deploy, observe, on-call it</text>
+  <rect x="256" y="244" width="300" height="64" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="272" y="270" fill="#d2a8ff" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">3. Library called over FFI</text>
+  <text x="272" y="292" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Proves: one core, many platforms</text>
+  <rect x="352" y="164" width="300" height="64" rx="10" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="368" y="190" fill="#ffa657" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">4. New service, owned end to end</text>
+  <text x="368" y="212" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Proves: the team can ship features</text>
+  <rect x="448" y="84" width="320" height="64" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="464" y="110" fill="#f78166" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">5. Rewrite a measured hot path</text>
+  <text x="464" y="132" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Proves: the business case in numbers</text>
+  <text x="400" y="420" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Exit criteria before the next rung:</text>
+  <text x="400" y="442" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">metrics agreed up front, two or more owners,</text>
+  <text x="400" y="462" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">a written go / no-go, and a way back.</text>
+  <text x="32" y="504" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Skipping straight to rung 5 is the classic failure: a rewrite with no tooling, no owners and no baseline.</text>
+</svg>

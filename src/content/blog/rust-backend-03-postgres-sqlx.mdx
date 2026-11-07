@@ -1,0 +1,977 @@
+---
+title: "Rust Backend, Part 3: PostgreSQL with SQLx"
+date: 2026-11-07
+excerpt: "Move orders-api onto Postgres with SQLx 0.8: pool sizing, compile-time checked queries and offline mode, migrations, transactions with an outbox, keyset pagination, optimistic locking and N+1 avoidance, without burying SQL under abstractions."
+tags: ["Rust", "Backend", "PostgreSQL", "Databases", "API Design"]
+readingTime: 28
+level: mid
+series: "Backend Services in Rust"
+seriesOrder: 3
+draft: false
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+An order service that forgets every order on restart is a demo, not a service. This part replaces the in-memory store of orders-api with PostgreSQL through SQLx, and uses the move to teach the database skills a Rust backend engineer needs day to day: sizing a connection pool, getting the compiler to check your SQL, writing migrations, using transactions correctly, paginating without `OFFSET`, preventing lost updates with a version column, and avoiding N+1 queries. It is for engineers who know SQL and have the Part 2 service running. You will finish with a service that persists orders, writes outbox events in the same transaction, and keeps SQL visible instead of hiding it behind an ORM.
+
+<Callout variant="note" title="You should already know">
+- `AppError`, `AppState`, configuration and tracing from [Part 2: Errors, Configuration and Tracing](/blog/rust-backend-02-errors-config-tracing)
+- Indexes, transactions and isolation levels ([Backend Engineering, Part 3](/blog/backend-03-databases-fundamentals))
+- What happens when a pool runs dry ([Case study: connection pool exhaustion](/blog/case-01-connection-pool-exhaustion))
+- Async Rust and Tokio basics ([Rust, Part 8](/blog/rust-08-async-rust))
+</Callout>
+
+## Why SQLx
+
+Rust has three mainstream ways to talk to Postgres. **Diesel** is a mature ORM and query builder with a synchronous core (an async companion crate exists). **SeaORM** is an async ORM built on top of SQLx, with an ActiveRecord-like API. **SQLx** is not an ORM at all: you write SQL as strings, and SQLx runs it asynchronously, maps rows to structs, and, with its macros, checks the SQL against a real database at compile time.
+
+orders-api uses SQLx 0.8 because SQL stays visible (the query in the code is the query `EXPLAIN ANALYZE` shows), because compile-time checking catches wrong column names, types and nullability without a DSL, and because it is async-native. A comparison table is at the end of this post.
+
+## Setup
+
+Add SQLx with only the features you need. Its default features include drivers you do not use, so turn them off:
+
+```toml
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "macros",
+    "migrate",
+    "uuid",
+    "time",
+    "json",
+] }
+```
+
+`uuid`, `time` and `json` enable mappings for `Uuid`, `OffsetDateTime` (to and from `timestamptz`) and `serde_json::Value` (to and from `jsonb`). `tls-rustls` is needed for TLS connections to managed databases; pick `tls-native-tls` instead if your platform policy requires the system TLS stack.
+
+Install the CLI, which handles database creation, migrations and offline query data, and start a local Postgres:
+
+```bash
+cargo install sqlx-cli --no-default-features --features rustls,postgres
+
+docker run -d --name orders-db -p 5432:5432 \
+  -e POSTGRES_USER=orders -e POSTGRES_PASSWORD=orders -e POSTGRES_DB=orders \
+  postgres:17
+
+export DATABASE_URL=postgres://orders:orders@localhost:5432/orders
+sqlx database create
+```
+
+`DATABASE_URL` is read by the CLI and, importantly, by the SQLx macros at compile time. The running service reads its URL from configuration (`ORDERS_DATABASE__URL`, see Part 2). Locally they point at the same database; in CI and production they do not need to, as we will see with offline mode.
+
+## Migrations
+
+Schema changes live in versioned SQL files under `migrations/`, applied in order and recorded in a `_sqlx_migrations` table so each runs exactly once.
+
+```bash
+sqlx migrate add initial_schema
+# creates migrations/20261107000001_initial_schema.sql
+```
+
+Pass `-r` to create reversible migrations as `.up.sql` and `.down.sql` pairs. Down migrations are useful during development; in production, most teams roll forward with a new migration rather than running a down script against live data.
+
+Here is the schema for orders-api. These table names (`customers`, `orders`, `order_items`, `outbox`) are what the rest of the series builds on:
+
+```sql
+CREATE TYPE order_status AS ENUM ('pending', 'awaiting_payment', 'paid', 'cancelled');
+
+CREATE TABLE customers (
+    id          uuid        PRIMARY KEY,
+    email       text        NOT NULL UNIQUE,
+    name        text        NOT NULL,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE orders (
+    id           uuid         PRIMARY KEY,
+    customer_id  uuid         NOT NULL REFERENCES customers (id),
+    status       order_status NOT NULL DEFAULT 'pending',
+    total_cents  bigint       NOT NULL CHECK (total_cents >= 0),
+    version      integer      NOT NULL DEFAULT 1,
+    created_at   timestamptz  NOT NULL DEFAULT now(),
+    updated_at   timestamptz  NOT NULL DEFAULT now()
+);
+
+-- Serves "this customer's orders, newest first" and keyset pagination.
+CREATE INDEX orders_customer_created_idx ON orders (customer_id, created_at DESC, id DESC);
+
+CREATE TABLE order_items (
+    order_id          uuid    NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+    line_no           integer NOT NULL,
+    sku               text    NOT NULL,
+    quantity          integer NOT NULL CHECK (quantity > 0),
+    unit_price_cents  bigint  NOT NULL CHECK (unit_price_cents >= 0),
+    PRIMARY KEY (order_id, line_no)
+);
+
+CREATE TABLE outbox (
+    id              uuid        PRIMARY KEY,
+    aggregate_type  text        NOT NULL,
+    aggregate_id    uuid        NOT NULL,
+    event_type      text        NOT NULL,
+    payload         jsonb       NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    published_at    timestamptz
+);
+
+CREATE INDEX outbox_unpublished_idx ON outbox (created_at) WHERE published_at IS NULL;
+```
+
+```mermaid
+flowchart LR
+    C["customers<br/>id, email, name"] -->|"1 to many"| O["orders<br/>id, customer_id, status,<br/>total_cents, version"]
+    O -->|"1 to many"| I["order_items<br/>order_id, line_no, sku,<br/>quantity, unit_price_cents"]
+    O -.->|"events about"| X["outbox<br/>aggregate_id, event_type,<br/>payload jsonb, published_at"]
+```
+
+Design notes worth calling out:
+
+- **Constraints are the last line of defense.** The application validates quantities and prices, but `CHECK` constraints mean a bug or a manual `UPDATE` cannot store a negative quantity. Foreign keys mean an order cannot reference a customer that does not exist.
+- **`version` exists for optimistic locking**, covered below.
+- **The composite index matches the main query** exactly: filter by `customer_id`, order by `created_at DESC, id DESC`. The `id` column breaks ties between orders created in the same microsecond, which keyset pagination needs.
+- **`outbox` is written in this part and read in [Part 6](/blog/rust-backend-06-async-jobs-messaging-grpc)**, where a relay publishes rows to a message broker. The partial index makes "find unpublished events" cheap even when the table holds millions of published ones.
+
+Migrations can be applied with `sqlx migrate run`, or embedded in the binary. The `migrate!` macro reads the `migrations/` directory **at compile time** and embeds the SQL, so the deployed binary carries its own schema:
+
+```rust
+/// Runs the embedded migrations. `migrate!` reads ./migrations at compile time.
+pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}
+```
+
+Running migrations at startup is fine for a small service; SQLx takes a Postgres advisory lock while migrating, so replicas starting together do not race. At larger scale, many teams run migrations as a separate deploy step (a Kubernetes Job) so schema changes are explicit and a slow migration does not block every pod. Either way, migrations must stay compatible with the code still running during a rollout; [Part 8](/blog/rust-backend-08-shipping-production) covers expand and contract.
+
+## The connection pool
+
+Opening a Postgres connection costs a TCP handshake, often TLS, authentication and a backend process fork on the server. You do not want that per request. A **pool** keeps connections open and lends them out.
+
+```rust
+use std::{str::FromStr, time::Duration};
+
+use secrecy::ExposeSecret;
+use sqlx::{
+    PgPool,
+    postgres::{PgConnectOptions, PgPoolOptions},
+};
+
+use crate::config::DatabaseConfig;
+
+pub async fn connect(cfg: &DatabaseConfig) -> Result<PgPool, sqlx::Error> {
+    let options = PgConnectOptions::from_str(cfg.url.expose_secret())?
+        .application_name("orders-api");
+
+    PgPoolOptions::new()
+        .max_connections(cfg.max_connections)
+        .min_connections(cfg.min_connections)
+        // Fail fast instead of queueing forever when the pool is exhausted.
+        .acquire_timeout(Duration::from_millis(cfg.acquire_timeout_ms))
+        .idle_timeout(Duration::from_secs(10 * 60))
+        .max_lifetime(Duration::from_secs(30 * 60))
+        .connect_with(options)
+        .await
+}
+```
+
+The `DatabaseConfig` from Part 2 grows two fields:
+
+```rust
+#[derive(Debug, Deserialize)]
+pub struct DatabaseConfig {
+    pub url: SecretString,
+    pub max_connections: u32,
+    pub min_connections: u32,
+    pub acquire_timeout_ms: u64,
+}
+```
+
+### Sizing the pool
+
+The instinct is to make the pool large "for headroom". That is usually wrong, for two reasons.
+
+**The database has a hard limit.** Postgres defaults to `max_connections = 100`, and each connection is a server process. What matters is the total: 10 pods with a pool of 20 is 200 connections, more during a rolling deploy. The rule: `replicas × max_connections`, including the rollout surge and other clients, must fit under what the database (or a pooler like PgBouncer) allows.
+
+**More connections do not mean more throughput.** Postgres executes each query on a CPU core and waits on disk. Beyond a point, extra concurrent queries just contend for the same cores and locks, and latency rises for everyone. A widely quoted starting point from the HikariCP documentation is roughly `cores × 2` plus the number of disks for the *database server*, shared across all clients. Treat it as a starting point and measure.
+
+**Little's law gives the floor.** If each request holds a connection for 5 ms on average and one pod serves 400 requests per second, it needs on average `400 × 0.005 = 2` connections busy. A pool of 10 gives plenty of room for bursts. If the same pool is sized at 2, every small burst queues.
+
+Two settings decide what happens when demand exceeds the pool:
+
+- **`acquire_timeout`** bounds how long a request waits for a connection. SQLx's default is 30 seconds, which in a web service means requests pile up, clients time out and retry, and the pile grows. A short timeout (one or two seconds) turns exhaustion into fast errors that load balancers and clients can react to. The [connection pool exhaustion case study](/blog/case-01-connection-pool-exhaustion) walks through how a long timeout turns a slow query into an outage.
+- **`max_lifetime`** recycles connections periodically, which helps when the database fails over behind a DNS name or when a proxy silently drops long-lived connections.
+
+Finally, a connection is held for the lifetime of the `PoolConnection` or `Transaction` value. A handler that calls a slow external API inside a transaction holds a connection, and possibly row locks, for the whole call. Do external I/O outside transactions.
+
+### Wiring the pool into the service
+
+`AppState` changes shape: the in-memory store goes away and the pool takes its place. This is the form the rest of the series uses:
+
+```rust
+use std::sync::Arc;
+
+use sqlx::PgPool;
+
+use crate::config::Config;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub db: PgPool,
+    pub config: Arc<Config>,
+}
+```
+
+`PgPool` is a reference-counted handle, so cloning it per request is cheap, exactly as Part 1 required of state. `main` connects, migrates, serves, and closes the pool after the server has drained:
+
+```rust
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let config = Config::load().context("failed to load configuration")?;
+    telemetry::init(&config.log);
+
+    let pool = db::connect(&config.database)
+        .await
+        .context("failed to connect to Postgres")?;
+    db::migrate(&pool).await.context("failed to run migrations")?;
+
+    let addr = SocketAddr::new(config.http.host, config.http.port);
+    let state = AppState { db: pool.clone(), config: Arc::new(config) };
+
+    let listener = TcpListener::bind(addr).await.with_context(|| format!("failed to bind {addr}"))?;
+    tracing::info!(%addr, "orders-api listening");
+
+    axum::serve(listener, router(state))
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("server error")?;
+
+    // In-flight requests are done; return connections cleanly.
+    pool.close().await;
+    tracing::info!("orders-api stopped");
+    Ok(())
+}
+```
+
+`connect_with` opens a connection before returning, so a pod that cannot reach its database fails at startup instead of accepting traffic. `connect_lazy_with` defers connecting, if you prefer readiness probes ([Part 7](/blog/rust-backend-07-observability-performance)) to report database health instead.
+
+## Mapping rows to Rust types
+
+Rows need to become Rust values. SQLx gives you two paths: the `FromRow` derive used with the runtime-checked `query_as` function, and the compile-time checked `query_as!` macro, which maps columns to struct fields by name without needing `FromRow`. Either way, keep **row structs** separate from domain types, for the same reason Part 1 kept DTOs separate: the table shape and the domain shape diverge. Here an order row has no items (they live in another table) and the domain `Order` does.
+
+```rust
+#[derive(Debug, FromRow)]
+struct OrderRow {
+    id: Uuid,
+    customer_id: Uuid,
+    status: OrderStatus,
+    total_cents: i64,
+    version: i32,
+    created_at: OffsetDateTime,
+}
+
+#[derive(Debug, FromRow)]
+struct OrderItemRow {
+    order_id: Uuid,
+    sku: String,
+    quantity: i32,
+    unit_price_cents: i64,
+}
+
+impl OrderRow {
+    fn into_domain(self, items: Vec<OrderItem>) -> Order {
+        Order {
+            id: self.id,
+            customer_id: self.customer_id,
+            status: self.status,
+            items,
+            total_cents: self.total_cents,
+            version: self.version,
+            created_at: self.created_at,
+        }
+    }
+}
+
+impl From<OrderItemRow> for OrderItem {
+    fn from(r: OrderItemRow) -> Self {
+        OrderItem { sku: r.sku, quantity: r.quantity, unit_price_cents: r.unit_price_cents }
+    }
+}
+```
+
+The domain `Order` gains a `version: i32` field, set to `1` by `Order::new`. Type mappings follow Postgres types precisely: `integer` is `i32`, `bigint` is `i64`, `text` is `String`, `uuid` is `Uuid`, `timestamptz` is `OffsetDateTime`. A nullable column becomes `Option<T>`. There is no implicit widening; mapping a `bigint` column to `i32` is an error, which is how it should be.
+
+### Postgres enums
+
+The `order_status` enum type maps to the Rust `OrderStatus` with a derive:
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "order_status", rename_all = "snake_case")]
+pub enum OrderStatus {
+    Pending,
+    AwaitingPayment,
+    Paid,
+    Cancelled,
+}
+```
+
+`type_name` names the Postgres type; `rename_all` maps `AwaitingPayment` to `'awaiting_payment'`. This does put a SQLx derive on a domain type. The purist alternative, a separate `DbOrderStatus` with conversions both ways, doubles the places to update when a status is added; one attribute is the cheaper trade. Postgres enums are compact, but adding a value needs a migration and removing one is painful, so for frequently changing sets prefer a `text` column with a `CHECK` constraint.
+
+## Compile-time checked queries
+
+This is the feature that makes SQLx distinctive. The `query!` and `query_as!` macros connect to the database named by `DATABASE_URL` **while the code compiles**, ask Postgres to prepare the statement, and use the result to type-check your Rust code: parameter types, result column names and types, and nullability.
+
+Here is the repository's `find` function written with the macros:
+
+```rust
+pub async fn find(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<Order>> {
+    let Some(row) = sqlx::query_as!(
+        OrderRow,
+        r#"SELECT id, customer_id, status AS "status: OrderStatus",
+                  total_cents, version, created_at
+           FROM orders
+           WHERE id = $1"#,
+        id
+    )
+    .fetch_optional(pool)
+    .await?
+    else {
+        return Ok(None);
+    };
+
+    let items = sqlx::query_as!(
+        OrderItemRow,
+        "SELECT order_id, sku, quantity, unit_price_cents
+         FROM order_items
+         WHERE order_id = $1
+         ORDER BY line_no",
+        id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(Some(row.into_domain(items.into_iter().map(Into::into).collect())))
+}
+```
+
+If you rename `total_cents` in a migration and forget this query, the build fails, not a request at 3 a.m. If you change `quantity` to `bigint`, the build fails because the struct field is `i32`. If you pass a `String` where `$1` expects a `uuid`, the build fails.
+
+### Overrides: telling the macro what it cannot infer
+
+The macro infers types from Postgres, and sometimes needs help. The override syntax lives in the column alias, which is why the query uses a raw string `r#"..."#`:
+
+- `status AS "status: OrderStatus"` says "this column is the Rust type `OrderStatus`". Without it, the macro does not know which Rust type corresponds to the custom `order_status` type.
+- `count(*) AS "count!"` forces a column to be treated as non-null. Postgres reports most expressions (aggregates, function results, columns from the nullable side of a `LEFT JOIN`) as possibly null, and the macro conservatively maps them to `Option<T>`.
+- `AS "name?"` forces nullable, which you need for `LEFT JOIN` columns that Postgres describes as `NOT NULL` from the base table.
+- `AS "name!: Type"` combines both.
+
+For bind parameters with custom types, cast the argument: `new_status as OrderStatus`. And when you need to opt out of checking for one parameter, `value as _` does that.
+
+### Offline mode and CI
+
+Requiring a live database to compile is fine on a laptop and awkward everywhere else: CI runners, Docker builds, a teammate's machine without Postgres running. **Offline mode** solves it:
+
+```bash
+# with DATABASE_URL pointing at a migrated database
+cargo sqlx prepare
+```
+
+This compiles the project, records each macro query's metadata (parameter and column types, nullability) into JSON files in a `.sqlx/` directory at the crate or workspace root, and stops. **Commit `.sqlx/`.** When the macros run without a reachable `DATABASE_URL`, or with `SQLX_OFFLINE=true` set, they read those files instead of connecting.
+
+The catch is drift: if someone changes a query or a migration and forgets to rerun `prepare`, the committed metadata is stale. Add a check to CI that runs against a real database:
+
+```bash
+# in CI, after starting Postgres and running migrations
+cargo sqlx prepare --check
+```
+
+It fails if `.sqlx/` does not match what the current queries and schema produce. Docker builds then set `SQLX_OFFLINE=true` and need no database at all. [Part 8](/blog/rust-backend-08-shipping-production) puts this into the full pipeline.
+
+### When to use the runtime functions instead
+
+The macros need a string literal. For queries whose shape depends on input (optional filters, user-chosen sorting), use `sqlx::query` and `sqlx::query_as::<_, T>` with `.bind()`, or `QueryBuilder`. They check nothing at compile time and decode through `FromRow`:
+
+```rust
+let row = sqlx::query_as::<_, OrderRow>(
+    "SELECT id, customer_id, status, total_cents, version, created_at
+     FROM orders WHERE id = $1",
+)
+.bind(id)
+.fetch_optional(pool)
+.await?;
+```
+
+No override is needed here: `FromRow` decodes using the struct field's type. Use macros by default and runtime functions where the shape is genuinely dynamic.
+
+## Writing: executors, transactions and the outbox
+
+### Executors
+
+Query methods like `.execute()` and `.fetch_one()` accept any **executor**: a `&PgPool` (borrow a connection for this one query), a `&mut PgConnection`, or a `&mut Transaction`. Repository functions that may need to participate in a caller's transaction should take `&mut PgConnection`; a `Transaction` dereferences to a connection, so callers pass `&mut tx` and it just works.
+
+```rust
+pub async fn insert(conn: &mut PgConnection, order: &Order) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT INTO orders (id, customer_id, status, total_cents, version, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+        order.id,
+        order.customer_id,
+        order.status as OrderStatus,
+        order.total_cents,
+        order.version,
+        order.created_at,
+    )
+    .execute(&mut *conn)
+    .await?;
+
+    // One round trip for all items: UNNEST turns parallel arrays into rows.
+    let line_nos: Vec<i32> = (1..=order.items.len() as i32).collect();
+    let skus: Vec<String> = order.items.iter().map(|i| i.sku.clone()).collect();
+    let quantities: Vec<i32> = order.items.iter().map(|i| i.quantity).collect();
+    let prices: Vec<i64> = order.items.iter().map(|i| i.unit_price_cents).collect();
+
+    sqlx::query!(
+        "INSERT INTO order_items (order_id, line_no, sku, quantity, unit_price_cents)
+         SELECT $1, * FROM UNNEST($2::int4[], $3::text[], $4::int4[], $5::int8[])",
+        order.id,
+        &line_nos[..],
+        &skus[..],
+        &quantities[..],
+        &prices[..],
+    )
+    .execute(&mut *conn)
+    .await?;
+
+    Ok(())
+}
+```
+
+The `&mut *conn` reborrow is needed because `execute` takes the executor by value; passing `conn` directly would move the mutable reference into the first call and leave nothing for the second.
+
+The `UNNEST` insert replaces one `INSERT` per item (20 items, 20 round trips) with one statement that takes arrays as parameters, so the parameter count stays fixed regardless of item count. `QueryBuilder::push_values` is the alternative, but its parameter count grows with the rows, and Postgres caps a statement at 65,535 parameters.
+
+### Transactions
+
+Creating an order touches two tables, `orders` and `order_items`, and should also record an `order.created` event in `outbox`. Either all three writes happen or none do. That is a transaction:
+
+```rust
+#[instrument(skip_all, fields(customer_id = %req.customer_id, order_id = tracing::field::Empty))]
+pub async fn create_order(
+    State(state): State<AppState>,
+    ValidatedJson(req): ValidatedJson<CreateOrderRequest>,
+) -> AppResult<impl IntoResponse> {
+    let items = req
+        .items
+        .into_iter()
+        .map(|i| OrderItem { sku: i.sku, quantity: i.quantity, unit_price_cents: i.unit_price_cents })
+        .collect();
+    let order = Order::new(req.customer_id, items);
+    tracing::Span::current().record("order_id", tracing::field::display(order.id));
+
+    let mut tx = state.db.begin().await?;
+
+    db::orders::insert(&mut tx, &order).await.map_err(|e| {
+        if is_fk_violation(&e, "orders_customer_id_fkey") {
+            AppError::Validation(vec![FieldError::new("customer_id", "unknown customer")])
+        } else {
+            e.into()
+        }
+    })?;
+
+    db::outbox::insert(
+        &mut tx,
+        &OutboxEvent {
+            id: Uuid::new_v4(),
+            aggregate_type: "order",
+            aggregate_id: order.id,
+            event_type: "order.created",
+            payload: json!({
+                "order_id": order.id,
+                "customer_id": order.customer_id,
+                "total_cents": order.total_cents,
+            }),
+        },
+    )
+    .await?;
+
+    tx.commit().await?;
+    tracing::info!(total_cents = order.total_cents, "order created");
+
+    Ok((
+        StatusCode::CREATED,
+        [(header::LOCATION, format!("/orders/{}", order.id))],
+        Json(OrderResponse::from(order)),
+    ))
+}
+```
+
+The key property of SQLx transactions: **dropping a `Transaction` without calling `commit()` rolls it back**. Every `?` in that function is an early return that drops `tx`, so any failure after `begin()` leaves the database untouched. You never write rollback code by hand. (The rollback is issued when the connection is next used or returned to the pool; the effect is the same.)
+
+```mermaid
+sequenceDiagram
+    participant H as "create_order"
+    participant P as "PgPool"
+    participant DB as "Postgres"
+    H->>P: "begin()"
+    P->>DB: "BEGIN"
+    H->>DB: "INSERT INTO orders"
+    H->>DB: "INSERT INTO order_items via UNNEST"
+    H->>DB: "INSERT INTO outbox order.created"
+    alt "all succeeded"
+        H->>DB: "COMMIT"
+        H-->>H: "201 Created"
+    else "any ? returned early"
+        Note over H,DB: "tx dropped, ROLLBACK, nothing persisted"
+    end
+```
+
+The outbox insert is the whole point of putting `outbox` in this transaction. If the service published `order.created` directly to Kafka after committing, a crash between commit and publish would lose the event; publishing before committing could announce an order that then rolls back. Writing the event to a table in the same transaction makes "order exists" and "event will be published" atomic. A separate relay ([Part 6](/blog/rust-backend-06-async-jobs-messaging-grpc)) reads unpublished rows and sends them. [Backend Engineering, Part 9](/blog/backend-09-event-driven-architecture) covers the pattern in depth.
+
+The outbox repository is a single insert, using a runtime query because its shape is trivial:
+
+```rust
+pub struct OutboxEvent {
+    pub id: Uuid,
+    pub aggregate_type: &'static str,
+    pub aggregate_id: Uuid,
+    pub event_type: &'static str,
+    pub payload: Value,
+}
+
+/// Must be called inside the same transaction as the state change it describes.
+pub async fn insert(conn: &mut PgConnection, event: &OutboxEvent) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO outbox (id, aggregate_type, aggregate_id, event_type, payload)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(event.id)
+    .bind(event.aggregate_type)
+    .bind(event.aggregate_id)
+    .bind(event.event_type)
+    .bind(&event.payload)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+```
+
+Transactions use Postgres's default isolation, `READ COMMITTED`. For stronger guarantees, run `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE` as the first statement in the transaction and be prepared to retry on serialization failures (SQLSTATE `40001`).
+
+### Turning database errors into AppError
+
+Part 2's `AppError` gains a variant for database failures, mapped to a logged, detail-free 500 like `Internal`:
+
+```rust
+#[error(transparent)]
+Database(#[from] sqlx::Error),
+```
+
+That covers the unexpected. Some database errors, however, are the database enforcing a rule the client violated, and deserve a specific response. A foreign-key violation on `orders_customer_id_fkey` means the client sent an unknown `customer_id`, which is a validation error, not a server failure:
+
+```rust
+fn is_fk_violation(err: &sqlx::Error, constraint: &str) -> bool {
+    matches!(err, sqlx::Error::Database(db)
+        if db.is_foreign_key_violation() && db.constraint() == Some(constraint))
+}
+```
+
+Match on the **constraint name**, not the message text. Messages vary across Postgres versions and locales; constraint names are part of your schema. (`orders_customer_id_fkey` is the name Postgres generates for that foreign key; name constraints explicitly in migrations if you want stable, readable names.) `is_unique_violation()` works the same way, for example to turn a duplicate customer email into a `409 Conflict`. And avoid mapping `sqlx::Error::RowNotFound` to `404` globally: use `fetch_optional` where absence is expected and decide explicitly, so a missing row in some internal lookup does not surface as a misleading 404.
+
+## Keyset pagination
+
+Part 1's list endpoint returned the newest 20 orders and stopped. Real clients need pages. The obvious implementation is `LIMIT 20 OFFSET 40`, and it has two problems.
+
+**It gets slower with depth.** To return rows 10,000 to 10,020, Postgres reads and discards the first 10,000 rows. Deep pages cost more than shallow ones.
+
+**It is unstable under writes.** If a new order arrives while a client pages through, every row shifts by one; the client sees an order twice or skips one.
+
+**Keyset pagination** (also called cursor or seek pagination) fixes both. Instead of "skip N rows", the client says "give me rows after this one", identified by the sort key of the last row it saw. With the composite index on `(customer_id, created_at DESC, id DESC)`, Postgres seeks directly to that position and reads 20 rows, no matter how deep the page is.
+
+![OFFSET pagination reads and discards every earlier row and shifts when new rows arrive, while keyset pagination seeks straight to the position after the last row seen using the index](/images/blog/rust/rust-backend-03-postgres-sqlx-keyset.svg)
+
+```rust
+/// Position of the last row on the previous page.
+#[derive(Debug, Clone, Copy)]
+pub struct Cursor {
+    pub created_at: OffsetDateTime,
+    pub id: Uuid,
+}
+
+pub async fn list_for_customer(
+    pool: &PgPool,
+    customer_id: Uuid,
+    after: Option<Cursor>,
+    limit: i64,
+) -> sqlx::Result<Vec<Order>> {
+    let rows = match after {
+        None => {
+            sqlx::query_as!(
+                OrderRow,
+                r#"SELECT id, customer_id, status AS "status: OrderStatus",
+                          total_cents, version, created_at
+                   FROM orders
+                   WHERE customer_id = $1
+                   ORDER BY created_at DESC, id DESC
+                   LIMIT $2"#,
+                customer_id,
+                limit
+            )
+            .fetch_all(pool)
+            .await?
+        }
+        Some(c) => {
+            sqlx::query_as!(
+                OrderRow,
+                r#"SELECT id, customer_id, status AS "status: OrderStatus",
+                          total_cents, version, created_at
+                   FROM orders
+                   WHERE customer_id = $1
+                     AND (created_at, id) < ($2::timestamptz, $3::uuid)
+                   ORDER BY created_at DESC, id DESC
+                   LIMIT $4"#,
+                customer_id,
+                c.created_at,
+                c.id,
+                limit
+            )
+            .fetch_all(pool)
+            .await?
+        }
+    };
+
+    // ... load items for the page, shown in the N+1 section below
+}
+```
+
+Details that matter:
+
+- **The row comparison `(created_at, id) < (...)`** compares lexicographically: earlier timestamp, or same timestamp and smaller id. Without the `id` tie-breaker, two orders with the same `created_at` straddling a page boundary could be skipped. The sort order and the comparison must match the index exactly.
+- **Two static queries instead of one with `$2 IS NULL OR ...`.** The "optional filter" trick compiles and returns correct results, but with prepared statements Postgres may settle on a generic plan that cannot use the row comparison as an index condition. Two queries, each with a plan that always seeks on the index, are clearer and predictable.
+- **The explicit casts** (`$2::timestamptz`, `$3::uuid`) tell Postgres the parameter types inside the row constructor, which it cannot always infer on its own.
+
+The handler asks for one extra row to learn whether another page exists, and returns an opaque cursor:
+
+```rust
+#[derive(Debug, Deserialize)]
+pub struct ListOrdersParams {
+    pub customer_id: Uuid,
+    pub limit: Option<i64>,
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrderPage {
+    pub items: Vec<OrderResponse>,
+    pub next_cursor: Option<String>,
+}
+
+/// Opaque to clients; we only promise to accept what we handed out.
+fn encode_cursor(c: Cursor) -> String {
+    format!("{}_{}", c.created_at.unix_timestamp_nanos(), c.id)
+}
+
+fn decode_cursor(s: &str) -> Option<Cursor> {
+    let (nanos, id) = s.split_once('_')?;
+    let created_at = OffsetDateTime::from_unix_timestamp_nanos(nanos.parse().ok()?).ok()?;
+    Some(Cursor { created_at, id: id.parse().ok()? })
+}
+
+#[instrument(skip(state))]
+pub async fn list_orders(
+    State(state): State<AppState>,
+    AppQuery(params): AppQuery<ListOrdersParams>,
+) -> AppResult<Json<OrderPage>> {
+    let limit = params.limit.unwrap_or(20).clamp(1, 100);
+    let after = match params.cursor.as_deref() {
+        None => None,
+        Some(raw) => Some(decode_cursor(raw).ok_or_else(|| {
+            AppError::Validation(vec![FieldError::new("cursor", "invalid cursor")])
+        })?),
+    };
+
+    // Ask for one extra row to learn whether another page exists.
+    let mut orders = db::orders::list_for_customer(&state.db, params.customer_id, after, limit + 1).await?;
+    let has_more = orders.len() as i64 > limit;
+    orders.truncate(limit as usize);
+
+    let next_cursor = has_more
+        .then(|| orders.last())
+        .flatten()
+        .map(|o| encode_cursor(Cursor { created_at: o.created_at, id: o.id }));
+
+    Ok(Json(OrderPage {
+        items: orders.into_iter().map(OrderResponse::from).collect(),
+        next_cursor,
+    }))
+}
+```
+
+`customer_id` is now required: listing every order in the system is an admin feature, and in [Part 4](/blog/rust-backend-04-auth-middleware) the customer id will come from the authenticated user rather than the query string. Postgres stores `timestamptz` with microsecond precision, and the cursor round-trips the exact value, so the comparison is precise. Many APIs base64-encode cursors to discourage clients from parsing them; the important part is documenting them as opaque. The trade-off of keyset pagination: no "jump to page 37". For feeds, lists and APIs consumed by programs, that is rarely a loss.
+
+## Avoiding N+1 queries
+
+A page of 20 orders needs each order's items. The tempting implementation calls `find` per order, or loads items in a loop: one query for the orders, then one per order for items. That is the **N+1 problem**: 21 round trips where 2 would do. At 1 ms per round trip within a data center it costs 20 ms per page; across regions or under load it costs far more, and it multiplies connection usage.
+
+```mermaid
+sequenceDiagram
+    participant R as "list_for_customer"
+    participant DB as "Postgres"
+    Note over R,DB: "N+1: one query per order"
+    R->>DB: "SELECT orders LIMIT 20"
+    loop "20 times"
+        R->>DB: "SELECT items WHERE order_id = $1"
+    end
+    Note over R,DB: "Batched: two queries total"
+    R->>DB: "SELECT orders LIMIT 20"
+    R->>DB: "SELECT items WHERE order_id = ANY($1)"
+```
+
+The batched version loads all items for the page in one query with `= ANY($1)` and an array parameter, then groups them in memory:
+
+```rust
+    // One query for the items of every order on the page, not one per order.
+    let ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
+    let item_rows = sqlx::query_as!(
+        OrderItemRow,
+        "SELECT order_id, sku, quantity, unit_price_cents
+         FROM order_items
+         WHERE order_id = ANY($1)
+         ORDER BY order_id, line_no",
+        &ids[..]
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut items_by_order: HashMap<Uuid, Vec<OrderItem>> = HashMap::new();
+    for r in item_rows {
+        items_by_order.entry(r.order_id).or_default().push(r.into());
+    }
+
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let items = items_by_order.remove(&row.id).unwrap_or_default();
+            row.into_domain(items)
+        })
+        .collect())
+```
+
+`ORDER BY order_id, line_no` keeps items in line order, and the final `map` walks the order rows in page order, so the unordered `HashMap` does not disturb sorting. The primary key on `order_items` serves the `ANY` lookup. (A single query with `json_agg` and a `LEFT JOIN` also works, at the cost of moving the mapping into SQL.) With SQLx there are no lazy-loaded relations hiding queries, so N+1 is easy to spot in review: a query inside a loop is the smell.
+
+## Optimistic locking with a version column
+
+Paying an order is a read-modify-write: read the order, check the domain rule (only `pending` orders can be paid), write the new status. Two concurrent requests can both read `pending`, both pass the check, and both write. In this case both writes set the same status, but each also emits an outbox event, so downstream systems would see two payment requests for one order. In other read-modify-write flows, the second write silently overwrites the first: a **lost update**.
+
+There are two standard fixes:
+
+- **Pessimistic locking**: `SELECT ... FOR UPDATE` inside a transaction locks the row; the second request waits until the first commits, then reads the new state. Simple and correct, but it holds a lock (and a connection) while your code runs.
+- **Optimistic locking**: no lock. Each row has a `version`. The write succeeds only if the version is still what you read, and increments it. If someone else wrote in between, your update matches zero rows, and you report a conflict.
+
+![Two requests read order version 3; the first update matches the row and bumps it to version 4, the second update's WHERE version = 3 matches nothing, so it gets 409 Conflict instead of silently overwriting](/images/blog/rust/rust-backend-03-postgres-sqlx-optimistic-locking.svg)
+
+orders-api uses the optimistic approach. The repository function returns whether the row was updated:
+
+```rust
+/// Optimistic update: returns false when someone changed the row
+/// since we read `expected_version`.
+pub async fn update_status(
+    conn: &mut PgConnection,
+    id: Uuid,
+    new_status: OrderStatus,
+    expected_version: i32,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE orders
+         SET status = $1, version = version + 1, updated_at = now()
+         WHERE id = $2 AND version = $3",
+        new_status as OrderStatus,
+        id,
+        expected_version
+    )
+    .execute(conn)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+```
+
+And the handler composes the read, the domain rule, the conditional write and the outbox event:
+
+```rust
+#[instrument(skip(state))]
+pub async fn pay_order(
+    State(state): State<AppState>,
+    AppPath(id): AppPath<Uuid>,
+) -> AppResult<StatusCode> {
+    let mut order = db::orders::find(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound { entity: "order", id: id.to_string() })?;
+
+    let read_version = order.version;
+    order.request_payment()?; // domain rule: only pending orders can be paid
+
+    let mut tx = state.db.begin().await?;
+    let updated = db::orders::update_status(&mut tx, id, order.status, read_version).await?;
+    if !updated {
+        // Someone else changed the order between our read and our write.
+        return Err(AppError::Conflict("order was modified concurrently, retry".into()));
+    }
+    db::outbox::insert(
+        &mut tx,
+        &OutboxEvent {
+            id: Uuid::new_v4(),
+            aggregate_type: "order",
+            aggregate_id: id,
+            event_type: "order.payment_requested",
+            payload: json!({ "order_id": id, "total_cents": order.total_cents }),
+        },
+    )
+    .await?;
+    tx.commit().await?;
+
+    Ok(StatusCode::ACCEPTED)
+}
+```
+
+The domain rule still lives in `Order::request_payment`; the database only guarantees that the state we checked is the state we are replacing. The read happens outside the transaction on purpose: the version check makes it safe, and it keeps the transaction (and its connection) as short as possible. If the early return fires, `tx` is dropped and rolled back, so no outbox event is written for the losing request.
+
+Optimistic locking suits rare conflicts and flows with slow steps between read and write, since it holds nothing while waiting. It also extends to HTTP: return the version as an `ETag`, require `If-Match`, and answer `412 Precondition Failed` on mismatch, which protects against lost updates between two *users*. Pessimistic locking is better when conflicts are frequent and retries would waste work. For payments, pair either with idempotency keys, as in the [duplicate payments case study](/blog/case-03-duplicate-payments-retries).
+
+## The repository pattern, without over-abstracting
+
+Notice what orders-api does *not* have: an `OrderRepository` trait, an implementation struct, a generic `Repository<T, ID>` base, or a unit-of-work abstraction. The repository is a module of free functions that take an executor:
+
+```text
+src/db/
+├── mod.rs       # connect(), migrate()
+├── orders.rs    # insert, find, list_for_customer, update_status
+└── outbox.rs    # insert
+```
+
+The value of a repository is keeping an aggregate's SQL in one place, with domain types in and out. Free functions give you that. A trait pays off only with a second implementation, and "we might switch databases" is not one. The realistic reason is testing handlers without a database, which [Part 5](/blog/rust-backend-05-testing) weighs against `#[sqlx::test]` on a real Postgres. Two rules keep this structure healthy:
+
+- **Functions that may join a caller's transaction take `&mut PgConnection`.** Functions that never need to (single-statement reads) can take `&PgPool`. The caller decides where transaction boundaries are, because transactions are a use-case concern, not a table concern.
+- **Repositories return domain types or `sqlx::Result`, never HTTP types.** Turning a missing row into a 404 or a constraint violation into a 422 is the handler's job, as `create_order` shows.
+
+## SQLx, Diesel and SeaORM
+
+| | SQLx | Diesel | SeaORM |
+|---|---|---|---|
+| Style | Raw SQL strings | Typed query builder DSL | ORM with entities and ActiveModel |
+| Checking | Macros check against a live DB or `.sqlx` metadata | Rust type system against a generated `schema.rs` | Mostly runtime |
+| Async | Native | Sync core; `diesel-async` crate for async | Native (built on SQLx) |
+| Migrations | SQL files, `sqlx-cli` | SQL files, `diesel_cli` | Rust or SQL, `sea-orm-cli` |
+| Dynamic queries | `QueryBuilder`, runtime functions | Excellent, composable | Good |
+| Best for | Teams fluent in SQL who want it visible | Complex, composable typed queries | CRUD-heavy apps wanting ORM ergonomics |
+
+Diesel excels at composing typed queries without a database at compile time, at the cost of a steep learning curve and notoriously long trait errors. SeaORM is closest to Spring Data JPA: entities, relations and generated CRUD, with SQL one step removed. For Kotlin developers, SQLx resembles Spring's `JdbcClient` with compile-time checks added, Diesel resembles jOOQ's DSL, and SeaORM resembles Exposed's DAO API. Pick by how your team thinks about data access, then stay consistent.
+
+## Running it
+
+```bash
+docker start orders-db
+export DATABASE_URL=postgres://orders:orders@localhost:5432/orders
+ORDERS_DATABASE__URL=$DATABASE_URL cargo run
+
+# seed a customer (there is no customers endpoint yet)
+psql "$DATABASE_URL" -c "INSERT INTO customers (id, email, name)
+  VALUES ('8c1f0e9e-1f5a-4a59-9a4e-2f4f3b1d6c11', 'ada@example.com', 'Ada')"
+
+curl -s -X POST localhost:3000/orders -H 'content-type: application/json' \
+  -d '{"customer_id":"8c1f0e9e-1f5a-4a59-9a4e-2f4f3b1d6c11",
+       "items":[{"sku":"BOOK-1","quantity":2,"unit_price_cents":1500}]}'
+
+curl -s 'localhost:3000/orders?customer_id=8c1f0e9e-1f5a-4a59-9a4e-2f4f3b1d6c11&limit=2'
+# {"items":[...],"next_cursor":"1794009955420294000_dfa9c6e6-..."}
+
+psql "$DATABASE_URL" -c "SELECT event_type, payload FROM outbox"
+```
+
+Restart the service and the orders are still there, which is the point.
+
+## Common mistakes
+
+**Oversized pools.** `max_connections(100)` on each of 20 replicas asks for 2,000 connections from a database that allows 100. Size from the database's capacity down, not from the service's concurrency up.
+
+**The default 30-second acquire timeout.** Under exhaustion, requests queue for half a minute, clients retry, and the backlog grows. Set a short timeout and let failures be fast.
+
+**Slow work inside a transaction.** Calling an HTTP API, sending an email or doing heavy computation between `begin()` and `commit()` holds a connection and row locks for the duration. Keep transactions to database work only.
+
+**Forgetting `commit()`.** Dropping the transaction rolls it back. The handler returns success, and nothing was saved. Tests against a real database (Part 5) catch this; reading the code often does not.
+
+**Stale `.sqlx` metadata.** Someone changes a query, the offline build still compiles against old metadata, and the mismatch surfaces at runtime. Run `cargo sqlx prepare --check` in CI.
+
+**`OFFSET` pagination on large tables.** Deep pages get slower and concurrent inserts shift results. Use keyset pagination with a unique tie-breaker column, backed by a matching index.
+
+**Queries in loops.** Loading related rows per parent row is N+1. Batch with `= ANY($1)`, a join, or aggregation.
+
+**Read-modify-write without protection.** Two concurrent updates both pass the check and one overwrites the other. Use a version column or `SELECT ... FOR UPDATE`.
+
+**Matching on error message text.** `if msg.contains("duplicate key")` breaks with a Postgres upgrade or locale change. Use `is_unique_violation()`, `is_foreign_key_violation()` and constraint names.
+
+**Forwarding `sqlx::Error` text to clients.** It contains table, column and constraint names. Map it to `AppError::Database`, which logs and returns a generic 500.
+
+## Interview questions
+
+<details>
+<summary>How do SQLx's compile-time checked queries work, and how do you build without a database?</summary>
+
+The `query!` and `query_as!` macros connect to the database in `DATABASE_URL` during compilation, prepare each statement, and use Postgres's description of parameters and result columns to type-check the Rust code: column names and types must match the target struct, parameter types must match the arguments, and nullable columns must map to `Option`. For builds without a database, `cargo sqlx prepare` records that metadata into a committed `.sqlx` directory, and the macros use it when no database is reachable or `SQLX_OFFLINE=true` is set. CI should run `cargo sqlx prepare --check` against a migrated database so the metadata cannot drift from the queries and schema.
+
+</details>
+
+<details>
+<summary>How would you size a database connection pool for a service running many replicas?</summary>
+
+Start from the database's capacity: the total of every replica's maximum pool size, including extra pods during rolling deploys and other clients, must fit under the server's connection limit or a pooler's limit. Then check per-pod demand with Little's law: requests per second times average connection hold time gives the average connections in use, and the pool needs headroom for bursts above that. More connections than the database has cores to serve does not increase throughput. Set a short acquire timeout so exhaustion fails fast rather than queueing requests, and keep connection hold times short by keeping slow work out of transactions.
+
+</details>
+
+<details>
+<summary>Why prefer keyset pagination over OFFSET, and what makes it correct?</summary>
+
+OFFSET makes the database read and discard all earlier rows, so deep pages get progressively slower, and concurrent inserts shift rows between pages, causing duplicates or gaps. Keyset pagination asks for rows after the last-seen sort key, which an index can seek to directly, so every page costs the same and results are stable under inserts. Correctness requires a total order: the sort key must include a unique tie-breaker such as the id, the comparison must be a row comparison matching the sort direction, and an index should match the filter and sort columns. The trade-off is no random access to page N.
+
+</details>
+
+<details>
+<summary>Explain optimistic locking with a version column. When would you choose pessimistic locking instead?</summary>
+
+Each row carries a version. A writer reads the row and its version, applies its logic, then updates with `WHERE id = $1 AND version = $2`, incrementing the version. If another writer got there first, the update affects zero rows and the caller reports a conflict or retries. No locks are held between read and write, which suits low-conflict workloads and flows with slow steps, and it maps naturally onto HTTP ETags and `If-Match`. Pessimistic locking with `SELECT ... FOR UPDATE` is better when conflicts are frequent, since retries would waste work, or when the critical section is short and already inside a transaction; its costs are held locks and connections and potential lock contention.
+
+</details>
+
+<details>
+<summary>What is the N+1 query problem and how do you avoid it with SQLx?</summary>
+
+N+1 is running one query to load N parent rows and then one more query per parent to load related rows, so round trips grow linearly with the page size. With SQLx, avoid it by loading related rows for the whole page in one query using `WHERE parent_id = ANY($1)` with an array parameter, then grouping in memory with a `HashMap`, or by using a join or JSON aggregation in a single query. Because SQLx has no lazy-loaded relations, every query is explicit in the code, so a query inside a loop is easy to spot in review.
+
+</details>
+
+<details>
+<summary>Why write an outbox row in the same transaction as the business change?</summary>
+
+Publishing an event directly to a broker is a separate system from the database, so there is no atomic commit across both. Publishing after commit risks losing the event if the process crashes in between; publishing before commit risks announcing a change that rolls back. Inserting the event into an outbox table in the same transaction makes the state change and the intent to publish atomic. A relay process then reads unpublished rows and publishes them, giving at-least-once delivery, which consumers handle by being idempotent.
+
+</details>
+
+<details>
+<summary>How does SQLx handle transaction rollback, and what pitfalls does that create?</summary>
+
+A `Transaction` rolls back when it is dropped without `commit()`. Combined with `?`, any early return after `begin()` automatically discards the transaction's work, so explicit rollback code is unnecessary. The pitfalls are forgetting `commit()` on the success path, which silently discards work while the handler reports success, and holding a transaction across slow non-database operations, which keeps a pooled connection and any row locks busy. Repository functions should accept `&mut PgConnection` so the caller controls transaction boundaries.
+
+</details>
+
+## Key takeaways
+
+- SQLx keeps SQL visible and checks it at compile time; commit `.sqlx` metadata for offline builds and verify it in CI with `cargo sqlx prepare --check`.
+- Size pools from the database's limits down, account for every replica and deploy surges, and set a short `acquire_timeout`.
+- Migrations are versioned SQL files; `migrate!` embeds them in the binary, and constraints in the schema back up application validation.
+- Keep row structs separate from domain types; map Postgres enums with `sqlx::Type`.
+- Transactions roll back on drop, so `?` gives you correct error handling for free; keep them short and free of external I/O.
+- Write outbox events in the same transaction as the change they describe.
+- Use keyset pagination with a unique tie-breaker and a matching index, batch related loads with `= ANY($1)`, and protect read-modify-write with a version column.
+- A repository can be a module of functions taking an executor; add traits only when you have a concrete reason.
+
+Previous: [Part 2: Errors, Configuration and Tracing](/blog/rust-backend-02-errors-config-tracing) · Next: [Part 4: Authentication, Authorization and Middleware](/blog/rust-backend-04-auth-middleware)

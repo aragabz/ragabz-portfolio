@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-labelledby="t d">
+  <title id="t">A slow request as a trace waterfall</title>
+  <desc id="d">An illustrative trace of POST /orders/{id}/pay taking 412 milliseconds. Most of the time is spent waiting to acquire a database connection from the pool, not running SQL, which points to pool exhaustion rather than a slow query.</desc>
+  <rect width="800" height="400" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Where did 412 ms go?</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Illustrative trace of one slow request. Bar length is wall-clock time on a shared axis.</text>
+
+  <line x1="250" y1="92" x2="250" y2="330" stroke="#30363d"/>
+  <line x1="378" y1="92" x2="378" y2="330" stroke="#30363d" stroke-dasharray="3 4"/>
+  <line x1="506" y1="92" x2="506" y2="330" stroke="#30363d" stroke-dasharray="3 4"/>
+  <line x1="634" y1="92" x2="634" y2="330" stroke="#30363d" stroke-dasharray="3 4"/>
+  <line x1="762" y1="92" x2="762" y2="330" stroke="#30363d" stroke-dasharray="3 4"/>
+  <text x="250" y="348" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">0</text>
+  <text x="378" y="348" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">100 ms</text>
+  <text x="506" y="348" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">200 ms</text>
+  <text x="634" y="348" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">300 ms</text>
+  <text x="762" y="348" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">400 ms</text>
+
+  <text x="32" y="117" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">POST /orders/{id}/pay</text>
+  <rect x="250" y="102" width="527" height="22" rx="4" fill="#79c0ff" fill-opacity="0.35" stroke="#79c0ff"/>
+  <text x="258" y="118" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">412 ms</text>
+
+  <text x="48" y="153" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">auth::verify_jwt</text>
+  <rect x="252" y="138" width="4" height="22" rx="2" fill="#7ee787"/>
+  <text x="264" y="154" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">0.3 ms</text>
+
+  <text x="48" y="189" fill="#f78166" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">db.pool.acquire</text>
+  <rect x="257" y="174" width="486" height="22" rx="4" fill="#f78166" fill-opacity="0.45" stroke="#f78166"/>
+  <text x="266" y="190" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">380 ms waiting for a free connection</text>
+
+  <text x="48" y="225" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">SELECT orders FOR UPDATE</text>
+  <rect x="743" y="210" width="5" height="22" rx="2" fill="#d2a8ff"/>
+  <text x="640" y="226" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">2.1 ms</text>
+
+  <text x="48" y="261" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">UPDATE orders</text>
+  <rect x="748" y="246" width="4" height="22" rx="2" fill="#d2a8ff"/>
+  <text x="640" y="262" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">1.4 ms</text>
+
+  <text x="48" y="297" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">INSERT INTO outbox</text>
+  <rect x="752" y="282" width="3" height="22" rx="2" fill="#d2a8ff"/>
+  <text x="640" y="298" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">0.9 ms</text>
+
+  <rect x="32" y="362" width="736" height="28" rx="6" fill="#161b22" stroke="#ffa657"/>
+  <text x="44" y="381" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">The SQL is fast. The request queued for a connection: check pool size and holders.</text>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Structs are AND, enums are OR</title>
+  <desc id="d">Left: a Customer struct holds an id and a name and an email and an active flag, all at once. Right: a PaymentMethod enum is exactly one of Cash, Card, BankTransfer or Voucher, each with its own fields. In memory the enum is a small tag saying which variant it is, plus space for the largest variant.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Product types and sum types</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">A struct has all of its fields. An enum is exactly one of its variants.</text>
+  <rect x="24" y="88" width="300" height="286" rx="12" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="44" y="118" fill="#79c0ff" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">struct Customer</text>
+  <text x="44" y="140" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">id AND name AND email AND active</text>
+  <rect x="44" y="160" width="260" height="38" rx="6" fill="#0d1117" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="58" y="184" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">id</text>
+  <text x="290" y="184" fill="#8b949e" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">u64</text>
+  <rect x="44" y="208" width="260" height="38" rx="6" fill="#0d1117" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="58" y="232" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">name</text>
+  <text x="290" y="232" fill="#8b949e" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">String</text>
+  <rect x="44" y="256" width="260" height="38" rx="6" fill="#0d1117" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="58" y="280" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">email</text>
+  <text x="290" y="280" fill="#8b949e" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">String</text>
+  <rect x="44" y="304" width="260" height="38" rx="6" fill="#0d1117" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="58" y="328" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">active</text>
+  <text x="290" y="328" fill="#8b949e" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">bool</text>
+  <rect x="344" y="88" width="432" height="286" rx="12" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="364" y="118" fill="#d2a8ff" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">enum PaymentMethod</text>
+  <text x="364" y="140" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Cash OR Card OR BankTransfer OR Voucher</text>
+  <rect x="364" y="160" width="392" height="38" rx="6" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="378" y="184" fill="#7ee787" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Cash</text>
+  <text x="742" y="184" fill="#8b949e" font-size="13" text-anchor="end" font-family="Inter, system-ui, sans-serif">no data</text>
+  <rect x="364" y="208" width="392" height="38" rx="6" fill="#0d1117" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="378" y="232" fill="#ffa657" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Card</text>
+  <text x="742" y="232" fill="#8b949e" font-size="13" text-anchor="end" font-family="Inter, system-ui, sans-serif">last4, network</text>
+  <rect x="364" y="256" width="392" height="38" rx="6" fill="#0d1117" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="378" y="280" fill="#79c0ff" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">BankTransfer</text>
+  <text x="742" y="280" fill="#8b949e" font-size="13" text-anchor="end" font-family="Inter, system-ui, sans-serif">iban</text>
+  <rect x="364" y="304" width="392" height="38" rx="6" fill="#0d1117" stroke="#f78166" stroke-width="1.5"/>
+  <text x="378" y="328" fill="#f78166" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Voucher</text>
+  <text x="742" y="328" fill="#8b949e" font-size="13" text-anchor="end" font-family="Inter, system-ui, sans-serif">code, value</text>
+  <text x="32" y="404" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">In memory:</text>
+  <rect x="110" y="388" width="60" height="28" rx="4" fill="#d2a8ff" fill-opacity="0.25" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="140" y="407" fill="#e6edf3" font-size="12" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">tag</text>
+  <rect x="176" y="388" width="300" height="28" rx="4" fill="#0d1117" stroke="#ffa657" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="326" y="407" fill="#ffa657" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">room for the largest variant</text>
+  <text x="490" y="407" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">one value, no extra heap allocation</text>
+  <text x="32" y="448" fill="#e6edf3" font-size="12" font-family="Inter, system-ui, sans-serif">match on an enum must handle every variant, so adding one flags each place that needs a decision.</text>
+</svg>

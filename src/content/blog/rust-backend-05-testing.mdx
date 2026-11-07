@@ -1,0 +1,1066 @@
+---
+title: "Rust Backend, Part 5: Testing a Rust Service"
+date: 2026-11-07
+excerpt: "A practical test pyramid for orders-api: domain unit tests, handler tests with tower's oneshot, #[sqlx::test] against real Postgres, testcontainers, fakes versus mockall, proptest, insta snapshots, JSON contract tests and a fast CI setup with cargo-nextest."
+tags: ["Rust", "Backend", "Testing", "PostgreSQL", "DevOps"]
+readingTime: 25
+level: senior
+series: "Backend Services in Rust"
+seriesOrder: 5
+draft: false
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Rust's compiler removes a whole class of bugs before any test runs: null dereferences, data races, forgotten error cases, type mix-ups. That's the source of the claim that Rust code "just works" once it compiles. It doesn't. The compiler can't know that a cancelled order must never be paid, that a customer mustn't see another customer's orders, or that a middleware layer sits in the wrong place. This part is for engineers who want a test suite for a Rust service that catches those bugs, runs in seconds locally, and doesn't become a maintenance burden. By the end you'll know which kind of test to write for which kind of risk, and how to make each kind cheap.
+
+<Callout variant="note" title="You should already know">
+The orders-api service built so far: axum handlers and state ([Part 1](/blog/rust-backend-01-first-http-service)), `AppError` ([Part 2](/blog/rust-backend-02-errors-config-tracing)), SQLx and migrations ([Part 3](/blog/rust-backend-03-postgres-sqlx)), and auth plus the middleware stack ([Part 4](/blog/rust-backend-04-auth-middleware)). The tests in this post exercise that exact code.
+</Callout>
+
+All snippets compile against axum 0.8, SQLx 0.8, tower 0.5, mockall 0.15, proptest 1, insta 1 and testcontainers-modules 0.15 on edition 2024. The dev-dependencies:
+
+```toml
+[dev-dependencies]
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
+mockall = "0.15"
+proptest = "1"
+insta = { version = "1", features = ["json", "redactions"] }
+testcontainers-modules = { version = "0.15", features = ["postgres"] }
+```
+
+## A test pyramid for a Rust service
+
+### What each layer is for
+
+The classic pyramid (many unit tests, fewer integration tests, very few end-to-end tests) still holds, but the reason matters more than the shape. Each layer exists to catch a specific kind of mistake at the lowest possible cost.
+
+![The orders-api test pyramid: many fast domain and property tests at the base, handler tests with oneshot above them, then sqlx::test database tests, and a few container-based end-to-end tests at the top](/images/blog/rust/rust-backend-05-testing-pyramid.svg)
+
+| Layer | Catches | Tool | Speed |
+|---|---|---|---|
+| Domain unit tests | wrong business rules | `#[test]`, proptest | microseconds |
+| Handler tests | wrong status codes, auth, validation, layer order | `tower::ServiceExt::oneshot` | milliseconds, no network |
+| Database tests | wrong SQL, constraints, transactions, races | `#[sqlx::test]` | tens of milliseconds each |
+| Container / e2e | migrations on a clean DB, wiring, config | testcontainers | seconds |
+
+In a Rust service, the base of the pyramid is unusually strong. Pure functions over owned data, enums for state, and `Result` for failure make domain logic easy to test without any framework. Push as much behavior as you can into that layer and the expensive layers stay small.
+
+### Where each test cuts the system
+
+Thinking about tests as "cuts" through the call path helps decide what to fake. Each test type starts at some entry point and stops at some boundary.
+
+![Diagram of the orders-api call path from HTTP router through middleware and handlers to the domain, Postgres and the payment provider, with brackets showing which part each test type exercises and what it replaces](/images/blog/rust/rust-backend-05-testing-seams.svg)
+
+The rule that falls out: fake things you don't own and that are slow or nondeterministic (the payment provider, the clock, randomness). Don't fake the database you do own; test against a real Postgres, because the bugs you care about live in the SQL.
+
+## Unit tests for the domain
+
+### Make the domain testable first
+
+Tests are easy when the code under test is pure. The orders-api `Order` type owns its invariants: construction validates, state transitions are methods that return `Result`, and nothing touches I/O.
+
+```rust
+pub const MAX_ITEMS: usize = 100;
+pub const MAX_QUANTITY: u32 = 1_000;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LineItem {
+    pub sku: String,
+    pub quantity: u32,
+    pub unit_price_cents: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Order {
+    pub id: Uuid,
+    pub customer_id: Uuid,
+    pub status: OrderStatus,
+    pub items: Vec<LineItem>,
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum DomainError {
+    #[error("an order needs at least one item")]
+    EmptyOrder,
+    #[error("too many items (max {MAX_ITEMS})")]
+    TooManyItems,
+    #[error("invalid quantity for {sku}")]
+    InvalidQuantity { sku: String },
+    #[error("negative price for {sku}")]
+    NegativePrice { sku: String },
+    #[error("order total overflows")]
+    TotalOverflow,
+    #[error("cannot {action} an order that is {from:?}")]
+    InvalidTransition { from: OrderStatus, action: &'static str },
+}
+
+impl Order {
+    pub fn new(customer_id: Uuid, items: Vec<LineItem>) -> Result<Self, DomainError> {
+        if items.is_empty() {
+            return Err(DomainError::EmptyOrder);
+        }
+        if items.len() > MAX_ITEMS {
+            return Err(DomainError::TooManyItems);
+        }
+        for item in &items {
+            if item.quantity == 0 || item.quantity > MAX_QUANTITY {
+                return Err(DomainError::InvalidQuantity { sku: item.sku.clone() });
+            }
+            if item.unit_price_cents < 0 {
+                return Err(DomainError::NegativePrice { sku: item.sku.clone() });
+            }
+        }
+        let order = Self { id: Uuid::new_v4(), customer_id, status: OrderStatus::Pending, items };
+        order.total_cents()?; // reject orders whose total cannot be represented
+        Ok(order)
+    }
+
+    pub fn total_cents(&self) -> Result<i64, DomainError> {
+        self.items.iter().try_fold(0i64, |acc, item| {
+            item.unit_price_cents
+                .checked_mul(i64::from(item.quantity))
+                .and_then(|line| acc.checked_add(line))
+                .ok_or(DomainError::TotalOverflow)
+        })
+    }
+
+    pub fn mark_paid(&mut self) -> Result<(), DomainError> {
+        match self.status {
+            OrderStatus::Pending => {
+                self.status = OrderStatus::Paid;
+                Ok(())
+            }
+            // Payment confirmations can arrive twice; paying a paid order is a no-op.
+            OrderStatus::Paid => Ok(()),
+            from @ OrderStatus::Cancelled => {
+                Err(DomainError::InvalidTransition { from, action: "pay" })
+            }
+        }
+    }
+
+    pub fn cancel(&mut self) -> Result<(), DomainError> {
+        match self.status {
+            OrderStatus::Pending => {
+                self.status = OrderStatus::Cancelled;
+                Ok(())
+            }
+            OrderStatus::Cancelled => Ok(()),
+            from @ OrderStatus::Paid => {
+                Err(DomainError::InvalidTransition { from, action: "cancel" })
+            }
+        }
+    }
+}
+```
+
+`DomainError` derives `PartialEq` so tests can compare whole error values with `assert_eq!`, which produces far better failure messages than `assert!(matches!(...))`. The `From<DomainError> for AppError` impl (invalid transitions become 409, everything else 422) keeps HTTP concerns out of this file entirely.
+
+### The tests
+
+Unit tests live next to the code in a `#[cfg(test)]` module, so they can see private items and compile away in release builds:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(sku: &str, quantity: u32, unit_price_cents: i64) -> LineItem {
+        LineItem { sku: sku.into(), quantity, unit_price_cents }
+    }
+
+    fn pending_order() -> Order {
+        Order::new(Uuid::new_v4(), vec![item("SKU-1", 2, 1_250), item("SKU-2", 1, 499)]).unwrap()
+    }
+
+    #[test]
+    fn total_is_sum_of_lines() {
+        assert_eq!(pending_order().total_cents(), Ok(2 * 1_250 + 499));
+    }
+
+    #[test]
+    fn empty_order_is_rejected() {
+        assert_eq!(Order::new(Uuid::new_v4(), vec![]), Err(DomainError::EmptyOrder));
+    }
+
+    #[test]
+    fn overflowing_total_is_rejected() {
+        let err = Order::new(Uuid::new_v4(), vec![item("A", 2, i64::MAX)]).unwrap_err();
+        assert_eq!(err, DomainError::TotalOverflow);
+    }
+
+    #[test]
+    fn paying_twice_is_idempotent() {
+        let mut order = pending_order();
+        order.mark_paid().unwrap();
+        order.mark_paid().unwrap();
+        assert_eq!(order.status, OrderStatus::Paid);
+    }
+
+    #[test]
+    fn cancelled_order_cannot_be_paid() {
+        let mut order = pending_order();
+        order.cancel().unwrap();
+        assert_eq!(
+            order.mark_paid(),
+            Err(DomainError::InvalidTransition { from: OrderStatus::Cancelled, action: "pay" })
+        );
+    }
+}
+```
+
+Small builder helpers like `item` and `pending_order` matter more than they look. When a field is added to `LineItem`, you fix one helper instead of forty struct literals. Name tests after the behavior, not the method; `paying_twice_is_idempotent` documents a business rule that someone will otherwise "fix" later.
+
+The same idea applies to infrastructure code. The token bucket from Part 4 takes `now: Instant` as a parameter instead of reading the clock, so its test is deterministic and instant:
+
+```rust
+#[test]
+fn burst_then_refill() {
+    let limiter = RateLimiter::new(2, 1);
+    let key = ClientKey::Ip(IpAddr::from([10, 0, 0, 1]));
+    let t0 = Instant::now();
+    assert!(limiter.check(key, t0).is_ok());
+    assert!(limiter.check(key, t0).is_ok());
+    assert!(limiter.check(key, t0).is_err());
+    assert!(limiter.check(key, t0 + Duration::from_millis(1_000)).is_ok());
+}
+```
+
+Passing time in is the cheapest form of dependency injection there is. For async code that sleeps, `tokio::time::pause()` (with the `test-util` feature) gives you a virtual clock instead.
+
+## Property tests with proptest
+
+### Finding the cases you didn't think of
+
+Example-based tests check the cases you thought of. Property tests check a statement that should hold for all inputs, by generating hundreds of random ones and, when one fails, shrinking it to the smallest input that still fails.
+
+To see why that's worth having, here is the naive total that an earlier version of orders-api used, with an obvious-looking property:
+
+```rust
+use proptest::prelude::*;
+
+fn naive_total(lines: &[(u32, i64)]) -> i64 {
+    lines.iter().map(|(q, p)| p * i64::from(*q)).sum()
+}
+
+proptest! {
+    #[test]
+    fn total_is_non_negative(lines in prop::collection::vec((1u32..=1_000, 0i64..=i64::MAX / 2), 1..10)) {
+        prop_assert!(naive_total(&lines) >= 0);
+    }
+}
+```
+
+```text
+Test failed: attempt to multiply with overflow.
+minimal failing input: lines = [
+    (
+        3,
+        3074457345618258603,
+    ),
+]
+	successes: 0
+```
+
+Proptest found the overflow and shrank it to a single line just past `i64::MAX / 3`. In a debug build the multiplication panics; in a release build it would silently wrap to a negative total. That's the bug that led to `checked_mul` and `DomainError::TotalOverflow` above. Proptest also writes failing seeds to a `proptest-regressions/` directory; commit it so the case is replayed on every run.
+
+### Properties for orders-api
+
+Good properties come in a few recurring shapes: an invariant that always holds, an oracle (a slow, obviously correct implementation to compare with), and a round trip.
+
+```rust
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn line_item() -> impl Strategy<Value = LineItem> {
+        ("[A-Z]{3}-[0-9]{1,4}", 1..=MAX_QUANTITY, 0i64..=1_000_000)
+            .prop_map(|(sku, quantity, unit_price_cents)| LineItem { sku, quantity, unit_price_cents })
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum Action {
+        Pay,
+        Cancel,
+    }
+
+    fn action() -> impl Strategy<Value = Action> {
+        prop_oneof![Just(Action::Pay), Just(Action::Cancel)]
+    }
+
+    proptest! {
+        #[test]
+        fn total_is_never_negative_and_matches_lines(
+            items in prop::collection::vec(line_item(), 1..=MAX_ITEMS)
+        ) {
+            let order = Order::new(Uuid::new_v4(), items.clone()).unwrap();
+            let expected: i64 = items.iter().map(|i| i.unit_price_cents * i64::from(i.quantity)).sum();
+            prop_assert_eq!(order.total_cents(), Ok(expected));
+            prop_assert!(expected >= 0);
+        }
+
+        #[test]
+        fn paid_orders_never_become_cancelled(actions in prop::collection::vec(action(), 0..20)) {
+            let mut order = Order::new(
+                Uuid::new_v4(),
+                vec![LineItem { sku: "A-1".into(), quantity: 1, unit_price_cents: 100 }],
+            ).unwrap();
+            let mut was_paid = false;
+            for a in actions {
+                let _ = match a {
+                    Action::Pay => order.mark_paid(),
+                    Action::Cancel => order.cancel(),
+                };
+                was_paid |= order.status == OrderStatus::Paid;
+                if was_paid {
+                    prop_assert_eq!(order.status, OrderStatus::Paid);
+                }
+            }
+        }
+
+        #[test]
+        fn line_item_json_round_trips(item in line_item()) {
+            let json = serde_json::to_string(&item).unwrap();
+            let back: LineItem = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(back, item);
+        }
+    }
+}
+```
+
+The second property is a small state-machine test: generate a random sequence of commands, apply them, and check an invariant after each step. It's the same technique used for testing databases and distributed protocols, scaled down. The regex strategy `"[A-Z]{3}-[0-9]{1,4}"` generates matching strings, so SKUs look realistic without a hand-written generator.
+
+<Callout variant="tip" title="Keep property tests fast">
+Proptest runs 256 cases per property by default. That's fine for pure functions. For anything that touches a database or the network, lower it with `ProptestConfig::with_cases(32)` or keep properties at the domain layer, where they belong anyway.
+</Callout>
+
+## Handler tests with oneshot
+
+### The router is a Service
+
+Because an axum `Router` is a tower `Service`, you can call it directly with a request and get a response, with no socket, no port and no HTTP client. `tower::ServiceExt::oneshot` does `poll_ready` and `call` in one step. These tests exercise the real router with the real middleware stack from Part 4, so they catch layer-order mistakes that unit tests can't.
+
+A small harness keeps each test short:
+
+```rust
+use std::sync::Arc;
+
+use axum::{
+    Router,
+    body::Body,
+    http::{Method, Request, StatusCode, header},
+};
+use http_body_util::BodyExt;
+use orders_api::{
+    auth::jwt::Role,
+    config::Config,
+    http::rate_limit::{RateLimiter, RateLimits},
+    state::AppState,
+};
+use serde_json::{Value, json};
+use sqlx::postgres::PgPoolOptions;
+use tower::ServiceExt; // for `oneshot`
+use uuid::Uuid;
+
+struct TestApp {
+    router: Router,
+    state: AppState,
+}
+
+impl TestApp {
+    fn new() -> Self {
+        Self::with_limits(1_000, 1_000)
+    }
+
+    /// `per_ip` and `per_user` are burst sizes; both refill at 1 token per second.
+    fn with_limits(per_ip: u32, per_user: u32) -> Self {
+        // A lazy pool never connects until a query runs. Tests that touch the
+        // database belong in the #[sqlx::test] suite, not here.
+        let db = PgPoolOptions::new()
+            .connect_lazy("postgres://unused@localhost/unused")
+            .expect("valid url");
+        let state = AppState::new(db, Config::for_tests());
+        let limits = RateLimits {
+            per_ip: Arc::new(RateLimiter::new(per_ip, 1)),
+            per_user: Arc::new(RateLimiter::new(per_user, 1)),
+        };
+        let router = orders_api::http::router(state.clone(), limits);
+        Self { router, state }
+    }
+
+    fn token(&self, role: Role) -> String {
+        self.state.jwt.issue(Uuid::new_v4(), role).unwrap()
+    }
+
+    async fn send(&self, req: Request<Body>) -> (StatusCode, axum::http::HeaderMap, Value) {
+        let res = self.router.clone().oneshot(req).await.unwrap();
+        let status = res.status();
+        let headers = res.headers().clone();
+        let bytes = res.into_body().collect().await.unwrap().to_bytes();
+        let body = if bytes.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes).unwrap_or(Value::String(String::from_utf8_lossy(&bytes).into()))
+        };
+        (status, headers, body)
+    }
+}
+
+fn json_request(method: Method, uri: &str, token: Option<&str>, body: Value) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(header::CONTENT_TYPE, "application/json");
+    if let Some(t) = token {
+        builder = builder.header(header::AUTHORIZATION, format!("Bearer {t}"));
+    }
+    builder.body(Body::from(body.to_string())).unwrap()
+}
+```
+
+Two techniques make this layer fast. `connect_lazy` builds a `PgPool` that hasn't connected to anything, so `AppState` can be constructed without a database; any test that accidentally runs a query will fail (slowly, after the pool's acquire timeout), which is a useful signal that it belongs in the database suite. And `oneshot` consumes the service, so the harness clones the router per request. Cloning a `Router` is cheap: it's reference-counted internally.
+
+Tokens are minted with the same `JwtKeys` the app uses. There's no need to call `/auth/login` (which would need a database) just to get a valid token.
+
+### What to test here
+
+Test the HTTP contract, the auth rules and the middleware behavior: everything between the socket and the domain.
+
+```rust
+#[tokio::test]
+async fn missing_token_is_401_problem_json() {
+    let app = TestApp::new();
+    let req = Request::get(format!("/orders/{}", Uuid::new_v4()))
+        .body(Body::empty())
+        .unwrap();
+
+    let (status, headers, body) = app.send(req).await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(headers[header::WWW_AUTHENTICATE], "Bearer");
+    assert_eq!(headers[header::CONTENT_TYPE], "application/problem+json");
+    assert_eq!(body["status"], 401);
+}
+
+#[tokio::test]
+async fn unknown_route_is_404_not_401() {
+    let app = TestApp::new();
+    let req = Request::get("/nope").body(Body::empty()).unwrap();
+    let (status, _, _) = app.send(req).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn customer_cannot_use_admin_route() {
+    let app = TestApp::new();
+    let token = app.token(Role::Customer);
+    let uri = format!("/admin/orders/{}/cancel", Uuid::new_v4());
+    let (status, _, _) = app.send(json_request(Method::POST, &uri, Some(&token), json!({}))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn oversized_body_is_413() {
+    let app = TestApp::new();
+    let token = app.token(Role::Customer);
+    let big = "x".repeat(100 * 1024);
+    let (status, _, _) = app
+        .send(json_request(Method::POST, "/orders", Some(&token), json!({ "pad": big })))
+        .await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+}
+```
+
+`unknown_route_is_404_not_401` pins down the `route_layer` decision from Part 4: change auth to `.layer` and this test fails. The admin test passes without a database because `require_admin` runs before any query, which is itself a property worth protecting.
+
+Middleware behavior is where these tests pay for themselves:
+
+```rust
+#[tokio::test]
+async fn second_request_over_the_limit_gets_429_with_retry_after() {
+    let app = TestApp::with_limits(1, 1_000);
+    let first = app.send(Request::get("/health").body(Body::empty()).unwrap()).await;
+    let second = app.send(Request::get("/health").body(Body::empty()).unwrap()).await;
+
+    assert_eq!(first.0, StatusCode::OK);
+    assert_eq!(second.0, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(second.1[header::RETRY_AFTER], "1");
+}
+
+#[tokio::test]
+async fn per_user_limit_is_keyed_by_user_not_ip() {
+    let app = TestApp::with_limits(1_000, 1);
+    let alice = app.token(Role::Customer);
+    let bob = app.token(Role::Customer);
+    // An admin route a customer may not use: 403 without touching the database.
+    let cancel = |token: &str| {
+        let uri = format!("/admin/orders/{}/cancel", Uuid::new_v4());
+        json_request(Method::POST, &uri, Some(token), json!({}))
+    };
+
+    assert_eq!(app.send(cancel(&alice)).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(app.send(cancel(&alice)).await.0, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(app.send(cancel(&bob)).await.0, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn cors_preflight_from_allowed_origin() {
+    let app = TestApp::new();
+    let req = Request::builder()
+        .method(Method::OPTIONS)
+        .uri("/orders")
+        .header(header::ORIGIN, "http://localhost:3000")
+        .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+        .header(header::ACCESS_CONTROL_REQUEST_HEADERS, "authorization,content-type")
+        .body(Body::empty())
+        .unwrap();
+    let (status, headers, _) = app.send(req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "http://localhost:3000");
+}
+```
+
+The per-user test is the one that would have caught the bug described in Part 4, where a single edge limiter tried to key by user and silently keyed by IP. In a `oneshot` test there's no `ConnectInfo`, so every request shares the fallback IP key; if the limiter were keyed by IP, Bob's request would get 429 too.
+
+In Kotlin, the equivalent is `MockMvc` or `WebTestClient` against a Spring context:
+
+```kotlin
+@WebMvcTest(OrderController::class)
+class OrderControllerTest(@Autowired val mvc: MockMvc) {
+    @Test
+    fun `missing token is 401`() {
+        mvc.get("/orders/${UUID.randomUUID()}").andExpect { status { isUnauthorized() } }
+    }
+}
+```
+
+The Rust version has no test context to boot and no annotation scanning, so it starts in milliseconds and runs in parallel by default. The price is that you build the harness yourself, once.
+
+## Snapshot tests with insta
+
+Assertions on individual fields miss changes to fields you didn't assert on. Snapshot tests record the whole output and fail on any difference. insta supports inline snapshots, stored in the test source itself:
+
+```rust
+#[tokio::test]
+async fn empty_order_is_rejected_before_touching_the_db() {
+    let app = TestApp::new();
+    let token = app.token(Role::Customer);
+    let (status, _, body) = app
+        .send(json_request(Method::POST, "/orders", Some(&token), json!({ "items": [] })))
+        .await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    insta::assert_json_snapshot!(body, @r###"
+    {
+      "detail": "an order needs at least one item",
+      "status": 422,
+      "title": "Validation Failed",
+      "type": "about:blank"
+    }
+    "###);
+}
+```
+
+The workflow: write the macro with an empty `@""`, run the tests, then run `cargo insta review` (from `cargo install cargo-insta`) to accept the recorded output into the source. When the output changes later, the review shows a diff and you decide whether it's a bug or an intended change. In CI, set `CI=true` (most CI systems already do) so insta fails instead of writing new snapshots.
+
+Snapshots are good for structured output that humans should review when it changes: error bodies, API responses, generated SQL, rendered emails. They are bad for anything nondeterministic unless you redact it, and they become noise if people accept changes without reading them.
+
+## Contract tests for JSON
+
+The JSON your service emits is a contract with every client, including mobile apps that will be on old versions for months. Changing `total_cents` to `totalCents` compiles fine and breaks all of them. Contract tests make the wire format explicit:
+
+```rust
+use orders_api::{domain::OrderStatus, http::orders::{CreateOrderRequest, OrderSummary}};
+use uuid::Uuid;
+
+#[test]
+fn order_summary_wire_format() {
+    let summary = OrderSummary {
+        id: Uuid::new_v4(),
+        customer_id: Uuid::new_v4(),
+        status: OrderStatus::Paid,
+        total_cents: 2_999,
+    };
+    insta::assert_json_snapshot!(summary, {
+        ".id" => "[uuid]",
+        ".customer_id" => "[uuid]",
+    }, @r###"
+    {
+      "id": "[uuid]",
+      "customer_id": "[uuid]",
+      "status": "paid",
+      "total_cents": 2999
+    }
+    "###);
+}
+
+/// Requests that shipped clients send today must keep parsing.
+#[test]
+fn accepts_v1_create_order_payload() {
+    let v1 = r#"{ "items": [ { "sku": "SKU-1", "quantity": 2, "unit_price_cents": 1250 } ] }"#;
+    let req: CreateOrderRequest = serde_json::from_str(v1).expect("v1 payload must stay valid");
+    assert_eq!(req.items.len(), 1);
+}
+
+#[test]
+fn unknown_fields_are_ignored_not_rejected() {
+    let newer = r#"{ "items": [ { "sku": "A", "quantity": 1, "unit_price_cents": 1 } ], "coupon": "X" }"#;
+    assert!(serde_json::from_str::<CreateOrderRequest>(newer).is_ok());
+}
+```
+
+The redactions (`".id" => "[uuid]"`) replace random values so the snapshot is stable. The response test guards what you send; the request tests guard what you accept, which is the direction teams forget. The third test pins a deliberate choice: serde ignores unknown fields by default, so a newer client can send extra fields to an older server. Adding `#[serde(deny_unknown_fields)]` later would break that, and this test makes the break visible.
+
+These are provider-side tests. For consumer-driven contracts across teams (each client publishes the fields it actually uses and the provider verifies against all of them), Pact is the usual tool; Rust support exists through the `pact_consumer` and `pact_verifier` crates, though the ecosystem is more mature on the JVM. If you publish an OpenAPI document, generated with a crate like `utoipa`, a test that compares the generated spec to a committed file catches the same class of change. See [Backend Engineering, Part 2](/blog/backend-02-rest-api-design) for the compatibility rules themselves.
+
+## Fakes versus mocks
+
+### The seam
+
+orders-api calls an external payment provider. That call is slow, costs money, and its failures are exactly what you need to test, so it sits behind a trait:
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChargeId(pub String);
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum PaymentError {
+    #[error("card declined")]
+    Declined,
+    #[error("payment provider unavailable")]
+    Unavailable,
+}
+
+#[cfg_attr(test, mockall::automock)]
+pub trait PaymentGateway: Send + Sync {
+    fn charge(
+        &self,
+        idempotency_key: Uuid,
+        amount_cents: i64,
+    ) -> impl Future<Output = Result<ChargeId, PaymentError>> + Send;
+}
+
+/// Charge the customer, then move the order to Paid.
+/// The order id doubles as the idempotency key, so a retried call cannot double-charge.
+pub async fn pay_order(
+    order: &mut Order,
+    gateway: &impl PaymentGateway,
+) -> Result<ChargeId, PayError> {
+    let amount = order.total_cents()?;
+    // Check the transition is legal before talking to the provider.
+    order.clone().mark_paid()?;
+    let charge = gateway.charge(order.id, amount).await?;
+    order.mark_paid()?;
+    Ok(charge)
+}
+```
+
+The trait method is written as `fn ... -> impl Future<...> + Send` rather than `async fn`. Both are stable since Rust 1.75, but a plain `async fn` in a public trait doesn't let callers rely on the future being `Send`, which `tokio::spawn` requires; the explicit form promises it. Implementors can still write `async fn`. Because the function is generic over `impl PaymentGateway`, the production gateway and the test double are both static dispatch. If you need `Arc<dyn PaymentGateway>` in `AppState`, this trait isn't dyn-compatible as written; you'd return a boxed future instead (or use the `async-trait` crate, which does exactly that).
+
+### A hand-written fake
+
+A fake is a working, simplified implementation. It records what happened and lets the test script the outcome:
+
+```rust
+#[derive(Default)]
+pub struct FakeGateway {
+    pub calls: Mutex<Vec<(Uuid, i64)>>,
+    pub fail_with: Option<PaymentError>,
+}
+
+impl PaymentGateway for FakeGateway {
+    async fn charge(&self, key: Uuid, amount_cents: i64) -> Result<ChargeId, PaymentError> {
+        self.calls.lock().unwrap().push((key, amount_cents));
+        match &self.fail_with {
+            Some(e) => Err(e.clone()),
+            None => Ok(ChargeId(format!("ch_{key}"))),
+        }
+    }
+}
+
+#[tokio::test]
+async fn pays_the_total_with_order_id_as_idempotency_key() {
+    let gateway = FakeGateway::default();
+    let mut order = order();
+
+    pay_order(&mut order, &gateway).await.unwrap();
+
+    assert_eq!(order.status, OrderStatus::Paid);
+    assert_eq!(*gateway.calls.lock().unwrap(), vec![(order.id, 3_000)]);
+}
+
+#[tokio::test]
+async fn declined_payment_leaves_order_pending() {
+    let gateway = FakeGateway { fail_with: Some(PaymentError::Declined), ..Default::default() };
+    let mut order = order();
+
+    let err = pay_order(&mut order, &gateway).await.unwrap_err();
+
+    assert_eq!(err, PayError::Payment(PaymentError::Declined));
+    assert_eq!(order.status, OrderStatus::Pending);
+}
+```
+
+The `Mutex` is needed because `charge` takes `&self` (the trait is shared across tasks); a `std::sync::Mutex` is fine because it's never held across an `.await`.
+
+### mockall
+
+mockall generates a mock from the trait. With `#[cfg_attr(test, mockall::automock)]` on the trait, a `MockPaymentGateway` type exists only in test builds:
+
+```rust
+use mockall::predicate::eq;
+
+#[tokio::test]
+async fn cancelled_order_never_reaches_the_provider() {
+    let mut gateway = MockPaymentGateway::new();
+    gateway.expect_charge().never();
+    let mut order = order();
+    order.cancel().unwrap();
+
+    let err = pay_order(&mut order, &gateway).await.unwrap_err();
+    assert!(matches!(err, PayError::Domain(_)));
+}
+
+#[tokio::test]
+async fn mockall_checks_arguments() {
+    let mut order = order();
+    let mut gateway = MockPaymentGateway::new();
+    gateway
+        .expect_charge()
+        .with(eq(order.id), eq(3_000))
+        .times(1)
+        .returning(|_, _| Box::pin(async { Ok(ChargeId("ch_1".into())) }));
+
+    pay_order(&mut order, &gateway).await.unwrap();
+}
+```
+
+For a method returning `impl Future`, mockall's `returning` closure gives back a boxed future, hence the `Box::pin(async { ... })`.
+
+### Which one to use
+
+```mermaid
+flowchart TD
+    Q["Need a test double?"] --> OWN{"Do you own the dependency?"}
+    OWN -- "yes, it is our Postgres" --> REAL["Use the real thing: sqlx::test"]
+    OWN -- "no, external API" --> STATE{"Does the test care about state or about calls?"}
+    STATE -- "state and outcomes" --> FAKE["Hand-written fake"]
+    STATE -- "a call must or must not happen" --> MOCK["mockall expectation"]
+    FAKE --> REUSE["Reuse it across many tests"]
+    MOCK --> KEEP["Keep expectations few and loose"]
+```
+
+Default to fakes. A fake is plain Rust, reads like the production code, survives refactors, and can be reused by every test that needs a payment provider, including the handler tests. Mocks shine for one specific thing: asserting that an interaction did or did not happen, like "a cancelled order never reaches the provider". Their failure mode is over-specification: tests that assert the exact sequence of calls break on every harmless refactor and end up testing the implementation instead of the behavior. If a mock setup is longer than the code under test, write a fake.
+
+## Database tests with #[sqlx::test]
+
+### What it does
+
+The bugs that matter most in orders-api live in SQL: the ownership filter, the conditional update in token rotation, constraint violations, transaction boundaries. You can't fake those meaningfully, so test them against real Postgres. `#[sqlx::test]` makes that cheap:
+
+```mermaid
+sequenceDiagram
+    participant T as "Test binary"
+    participant M as "sqlx::test macro"
+    participant PG as "Postgres at DATABASE_URL"
+    T->>M: "run test fn"
+    M->>PG: "CREATE DATABASE for this test"
+    M->>PG: "apply ./migrations"
+    M->>PG: "apply fixtures, e.g. customers.sql"
+    M->>T: "call test with a PgPool to the new DB"
+    T->>PG: "queries under test"
+    M->>PG: "DROP DATABASE when the test passes"
+```
+
+Each test gets its own freshly migrated database, so tests run in parallel without interfering and without manual cleanup. Migrations are picked up from `./migrations` automatically when the crate enables SQLx's `migrate` feature. Fixtures are plain SQL files, resolved relative to the test file's directory under `fixtures/`. The macro reads `DATABASE_URL` at runtime; that server only needs permission to create databases. SQLx tracks the databases it created in a `_sqlx_test` schema and cleans up leftovers from failed runs on a later run.
+
+```sql
+INSERT INTO customers (id, email, name, password_hash, role) VALUES
+  ('00000000-0000-0000-0000-00000000000a', 'alice@example.com', 'Alice', 'x', 'customer'),
+  ('00000000-0000-0000-0000-00000000000b', 'bob@example.com',   'Bob',   'x', 'customer');
+```
+
+### Testing the refresh-token rotation for real
+
+```rust
+use std::{sync::Arc, time::Duration};
+
+use axum::{body::Body, http::{Request, StatusCode, header}};
+use orders_api::{
+    auth::{jwt::Role, refresh},
+    config::Config,
+    error::AppError,
+    http::rate_limit::{RateLimiter, RateLimits},
+    state::AppState,
+};
+use sqlx::PgPool;
+use tower::ServiceExt;
+use uuid::{Uuid, uuid};
+
+const ALICE: Uuid = uuid!("00000000-0000-0000-0000-00000000000a");
+const BOB: Uuid = uuid!("00000000-0000-0000-0000-00000000000b");
+const TTL: Duration = Duration::from_secs(3600);
+
+#[sqlx::test(fixtures("customers"))]
+async fn reusing_a_refresh_token_revokes_the_family(pool: PgPool) -> anyhow::Result<()> {
+    let mut tx = pool.begin().await?;
+    let first = refresh::issue(&mut tx, ALICE, TTL).await?;
+    tx.commit().await?;
+
+    // Legitimate rotation.
+    let second = refresh::rotate(&pool, &first.0, TTL).await?;
+
+    // Attacker replays the old token: rejected...
+    let replay = refresh::rotate(&pool, &first.0, TTL).await;
+    assert!(matches!(replay, Err(AppError::Unauthorized)));
+
+    // ...and the legitimate user's newer token died with it.
+    let after = refresh::rotate(&pool, &second.refresh.0, TTL).await;
+    assert!(matches!(after, Err(AppError::Unauthorized)));
+    Ok(())
+}
+```
+
+This test reads like the security requirement it protects. It also exercises the `customer_role` enum mapping and the join in the rotation query, which only a real database can check.
+
+### Handler plus database
+
+The same `oneshot` technique works with a real pool, which gives you a full HTTP-to-SQL test without a network socket:
+
+```rust
+#[sqlx::test(fixtures("customers"))]
+async fn customers_cannot_see_each_others_orders(pool: PgPool) -> anyhow::Result<()> {
+    let order_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO orders (id, customer_id, total_cents) VALUES ($1, $2, 1000)")
+        .bind(order_id)
+        .bind(ALICE)
+        .execute(&pool)
+        .await?;
+
+    let state = AppState::new(pool, Config::for_tests());
+    let limits = RateLimits {
+        per_ip: Arc::new(RateLimiter::new(100, 100)),
+        per_user: Arc::new(RateLimiter::new(100, 100)),
+    };
+    let app = orders_api::http::router(state.clone(), limits);
+
+    let get_as = |who: Uuid| {
+        let token = state.jwt.issue(who, Role::Customer).unwrap();
+        Request::get(format!("/orders/{order_id}"))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+            .unwrap()
+    };
+
+    let alice = app.clone().oneshot(get_as(ALICE)).await?;
+    let bob = app.clone().oneshot(get_as(BOB)).await?;
+
+    assert_eq!(alice.status(), StatusCode::OK);
+    assert_eq!(bob.status(), StatusCode::NOT_FOUND); // not 403: don't confirm it exists
+    Ok(())
+}
+```
+
+Write one of these for every authorization rule. Broken object-level authorization is the most common API vulnerability, and a test like this is the cheapest way to keep it fixed.
+
+<Callout variant="warning" title="sqlx::test needs a server">
+`#[sqlx::test]` doesn't start Postgres for you. Locally, run one with Docker (`docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:17`) and export `DATABASE_URL`. In CI, use a service container (below). If you use the `query!` macros, compile-time checking also needs either a database or the `.sqlx` offline data from `cargo sqlx prepare` (Part 3).
+</Callout>
+
+## testcontainers: a database per test run
+
+When you'd rather not depend on an externally provided server, testcontainers starts a throwaway container from inside the test:
+
+```rust
+use sqlx::{PgPool, postgres::PgPoolOptions};
+use testcontainers_modules::{
+    postgres::Postgres,
+    testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
+};
+
+/// Keep the container handle alive as long as the pool: dropping it stops the container.
+pub struct TestDb {
+    pub pool: PgPool,
+    _container: ContainerAsync<Postgres>,
+}
+
+pub async fn start_postgres() -> anyhow::Result<TestDb> {
+    let container = Postgres::default().with_tag("17-alpine").start().await?;
+    let host = container.get_host().await?;
+    let port = container.get_host_port_ipv4(5432).await?;
+    let url = format!("postgres://postgres:postgres@{host}:{port}/postgres");
+
+    let pool = PgPoolOptions::new().max_connections(5).connect(&url).await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    Ok(TestDb { pool, _container: container })
+}
+
+#[tokio::test]
+#[ignore = "needs Docker; run with `cargo test -- --ignored`"]
+async fn migrations_apply_on_a_fresh_postgres() -> anyhow::Result<()> {
+    let db = start_postgres().await?;
+    let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM orders")
+        .fetch_one(&db.pool)
+        .await?;
+    assert_eq!(count, 0);
+    Ok(())
+}
+```
+
+`with_tag` comes from the `ImageExt` trait; forget the import and the compiler says the method isn't found, with a hint pointing at the trait. The `TestDb` struct ties the container's lifetime to the pool. Drop the handle early and the container stops under a pool that still thinks it's connected, which shows up as confusing connection errors.
+
+Containers take seconds to start, so don't start one per test. Either share one per test binary (a `tokio::sync::OnceCell` holding the URL works) and create a database per test inside it, or use testcontainers just to provide the server and let `#[sqlx::test]` do the per-test databases. The `#[ignore]` keeps the default `cargo test` independent of Docker; CI runs `--ignored` explicitly. Pin the image tag to the Postgres major version you run in production.
+
+The trade-off against a CI service container: testcontainers is self-contained (anyone with Docker can run the suite with no setup), while a service container is simpler and faster in CI. Many teams use `#[sqlx::test]` everywhere, a service container in CI, and testcontainers only for dependencies that are awkward to provision, such as Kafka.
+
+## Running tests fast in CI
+
+### cargo-nextest
+
+`cargo test` runs each test binary in turn and the tests within a binary on threads. cargo-nextest runs every test as its own process, scheduled across all binaries at once. In practice that means better parallelism on large suites, one test's panic or leaked global state can't affect another, and you get per-test timeouts, retries for flaky tests, and JUnit output for CI dashboards. nextest doesn't run doctests, so CI runs `cargo test --doc` separately.
+
+```toml
+# .config/nextest.toml
+[profile.ci]
+fail-fast = false
+retries = 1                       # surface flakiness, don't hide it: flaky tests are reported
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+[profile.ci.junit]
+path = "junit.xml"
+```
+
+### The pipeline
+
+```mermaid
+flowchart LR
+    PUSH["Push or PR"] --> CACHE["Restore cargo and target cache"]
+    CACHE --> LINT["fmt --check and clippy -D warnings"]
+    LINT --> BUILD["nextest archive or build tests once"]
+    BUILD --> UNIT["Unit, property, handler tests"]
+    BUILD --> DB["sqlx::test suite with Postgres service"]
+    UNIT --> REPORT["JUnit report"]
+    DB --> REPORT
+```
+
+```yaml
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      SQLX_OFFLINE: "true"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo nextest run --profile ci --run-ignored all
+      - run: cargo test --doc
+```
+
+The details that make this fast:
+
+- **Cache the target directory**, not just the registry. `Swatinem/rust-cache` keys on the lockfile and toolchain and prunes stale artifacts. Dependency compilation is usually most of a cold Rust CI run, and caching it typically cuts minutes off.
+- **`SQLX_OFFLINE=true`** makes the `query!` macros use the committed `.sqlx` data, so compiling doesn't depend on the database being up and migrated. The tests still use the real database at runtime.
+- **Install tools as binaries** (`taiki-e/install-action`) instead of `cargo install`, which compiles from source on every run.
+- **Build once, test once.** Clippy and the test build share most artifacts. On bigger workspaces, `cargo nextest archive` builds in one job and fans tests out to several machines with `--partition`.
+- **`--run-ignored all`** includes the Docker-backed tests in CI; on a GitHub-hosted Ubuntu runner, Docker is available.
+
+Measure before optimizing further. `cargo build --timings` shows which crates dominate compile time, and the fix is often trimming a heavy dependency's default features rather than adding more caching.
+
+## Common mistakes
+
+- **Mocking the database.** Trait-wrapping every query so it can be mocked doubles the code and tests nothing about the SQL. Use `#[sqlx::test]` against real Postgres.
+- **Testing through HTTP what belongs in the domain.** If a business rule can only be tested by sending a request, it's living in a handler. Move it into the domain type and test it there.
+- **Over-specified mocks.** Asserting the exact order and count of every call ties the tests to the implementation. Prefer fakes and assert outcomes.
+- **Shared mutable test state.** A global pool, a fixed database name or a shared container without per-test databases makes tests order-dependent and flaky under parallel runs.
+- **Reading the clock and RNG inside logic.** Pass `Instant` or `OffsetDateTime` in, and seed or inject randomness, so tests are deterministic.
+- **Accepting snapshots without reading them.** `cargo insta accept` on autopilot turns snapshot tests into change detectors that detect nothing.
+- **Forgetting the request direction in contract tests.** Teams snapshot their responses and then break old clients by tightening request parsing.
+- **Letting `cargo test` require Docker.** Mark container tests `#[ignore]` or gate them, so the default local run works for everyone.
+- **Not committing `proptest-regressions/`.** The failing case proptest found is lost and may not be generated again.
+
+## Interview questions
+
+<details>
+<summary>How would you structure the test suite for a Rust HTTP service backed by Postgres?</summary>
+
+As a pyramid organized by the kind of bug each layer catches. At the base, fast unit and property tests of the domain types: validation, state transitions, money arithmetic, with time and randomness injected. Above that, handler tests that call the real router as a tower `Service` with `oneshot`, covering status codes, auth, validation and middleware ordering, with no network and ideally no database. Then database tests with `#[sqlx::test]`, which give each test a freshly migrated database, for SQL correctness, constraints, transactions and authorization queries. At the top, a few container-based tests for migrations on a clean database and wiring. External services sit behind traits and are faked; the database you own is never faked.
+
+</details>
+
+<details>
+<summary>What does tower's oneshot give you that spinning up the server on a port doesn't?</summary>
+
+It calls the router directly as a `Service`: no socket, no port allocation, no HTTP client, no serialization over the network, so tests are fast and can run in parallel without port conflicts. You still exercise the real middleware stack and extractors, which is the point. What you don't exercise is the network layer itself (hyper's connection handling, `ConnectInfo`, TLS, graceful shutdown), so keep one or two tests, or an e2e smoke test, that bind a real listener if those matter to you.
+
+</details>
+
+<details>
+<summary>When would you choose a hand-written fake over mockall, and vice versa?</summary>
+
+A fake is a simplified working implementation: it holds state, records calls and returns scripted results. It's reusable across many tests, resilient to refactoring, and tests outcomes. Use it by default for external dependencies like a payment provider. mockall is better when the test's point is the interaction itself: a call must happen with specific arguments, or must never happen, like charging a cancelled order. The risk with mocks is over-specification, where tests assert the implementation's call sequence and break on harmless changes. A rule of thumb: if mock setup is longer than the code under test, write a fake.
+
+</details>
+
+<details>
+<summary>What is property-based testing, and what makes a good property?</summary>
+
+Instead of hand-picked examples, you state something that should hold for all inputs; the framework generates many random inputs and, on failure, shrinks to a minimal counterexample. Good properties fall into a few patterns: invariants (a total is never negative, a paid order never becomes cancelled), round trips (serialize then deserialize gives the original), oracles (compare with a simple reference implementation), and state-machine tests (random command sequences against a model). The value is in finding inputs you didn't think of, such as overflow at large quantities, and the shrunk counterexample makes the failure easy to understand. Commit the regressions file so found cases are replayed.
+
+</details>
+
+<details>
+<summary>How does #[sqlx::test] isolate tests, and what do you need in CI for it to work?</summary>
+
+For each test, it connects to the server in `DATABASE_URL`, creates a new database, applies the crate's migrations and any requested fixtures, and passes the test a pool to that database. It drops the database when the test passes and tracks the ones it created so leftovers are cleaned up later. Isolation is at the database level, so tests run in parallel without truncating tables or wrapping everything in rolled-back transactions. In CI you need a reachable Postgres whose user can create databases, usually a service container with a health check, `DATABASE_URL` set, and `SQLX_OFFLINE=true` with committed `.sqlx` data if you use the compile-time-checked macros.
+
+</details>
+
+<details>
+<summary>What are contract tests for a JSON API, and how do you write them in Rust?</summary>
+
+They pin down the wire format so that a refactor can't silently break clients. On the response side, snapshot the serialized DTOs (insta with redactions for ids and timestamps) so any renamed, removed or retyped field shows up as a reviewed diff. On the request side, keep fixtures of payloads that shipped clients send and assert they still deserialize, and pin decisions like ignoring unknown fields. Across teams, consumer-driven contracts (Pact) or a committed OpenAPI spec compared in CI let consumers declare what they depend on. The point is that compatibility becomes a test failure rather than an incident.
+
+</details>
+
+<details>
+<summary>Your Rust CI takes 25 minutes. How do you make it fast?</summary>
+
+Measure first: separate compile time from test time, and use `cargo build --timings` to find the heavy crates. Then: cache the target directory and registry keyed on the lockfile and toolchain; install tools as prebuilt binaries; avoid building twice with different feature or profile settings between clippy and tests; use `SQLX_OFFLINE` so builds don't need a migrated database; run tests with cargo-nextest for better parallelism; and for large suites, archive the build once and partition tests across machines. Trim heavy default features and duplicate dependency versions. Keep slow container tests in a separate job so the main feedback loop stays short.
+
+</details>
+
+## Key takeaways
+
+- Organize tests by the kind of bug they catch: domain rules, HTTP contract, SQL, wiring.
+- Push logic into pure domain types; they're trivial to test with plain `#[test]` and proptest.
+- Inject time and randomness so tests are deterministic.
+- Test the real router with `oneshot`; it covers auth, validation and layer order in milliseconds.
+- Don't fake the database you own: `#[sqlx::test]` gives every test a fresh, migrated Postgres database.
+- Fake external services with hand-written fakes; use mockall to assert interactions that must or must not happen.
+- Snapshot and contract tests make wire-format changes visible before clients see them.
+- In CI: cache aggressively, use nextest, `SQLX_OFFLINE`, a Postgres service container, and keep Docker-only tests out of the default local run.
+
+Previous: [Part 4: Authentication, Authorization and Middleware](/blog/rust-backend-04-auth-middleware) · Next: [Part 6: Async Jobs, Messaging, and gRPC](/blog/rust-backend-06-async-jobs-messaging-grpc)

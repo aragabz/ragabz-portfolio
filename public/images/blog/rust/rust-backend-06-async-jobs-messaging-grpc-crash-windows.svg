@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="t d">
+  <title id="t">Where a consumer crash can land</title>
+  <desc id="d">The payment consumer receives a message, commits a database transaction that records the event id and updates the order, then stores the Kafka offset. A crash before the database commit causes a clean retry. A crash between the database commit and the offset store causes redelivery, which the processed_events table turns into a no-op.</desc>
+  <rect width="800" height="420" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Three steps, two crash windows</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">At-least-once delivery means the only question is what a redelivery does to your data.</text>
+
+  <line x1="60" y1="150" x2="760" y2="150" stroke="#30363d" stroke-width="2"/>
+  <circle cx="110" cy="150" r="9" fill="#79c0ff"/>
+  <circle cx="400" cy="150" r="9" fill="#7ee787"/>
+  <circle cx="690" cy="150" r="9" fill="#d2a8ff"/>
+  <text x="110" y="120" text-anchor="middle" fill="#79c0ff" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">recv message</text>
+  <text x="400" y="112" text-anchor="middle" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">COMMIT db tx</text>
+  <text x="400" y="130" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">event id + order update</text>
+  <text x="690" y="120" text-anchor="middle" fill="#d2a8ff" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">store offset</text>
+
+  <line x1="255" y1="165" x2="255" y2="200" stroke="#f78166" stroke-width="2" stroke-dasharray="5 4"/>
+  <line x1="545" y1="165" x2="545" y2="200" stroke="#f78166" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="255" y="185" text-anchor="middle" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">crash A</text>
+  <text x="545" y="185" text-anchor="middle" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">crash B</text>
+
+  <rect x="60" y="214" width="330" height="120" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="76" y="240" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Crash A: before COMMIT</text>
+  <text x="76" y="264" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Postgres rolls the transaction back.</text>
+  <text x="76" y="284" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Offset was never stored, so Kafka</text>
+  <text x="76" y="304" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">redelivers and it runs normally.</text>
+  <text x="76" y="324" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">Outcome: applied once</text>
+
+  <rect x="410" y="214" width="350" height="120" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="426" y="240" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Crash B: after COMMIT, before offset</text>
+  <text x="426" y="264" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Order is already paid. Kafka redelivers.</text>
+  <text x="426" y="284" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">INSERT INTO processed_events hits the</text>
+  <text x="426" y="304" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">primary key: 0 rows, returns Duplicate.</text>
+  <text x="426" y="324" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">Outcome: applied once</text>
+
+  <rect x="60" y="354" width="700" height="44" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="76" y="381" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Dedup row and state change share one transaction. Split them and crash B double-applies.</text>
+</svg>

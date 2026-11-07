@@ -1,0 +1,943 @@
+---
+title: "Rust Backend, Part 2: Errors, Configuration and Tracing"
+date: 2026-11-07
+excerpt: "Give orders-api one error type that maps to problem+json without leaking internals, layered configuration with redacted secrets, and structured JSON logs where every line carries a request id."
+tags: ["Rust", "Backend", "API Design", "Observability", "Microservices"]
+readingTime: 25
+level: mid
+series: "Backend Services in Rust"
+seriesOrder: 2
+draft: false
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+The orders-api from Part 1 works, but it is not yet something you would want to be on call for. Its errors come in four formats, its address is hardcoded, and its logs cannot tell you which lines belong to which request. This part fixes all three. It is for engineers who have a working axum service and want the plumbing that makes it operable: by the end, every failure becomes a consistent `application/problem+json` response, configuration is loaded in layers from files and environment variables with secrets that cannot be printed by accident, and every log line is structured JSON carrying the request id that the client also sees.
+
+<Callout variant="note" title="You should already know">
+- The orders-api router, handlers and extractors from [Part 1: Your First HTTP Service with Axum](/blog/rust-backend-01-first-http-service)
+- `Result`, `?`, `From` conversions and the thiserror/anyhow split ([Rust, Part 3](/blog/rust-03-types-enums-errors))
+- Traits and generics, including trait bounds on impls ([Rust, Part 4](/blog/rust-04-traits-generics))
+- Why logs, metrics and traces matter in production ([Backend Engineering, Part 11](/blog/backend-11-reliability-observability))
+</Callout>
+
+## The problem with ad-hoc errors
+
+Here is what a client of the Part 1 service sees when things go wrong:
+
+| Situation | Status | Body |
+|---|---|---|
+| Path id is not a UUID | 400 | `text/plain`: `Invalid URL: Cannot parse ...` |
+| Body is not JSON | 415 | `text/plain`: `Expected request with ...` |
+| Validation fails | 422 | `{"errors": ["items: must contain ..."]}` |
+| Order not found | 404 | empty |
+| Paying twice | 409 | `text/plain`: `cannot pay an order in ...` |
+
+Five failure modes, four formats. Client developers end up writing a parser per endpoint. Worse, there is no single place where you decide what a failure looks like, so the next engineer to add a handler will invent a fifth format, and eventually someone will return `e.to_string()` from a database error and leak a table name, an SQL fragment or a connection string to the internet.
+
+The fix is a pattern you will see in almost every serious Rust service: **one error enum for the application, one place that turns it into an HTTP response**. Handlers return `Result<T, AppError>` and use `?` freely. The mapping to status codes and bodies lives in a single `IntoResponse` implementation.
+
+## Designing AppError
+
+Start from the question "what does the *caller* need to distinguish?", not "what can go wrong internally?". A client needs to know whether the resource does not exist, whether its input was wrong (and which fields), whether it hit a conflict it can resolve by re-reading, or whether the server failed and retrying later might help. That gives a small set of variants:
+
+```rust
+use axum::http::StatusCode;
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FieldError {
+    pub field: String,
+    pub message: String,
+}
+
+impl FieldError {
+    pub fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
+        Self { field: field.into(), message: message.into() }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AppError {
+    #[error("{entity} {id} not found")]
+    NotFound { entity: &'static str, id: String },
+
+    #[error("request validation failed")]
+    Validation(Vec<FieldError>),
+
+    #[error("malformed request: {detail}")]
+    BadRequest { status: StatusCode, detail: String },
+
+    #[error("conflict: {0}")]
+    Conflict(String),
+
+    #[error(transparent)]
+    Internal(#[from] anyhow::Error),
+}
+
+pub type AppResult<T> = Result<T, AppError>;
+```
+
+What each piece is for:
+
+- **`NotFound`** carries the entity name and id so the message is useful ("order 8c1f... not found") without the handler formatting strings.
+- **`Validation`** carries every field error at once, matching how Part 1 collected them.
+- **`BadRequest`** covers malformed requests that never got as far as validation: bad JSON, wrong content type, unparsable path or query. It carries the status because axum distinguishes 400, 415 and 422 for these, and that distinction is useful to clients.
+- **`Conflict`** is for requests that are well-formed but clash with current state, such as paying an order that is already awaiting payment. In Part 3 the same variant reports optimistic-locking failures.
+- **`Internal`** is the catch-all for everything the client cannot act on. `#[from] anyhow::Error` means any `anyhow::Error` converts into it with `?`. `#[error(transparent)]` forwards `Display` and `source()` to the inner error, so logs show the full chain.
+
+`thiserror` 2 generates the `Display` and `std::error::Error` implementations from those attributes, plus a `From<anyhow::Error>` implementation for the `#[from]` field. It generates nothing at runtime that you could not write by hand; it just saves you the boilerplate.
+
+Some variants you might expect are deliberately absent. There is no `Database` variant yet because there is no database yet; Part 3 adds `Database(#[from] sqlx::Error)`. `Unauthorized` and `Forbidden` arrive with authentication in Part 4. Grow the enum when a new *client-visible* category appears, not when a new internal library does.
+
+## Mapping errors to HTTP with problem+json
+
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) (which obsoletes RFC 7807) defines "Problem Details for HTTP APIs": a JSON object with `type`, `title`, `status`, `detail` and optional `instance` members, served with `Content-Type: application/problem+json`. It is not the only reasonable format, but it is a standard one, many client libraries understand it, and it saves the debate about field names. Extension members are allowed, so we add an `errors` array for validation failures.
+
+```rust
+use axum::{
+    Json,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
+};
+
+/// RFC 9457 problem details. Field names are fixed by the RFC;
+/// `errors` is an extension member.
+#[derive(Debug, Serialize)]
+struct Problem {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    title: &'static str,
+    status: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    errors: Vec<FieldError>,
+}
+
+impl AppError {
+    fn status(&self) -> StatusCode {
+        match self {
+            Self::NotFound { .. } => StatusCode::NOT_FOUND,
+            Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::BadRequest { status, .. } => *status,
+            Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let status = self.status();
+        let problem = match self {
+            Self::NotFound { .. } => Problem {
+                kind: "https://orders-api.example.com/problems/not-found",
+                title: "Resource not found",
+                status: status.as_u16(),
+                detail: Some(self.to_string()),
+                errors: vec![],
+            },
+            Self::Validation(errors) => Problem {
+                kind: "https://orders-api.example.com/problems/validation",
+                title: "Request validation failed",
+                status: status.as_u16(),
+                detail: None,
+                errors,
+            },
+            Self::BadRequest { detail, .. } => Problem {
+                kind: "https://orders-api.example.com/problems/malformed-request",
+                title: "Malformed request",
+                status: status.as_u16(),
+                detail: Some(detail),
+                errors: vec![],
+            },
+            Self::Conflict(detail) => Problem {
+                kind: "https://orders-api.example.com/problems/conflict",
+                title: "Conflict with current state",
+                status: status.as_u16(),
+                detail: Some(detail),
+                errors: vec![],
+            },
+            Self::Internal(err) => {
+                // The full chain goes to the logs, never to the client.
+                tracing::error!(error = ?err, "internal error");
+                Problem {
+                    kind: "about:blank",
+                    title: "Internal Server Error",
+                    status: status.as_u16(),
+                    detail: None,
+                    errors: vec![],
+                }
+            }
+        };
+
+        (
+            status,
+            [(header::CONTENT_TYPE, "application/problem+json")],
+            Json(problem),
+        )
+            .into_response()
+    }
+}
+```
+
+The order of the tuple matters in a subtle way. `Json` sets `Content-Type: application/json` when it is converted into a response, and the header array is applied as a "response parts" modifier on top. Because the `[(header::CONTENT_TYPE, ...)]` part comes before `Json` in the tuple, axum applies the body first and the explicit header after, so our `application/problem+json` wins. The tests below confirm that is what clients receive.
+
+The `type` URIs identify the *kind* of problem and should be stable; clients may switch on them. They do not need to resolve to a page, although it is nice if they do. `about:blank` is the RFC's value for "nothing more specific than the status code", which is exactly what we want for internal errors.
+
+![Errors from extractors, validation, domain rules and infrastructure all convert into AppError; one IntoResponse implementation turns each variant into a problem+json response, and internal errors are logged in full while the client receives only a generic 500](/images/blog/rust/rust-backend-02-errors-config-tracing-error-flow.svg)
+
+### Never leak internals
+
+The `Internal` arm is the most important line in the file. It logs the error with `?err` (the `Debug` representation, which for `anyhow::Error` includes the context chain) and returns a body with no `detail` at all. The client learns that the server failed, and the request id in the response header (added later in this part) lets support find the full story in the logs.
+
+The failure mode this prevents is common. A handler does `map_err(|e| AppError::BadRequest { detail: e.to_string(), .. })` on a database error, and now a unique-constraint violation returns `duplicate key value violates unique constraint "customers_email_key"` to the caller. That tells an attacker your table and index names, and it tells a legitimate client nothing actionable. The rule: **messages from your own variants are written for clients; messages from third-party errors are written for you**, and only go to logs.
+
+```mermaid
+flowchart LR
+    A["JsonRejection<br/>PathRejection"] --> E["AppError"]
+    B["Validation<br/>Vec of FieldError"] --> E
+    C["TransitionError<br/>domain rule"] --> E
+    D["anyhow::Error<br/>infrastructure"] --> E
+    E --> F["IntoResponse"]
+    F --> G["problem+json<br/>4xx with detail"]
+    F --> H["problem+json<br/>500, no detail"]
+    D -.-> L["error log<br/>full chain"]
+```
+
+## Turning axum's rejections into AppError
+
+axum's built-in extractors reject with their own types (`JsonRejection`, `PathRejection`, `QueryRejection`), each of which renders as plain text. To make them speak problem+json, convert them into `AppError`. Each rejection type exposes `status()` and `body_text()`, so the conversion preserves axum's choice of status code:
+
+```rust
+use axum::extract::rejection::{JsonRejection, PathRejection, QueryRejection};
+
+impl From<JsonRejection> for AppError {
+    fn from(rejection: JsonRejection) -> Self {
+        Self::BadRequest { status: rejection.status(), detail: rejection.body_text() }
+    }
+}
+
+impl From<PathRejection> for AppError {
+    fn from(rejection: PathRejection) -> Self {
+        Self::BadRequest { status: rejection.status(), detail: rejection.body_text() }
+    }
+}
+
+impl From<QueryRejection> for AppError {
+    fn from(rejection: QueryRejection) -> Self {
+        Self::BadRequest { status: rejection.status(), detail: rejection.body_text() }
+    }
+}
+```
+
+Is `body_text()` safe to return? For these rejections, yes: it describes the client's own input ("Cannot parse `id` with value `abc`"), not server internals. That is a judgement call worth making explicitly for every error you forward.
+
+Now we need extractors that use these conversions. There are two techniques, and orders-api uses both.
+
+### A hand-written extractor: ValidatedJson
+
+Part 1 called `req.validate()` at the top of the handler. That works until someone forgets. A custom extractor makes validation impossible to skip: if the handler runs, the value is valid.
+
+```rust
+use axum::{
+    Json,
+    extract::{FromRequest, Request},
+};
+use serde::de::DeserializeOwned;
+
+pub trait Validate {
+    fn validate(&self) -> Result<(), Vec<FieldError>>;
+}
+
+/// `Json<T>` that also runs `T::validate` and turns every failure into `AppError`.
+pub struct ValidatedJson<T>(pub T);
+
+impl<T, S> FromRequest<S> for ValidatedJson<T>
+where
+    T: DeserializeOwned + Validate,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let Json(value) = Json::<T>::from_request(req, state).await?;
+        value.validate().map_err(AppError::Validation)?;
+        Ok(Self(value))
+    }
+}
+```
+
+Note what is *not* there: no `#[async_trait]`. Since axum 0.8, the extractor traits use native `async fn` in traits (stable since Rust 1.75), so implementations are plain `async fn`. The `?` on `Json::<T>::from_request` works because of the `From<JsonRejection>` impl above. The request DTO implements `Validate` with the same rules as Part 1, now producing structured `FieldError`s:
+
+```rust
+impl Validate for CreateOrderRequest {
+    fn validate(&self) -> Result<(), Vec<FieldError>> {
+        let mut errors = Vec::new();
+        if self.items.is_empty() {
+            errors.push(FieldError::new("items", "must contain at least one item"));
+        }
+        if self.items.len() > 100 {
+            errors.push(FieldError::new("items", "at most 100 items per order"));
+        }
+        for (i, item) in self.items.iter().enumerate() {
+            if item.sku.trim().is_empty() || item.sku.len() > 64 {
+                errors.push(FieldError::new(format!("items[{i}].sku"), "must be 1-64 characters"));
+            }
+            if !(1..=1_000).contains(&item.quantity) {
+                errors.push(FieldError::new(format!("items[{i}].quantity"), "must be between 1 and 1000"));
+            }
+            if !(0..=10_000_000).contains(&item.unit_price_cents) {
+                errors.push(FieldError::new(format!("items[{i}].unit_price_cents"), "out of range"));
+            }
+        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
+}
+```
+
+### A derived wrapper: AppPath and AppQuery
+
+For `Path` and `Query`, we do not want extra behavior, just a different rejection type. axum's `macros` feature provides a derive for exactly that:
+
+```toml
+axum = { version = "0.8", features = ["macros"] }
+```
+
+```rust
+use axum::extract::FromRequestParts;
+
+/// `Path<T>` whose rejection is problem+json instead of text/plain.
+#[derive(FromRequestParts)]
+#[from_request(via(axum::extract::Path), rejection(AppError))]
+pub struct AppPath<T>(pub T);
+
+/// `Query<T>` whose rejection is problem+json instead of text/plain.
+#[derive(FromRequestParts)]
+#[from_request(via(axum::extract::Query), rejection(AppError))]
+pub struct AppQuery<T>(pub T);
+```
+
+`via(axum::extract::Path)` says "extract using `Path<T>`", and `rejection(AppError)` says "convert its rejection with `From` into `AppError`". The wrapper is used exactly like `Path`.
+
+## Handlers with AppError
+
+With the error type and extractors in place, handlers lose their error-formatting noise. Every function returns `AppResult<...>`:
+
+```rust
+impl From<TransitionError> for AppError {
+    fn from(e: TransitionError) -> Self {
+        AppError::Conflict(format!("cannot {} an order in status {:?}", e.action, e.from))
+    }
+}
+
+#[instrument(skip(state))]
+pub async fn get_order(
+    State(state): State<AppState>,
+    AppPath(id): AppPath<Uuid>,
+) -> AppResult<Json<OrderResponse>> {
+    let order = state
+        .orders
+        .get(id)
+        .ok_or_else(|| AppError::NotFound { entity: "order", id: id.to_string() })?;
+    Ok(Json(order.into()))
+}
+
+#[instrument(skip(state))]
+pub async fn pay_order(
+    State(state): State<AppState>,
+    AppPath(id): AppPath<Uuid>,
+) -> AppResult<StatusCode> {
+    state
+        .orders
+        .update(id, |order| order.request_payment())
+        .ok_or_else(|| AppError::NotFound { entity: "order", id: id.to_string() })??;
+    Ok(StatusCode::ACCEPTED)
+}
+```
+
+The double `??` in `pay_order` reads oddly the first time. `update` returns `Option<Result<(), TransitionError>>`. `ok_or_else` turns the outer `Option` into a `Result<Result<(), TransitionError>, AppError>`; the first `?` unwraps the "order exists" layer, the second unwraps the domain rule, converting `TransitionError` into `AppError::Conflict` through `From`. The domain module still knows nothing about HTTP: the mapping from a domain error to a status code lives on the HTTP side.
+
+These responses come from the real service, captured by an integration test:
+
+```text
+GET /orders/abc
+400 Bad Request | application/problem+json
+{"type":"https://orders-api.example.com/problems/malformed-request","title":"Malformed request",
+ "status":400,"detail":"Invalid URL: Cannot parse `id` with value `abc`: UUID parsing failed: invalid length: found 3"}
+
+GET /orders/8c1f0e9e-1f5a-4a59-9a4e-2f4f3b1d6c11
+404 Not Found | application/problem+json
+{"type":"https://orders-api.example.com/problems/not-found","title":"Resource not found",
+ "status":404,"detail":"order 8c1f0e9e-1f5a-4a59-9a4e-2f4f3b1d6c11 not found"}
+
+POST /orders  {"customer_id":"...","items":[{"sku":"","quantity":0,"unit_price_cents":100}]}
+422 Unprocessable Entity | application/problem+json
+{"type":"https://orders-api.example.com/problems/validation","title":"Request validation failed",
+ "status":422,"errors":[{"field":"items[0].sku","message":"must be 1-64 characters"},
+                        {"field":"items[0].quantity","message":"must be between 1 and 1000"}]}
+
+POST /orders  (no content-type)
+415 Unsupported Media Type | application/problem+json
+{"type":"https://orders-api.example.com/problems/malformed-request","title":"Malformed request",
+ "status":415,"detail":"Expected request with `Content-Type: application/json`"}
+```
+
+One format, one place to change it. Kotlin developers will recognize the role this plays: it is what a `@ControllerAdvice` with `@ExceptionHandler` methods does in Spring, except that the set of errors is a closed enum the compiler checks, rather than an open hierarchy of exceptions discovered at runtime.
+
+```kotlin
+@RestControllerAdvice
+class ApiErrors {
+    @ExceptionHandler(OrderNotFound::class)
+    fun notFound(e: OrderNotFound) =
+        ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.message ?: "not found")
+}
+```
+
+## thiserror inside, anyhow at the edges
+
+The Rust ecosystem's rule of thumb is "thiserror for libraries, anyhow for applications". In a service, the more useful framing is **thiserror where callers need to branch on the error, anyhow where they only need to report it**.
+
+- `AppError` is a thiserror enum because the HTTP layer branches on it to pick a status code.
+- Domain errors like `TransitionError` are concrete types because handlers convert them into specific variants.
+- Startup code (loading config, binding a socket, connecting to the database) only needs to fail with a good message. That is anyhow's job:
+
+```rust
+use anyhow::Context;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let config = Config::load().context("failed to load configuration")?;
+    telemetry::init(&config.log);
+
+    let addr = SocketAddr::new(config.http.host, config.http.port);
+    tracing::info!(environment = ?config.environment, %addr, "starting orders-api");
+
+    let state = AppState {
+        orders: OrderStore::default(),
+        config: Arc::new(config),
+    };
+
+    let listener = TcpListener::bind(addr)
+        .await
+        .with_context(|| format!("failed to bind {addr}"))?;
+
+    axum::serve(listener, router(state))
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("server error")?;
+
+    tracing::info!("orders-api stopped");
+    Ok(())
+}
+```
+
+If the port is taken, the process exits with `Error: failed to bind 0.0.0.0:3000`, followed by a `Caused by:` section containing the operating system's "Address already in use" error. `.context()` adds the *what were we trying to do* that the underlying OS error lacks.
+
+Inside request handling, anyhow appears through `AppError::Internal`. Any helper that returns `anyhow::Result` can be called with `?` in a handler, and the error lands in the generic 500 path, fully logged. Use that for genuinely unexpected failures (a downstream service returning garbage, a serialization bug), and add a specific variant as soon as you find yourself wanting to tell the client something more specific.
+
+## Layered configuration
+
+Part 1 hardcoded `0.0.0.0:3000`. Real services need different settings per environment, and the [twelve-factor](https://12factor.net/config) convention is that deploy-specific values come from the environment. In practice, most teams want a mix: sensible defaults checked into the repo, per-environment overrides, and environment variables (set by Kubernetes, Docker or your shell) on top.
+
+![Configuration layers merge from lowest to highest precedence: base.toml defaults, then the per-environment file, then ORDERS_ environment variables; the merged result is deserialized into a typed Config, and secrets stay wrapped in SecretString](/images/blog/rust/rust-backend-02-errors-config-tracing-config-layers.svg)
+
+### The typed Config
+
+Configuration is just another serde type. Deserializing into structs means a typo in a key or a non-numeric port is caught once, at startup, rather than when some code path first reads the value:
+
+```rust
+use std::net::IpAddr;
+
+use secrecy::SecretString;
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    pub environment: Environment,
+    pub http: HttpConfig,
+    pub log: LogConfig,
+    pub database: DatabaseConfig,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Environment {
+    Local,
+    Staging,
+    Production,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HttpConfig {
+    pub host: IpAddr,
+    pub port: u16,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LogConfig {
+    /// An EnvFilter directive, e.g. "orders_api=debug,tower_http=info,warn".
+    pub filter: String,
+    pub format: LogFormat,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogFormat {
+    Pretty,
+    Json,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DatabaseConfig {
+    pub url: SecretString,
+    pub max_connections: u32,
+}
+```
+
+The `database` section is declared now even though Part 3 is where we connect; it gives us a real secret to protect in the next section. Using `IpAddr` and `u16` instead of `String` is the same "parse, don't validate" idea as `Path<Uuid>`: an invalid address fails deserialization with a clear message.
+
+### Loading with figment
+
+Several crates do layered loading: `config`, `figment`, or a few lines of `std::env` plus `envy` for flat settings. orders-api uses **figment**, which merges "providers" in order and deserializes the result:
+
+```toml
+figment = { version = "0.10", features = ["toml", "env"] }
+secrecy = { version = "0.10", features = ["serde"] }
+```
+
+```rust
+use figment::{
+    Figment,
+    providers::{Env, Format, Toml},
+};
+
+impl Config {
+    /// Layering, lowest to highest precedence:
+    /// config/base.toml -> config/{APP_ENV}.toml -> ORDERS_* environment variables.
+    pub fn load() -> Result<Self, Box<figment::Error>> {
+        let env = std::env::var("APP_ENV").unwrap_or_else(|_| "local".to_string());
+        Self::figment(&env).extract().map_err(Box::new)
+    }
+
+    pub fn figment(env: &str) -> Figment {
+        Figment::new()
+            .merge(Toml::file("config/base.toml"))
+            .merge(Toml::file(format!("config/{env}.toml")))
+            .merge(Env::prefixed("ORDERS_").split("__"))
+    }
+}
+```
+
+The `Box` around `figment::Error` is there because the error type is large (over 200 bytes) and clippy's `result_large_err` lint flags returning it unboxed. A missing file is not an error for `Toml::file`; it simply contributes nothing, which is what you want for optional per-environment files.
+
+The files:
+
+```toml
+# config/base.toml: defaults for every environment
+environment = "local"
+
+[http]
+host = "0.0.0.0"
+port = 3000
+
+[log]
+filter = "orders_api=debug,tower_http=info,info"
+format = "pretty"
+
+[database]
+url = "postgres://orders:orders@localhost:5432/orders"
+max_connections = 10
+```
+
+```toml
+# config/production.toml: only what differs
+environment = "production"
+
+[log]
+filter = "orders_api=info,tower_http=info,warn"
+format = "json"
+```
+
+Environment variables override both. `Env::prefixed("ORDERS_").split("__")` maps a double underscore to nesting, so `ORDERS_HTTP__PORT=8080` sets `http.port` and `ORDERS_DATABASE__URL=...` sets `database.url`. The double underscore is needed because single underscores appear inside key names such as `max_connections`.
+
+```bash
+APP_ENV=production \
+ORDERS_HTTP__PORT=8080 \
+ORDERS_DATABASE__URL='postgres://orders:s3cret@db.internal:5432/orders' \
+cargo run
+```
+
+figment ships a `Jail` helper (behind its `test` feature) that runs a closure with a temporary directory and scoped environment variables, so layering can be tested without touching the real environment:
+
+```rust
+#[test]
+#[allow(clippy::result_large_err)]
+fn env_vars_override_files() {
+    figment::Jail::expect_with(|jail| {
+        jail.create_dir("config")?;
+        jail.create_file(
+            "config/base.toml",
+            r#"
+            environment = "local"
+            [http]
+            host = "127.0.0.1"
+            port = 3000
+            [log]
+            filter = "info"
+            format = "pretty"
+            [database]
+            url = "postgres://localhost/orders"
+            max_connections = 10
+            "#,
+        )?;
+        jail.create_file("config/production.toml", "environment = \"production\"\n[log]\nformat = \"json\"")?;
+        jail.set_env("ORDERS_HTTP__PORT", "8080");
+        jail.set_env("ORDERS_DATABASE__URL", "postgres://prod-db/orders");
+
+        let config: Config = Config::figment("production").extract()?;
+        assert_eq!(config.environment, Environment::Production);
+        assert_eq!(config.http.port, 8080);
+        assert!(matches!(config.log.format, LogFormat::Json));
+        assert_eq!(config.database.url.expose_secret(), "postgres://prod-db/orders");
+        assert!(!format!("{:?}", config.database).contains("prod-db"));
+        Ok(())
+    });
+}
+```
+
+### Secrets
+
+Two rules cover most of what goes wrong with secrets in services.
+
+**Secrets come from the environment or a secret store, never from committed files.** The `postgres://orders:orders@localhost` default in `base.toml` is a local development credential and nothing else. In staging and production, the real value arrives as `ORDERS_DATABASE__URL`, injected by Kubernetes from a `Secret`, or by an agent that reads from Vault or a cloud secret manager. Some teams prefer mounting secrets as files rather than environment variables, because environment variables are visible to anything that can read `/proc/<pid>/environ` and are often dumped by crash reporters. figment can read a file path too; the principle is the same.
+
+**Secrets must not be printable by accident.** The struct derives `Debug`, and sooner or later someone writes `tracing::info!(?config, "loaded config")`. If `url` were a `String`, the password would be in your logs, which are usually retained longer and accessed by more people than your database. `secrecy::SecretString` prevents that:
+
+```text
+DatabaseConfig { url: SecretBox<str>([REDACTED]), max_connections: 10 }
+```
+
+To use the value, you must call `expose_secret()`, which is easy to grep for in code review. `secrecy` also zeroes the memory when the value is dropped. That last property matters less than people think in a long-running service (the secret is copied into the database driver anyway), but the redacted `Debug` is worth the dependency on its own.
+
+### Fail fast, then share
+
+Load the configuration once, at startup, before binding any socket, and exit with a clear message if it is invalid. A service that starts with a broken configuration and fails on the first request is much harder to diagnose than one that refuses to start; Kubernetes will show a crash loop with your error message in the logs. After loading, wrap it in `Arc` and put it in `AppState`:
+
+```rust
+#[derive(Clone)]
+pub struct AppState {
+    pub orders: OrderStore,
+    pub config: Arc<Config>,
+}
+```
+
+Handlers that need a setting extract `State(state)` and read `state.config`. Avoid global statics for configuration: they make tests that need different settings painful, and they hide which code depends on which setting.
+
+## Structured logging with tracing
+
+`println!` debugging gives you lines of text. In production, you want **events with fields** that a log pipeline can index, and you want to know which request each event belongs to. The `tracing` crate provides both.
+
+### Events and spans
+
+`tracing` has two core concepts:
+
+- An **event** is something that happened at a point in time: `tracing::info!(total_cents = order.total_cents, "order created")`. Fields are key-value pairs, not interpolated into the message, so the log backend can filter on `total_cents > 100000` without regex.
+- A **span** is a period of time with its own fields: "handling request `x-request-id=abc`", "creating an order for customer 8c1f...". Spans nest. Any event emitted while a span is active is associated with it and with all its parents.
+
+That second point is the key to request correlation. If the outermost span for a request carries `request_id`, then every event emitted anywhere during that request, in handlers, in repositories, in helper functions three modules away, can be printed with that id, without passing it as a parameter.
+
+Field syntax is compact and worth learning: `%value` records with `Display`, `?value` records with `Debug`, and a bare `name` records a variable of the same name.
+
+### The subscriber
+
+`tracing` itself only produces events; a **subscriber** decides what to do with them. `tracing-subscriber` composes one from layers:
+
+```toml
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+```
+
+```rust
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::config::{LogConfig, LogFormat};
+
+pub fn init(log: &LogConfig) {
+    // RUST_LOG wins over the config file, which is handy when debugging.
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&log.filter));
+
+    let registry = tracing_subscriber::registry().with(filter);
+    match log.format {
+        LogFormat::Json => registry
+            .with(fmt::layer().json().with_current_span(false).with_span_list(true))
+            .init(),
+        LogFormat::Pretty => registry.with(fmt::layer().pretty()).init(),
+    }
+}
+```
+
+The `EnvFilter` directive `orders_api=debug,tower_http=info,info` means "debug and above for our crate, info for tower-http, info for everything else". Filtering happens before formatting, so disabled `debug!` calls cost almost nothing.
+
+Developers get human-friendly `pretty` output locally; production gets one JSON object per line, which every log pipeline (Loki, Elasticsearch, CloudWatch, Datadog) ingests without parsing rules. `with_span_list(true)` includes *every* span from root to leaf in each line, which is what puts the request id on events emitted deep inside a handler. With only the current span, a handler's events would carry the handler's fields but not the request's.
+
+### #[instrument]
+
+Writing spans by hand is verbose. The `#[instrument]` attribute wraps a function in a span named after it, recording arguments as fields:
+
+```rust
+#[instrument(skip_all, fields(customer_id = %req.customer_id, order_id = tracing::field::Empty))]
+pub async fn create_order(
+    State(state): State<AppState>,
+    ValidatedJson(req): ValidatedJson<CreateOrderRequest>,
+) -> AppResult<impl IntoResponse> {
+    let items = req
+        .items
+        .into_iter()
+        .map(|i| OrderItem { sku: i.sku, quantity: i.quantity, unit_price_cents: i.unit_price_cents })
+        .collect();
+    let order = Order::new(req.customer_id, items);
+    tracing::Span::current().record("order_id", tracing::field::display(order.id));
+
+    state.orders.insert(order.clone());
+    tracing::info!(total_cents = order.total_cents, "order created");
+
+    Ok((
+        StatusCode::CREATED,
+        [(header::LOCATION, format!("/orders/{}", order.id))],
+        Json(OrderResponse::from(order)),
+    ))
+}
+```
+
+Points that matter in practice:
+
+- **`skip_all` by default, then opt fields in.** Without `skip`, every argument is recorded with `Debug`. That means the whole `AppState` on every call, and for a login handler, the password. Explicit `fields(...)` keeps logs small and safe.
+- **`tracing::field::Empty` declares a field you will fill in later.** We do not know the order id until the order is built, so the span reserves `order_id` and `Span::current().record(...)` sets it. A field that was not declared when the span was created cannot be recorded later; this trips people up.
+- **`#[instrument]` works on `async fn` correctly.** It instruments the future, so the span is entered every time the future is polled and exited when it yields. Creating a span with `info_span!` and calling `.enter()` in async code is the classic mistake: the guard stays alive across `.await` points, so the span "leaks" onto whatever else runs on that thread. Use `#[instrument]` or `future.instrument(span)` instead.
+
+## Request ids with tower-http
+
+The last piece is the request id itself. `tower-http` provides two layers:
+
+- `SetRequestIdLayer` generates an id (with `MakeRequestUuid`, a UUID v4) and stores it in a request header, unless the request already has one.
+- `PropagateRequestIdLayer` copies the request's id header onto the response.
+
+`TraceLayer` creates a span per request and logs when the response is produced. Combined in the right order, the span reads the id that `SetRequestIdLayer` just set:
+
+```toml
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "request-id", "util"] }
+```
+
+```rust
+use std::time::Duration;
+
+use axum::{
+    Router,
+    extract::{MatchedPath, Request},
+    http::{HeaderName, Response},
+    routing::{get, post},
+};
+use tower::ServiceBuilder;
+use tower_http::{
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    trace::TraceLayer,
+};
+use tracing::{Span, field};
+
+const REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
+
+pub fn router(state: AppState) -> Router {
+    Router::new()
+        .route("/health", get(health))
+        .route("/orders", post(orders::create_order).get(orders::list_orders))
+        .route("/orders/{id}", get(orders::get_order))
+        .route("/orders/{id}/pay", post(orders::pay_order))
+        .layer(
+            ServiceBuilder::new()
+                // 1. Outermost: make sure every request has an id.
+                .layer(SetRequestIdLayer::new(REQUEST_ID, MakeRequestUuid))
+                // 2. Open a span that carries the id; everything inside logs under it.
+                .layer(
+                    TraceLayer::new_for_http()
+                        .make_span_with(make_span)
+                        .on_request(())
+                        .on_response(on_response),
+                )
+                // 3. Copy the id onto the response so clients can quote it.
+                .layer(PropagateRequestIdLayer::new(REQUEST_ID)),
+        )
+        .with_state(state)
+}
+
+fn make_span(req: &Request) -> Span {
+    let request_id = req
+        .headers()
+        .get(REQUEST_ID)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("-");
+    // The route template ("/orders/{id}"), not the raw path: low cardinality.
+    let route = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+        .unwrap_or("unmatched");
+
+    tracing::info_span!(
+        "http_request",
+        method = %req.method(),
+        route,
+        request_id,
+        status = field::Empty,
+    )
+}
+
+fn on_response<B>(res: &Response<B>, latency: Duration, span: &Span) {
+    span.record("status", res.status().as_u16());
+    tracing::info!(latency_ms = latency.as_millis() as u64, "request finished");
+}
+```
+
+### Layer order
+
+Layer ordering is the part people get wrong. With `ServiceBuilder`, layers run **top to bottom on the way in**: the first layer listed is the outermost, sees the request first, and sees the response last. (Calling `Router::layer` repeatedly is the opposite: each call wraps everything added before it, so the *last* call is outermost. `ServiceBuilder` reads more naturally, which is why it is used here.)
+
+```mermaid
+sequenceDiagram
+    participant C as "Client"
+    participant S as "SetRequestId"
+    participant T as "TraceLayer"
+    participant P as "PropagateRequestId"
+    participant H as "Router and handler"
+    C->>S: "request, maybe with x-request-id"
+    S->>T: "request with x-request-id set"
+    Note over T: "span http_request<br/>request_id, method, route"
+    T->>P: "request"
+    P->>H: "request"
+    H-->>P: "response"
+    P-->>T: "response with x-request-id"
+    Note over T: "record status, log latency"
+    T-->>S: "response"
+    S-->>C: "response"
+```
+
+If `TraceLayer` were outside `SetRequestIdLayer`, the span would be created before the id exists and would log `request_id="-"` for every request that did not bring its own.
+
+Two more details. `MatchedPath` is available in the span because the layers are applied with `Router::layer`, which runs them after routing; layers applied around the whole router from the outside (for example with `ServiceBuilder` wrapping the `Router` service) run before routing and see no `MatchedPath`. And logging the **route template** instead of the raw URI keeps the number of distinct values small, which matters once you turn these fields into metrics in [Part 7](/blog/rust-backend-07-observability-performance).
+
+### Should you trust a client-supplied id?
+
+`SetRequestIdLayer` keeps an existing `x-request-id` header. That is useful: if an API gateway or an upstream service already assigned an id, your logs join up with theirs. It is also a small risk: a client can send any string, including a very long one or one designed to collide with another request's id. Common policies are to trust the header only from your own gateway (and have the gateway overwrite whatever the client sent), or to accept it but cap its length. For distributed tracing across services, the W3C `traceparent` header and OpenTelemetry replace hand-rolled request ids; Part 7 covers that.
+
+### The result
+
+Here are real log lines from the integration test, one JSON object per line (wrapped here for readability):
+
+```text
+{"timestamp":"2026-11-07T00:05:55.420309Z","level":"INFO",
+ "fields":{"message":"order created","total_cents":3000},
+ "target":"orders_api::routes::orders",
+ "spans":[{"method":"POST","request_id":"client-supplied-123","route":"/orders","name":"http_request"},
+          {"customer_id":"8c1f0e9e-1f5a-4a59-9a4e-2f4f3b1d6c11",
+           "order_id":"dfa9c6e6-25d0-4f98-a18d-6ec7e7b55747","name":"create_order"}]}
+{"timestamp":"2026-11-07T00:05:55.420368Z","level":"INFO",
+ "fields":{"message":"request finished","latency_ms":0},
+ "target":"orders_api::routes",
+ "spans":[{"method":"POST","request_id":"client-supplied-123","route":"/orders",
+           "status":201,"name":"http_request"}]}
+```
+
+The handler's "order created" event carries the request id from the outer span and the customer and order ids from the `#[instrument]` span, without the handler knowing anything about request ids. The response the client got had `x-request-id: client-supplied-123`. When the client reports a problem and quotes that id, one log query returns everything that happened during that request.
+
+### What to log, and what not to
+
+- **Log events that change state or explain decisions**: order created, payment requested, retry scheduled, circuit opened. Log at `info` for business events, `warn` for handled anomalies, `error` for failures someone should look at.
+- **Do not log every successful read at `info`.** At a few thousand requests per second, the "request finished" line is already a lot of volume; some teams sample it or move it to `debug` and rely on metrics for counts.
+- **Never log secrets or personal data you do not need.** Passwords, tokens, full card numbers, and usually full request bodies. `skip_all` on `#[instrument]` and `SecretString` in config are your guard rails.
+- **Log errors once, where they are handled.** If every layer logs an error and re-throws it, one failure produces five log lines. In orders-api, internal errors are logged exactly once, in `AppError::into_response`.
+
+## Common mistakes
+
+**Returning `err.to_string()` for infrastructure errors.** It leaks schema names, hostnames and library internals. Map infrastructure failures to `Internal`, log them, and return a generic 500.
+
+**One giant error enum that mirrors every library.** An `AppError` with `Sqlx`, `Reqwest`, `Serde`, `Io` and `Jwt` variants is just a list of dependencies, and the HTTP layer still cannot tell a client what to do. Variants should reflect client-visible categories; libraries feed into them.
+
+**Forgetting axum's built-in rejections.** You build a careful error format, and malformed JSON still returns text/plain from `Json`'s default rejection. Wrap or convert every extractor you use.
+
+**Logging an error and also returning it up the stack.** The same failure appears several times in the logs with different context, and alert rules double-count it.
+
+**Recording a span field that was never declared.** `Span::current().record("order_id", ...)` silently does nothing if the span was created without an `order_id` field. Declare it with `field::Empty`.
+
+**Holding a span guard across `.await`.** `let _g = span.enter();` in an async function attaches unrelated work to your span when the task yields. Use `#[instrument]` or `.instrument(span)`.
+
+**Instrumenting without `skip`.** `#[instrument]` on a login handler records the request body, password included, with `Debug`.
+
+**Plain `String` for secrets in a `Debug` config struct.** One `?config` in a log statement and the database password is in your log storage for months.
+
+**Wrong layer order.** The trace span is created before the request id exists, or the propagate layer runs outside the layer that generates the id, so responses lack the header.
+
+## Interview questions
+
+<details>
+<summary>How would you design error handling for an axum service?</summary>
+
+Define one application error enum, derived with thiserror, whose variants are the categories a client must distinguish: not found, validation (with field-level detail), malformed request, conflict, unauthorized, and internal. Handlers return `Result<T, AppError>` and use `?`; `From` implementations convert domain errors, extractor rejections and infrastructure errors into it. A single `IntoResponse` implementation maps each variant to a status code and a consistent body such as RFC 9457 problem+json. Internal errors are logged with full context and returned without detail. A strong answer also mentions converting the framework's own rejections so malformed input uses the same format.
+
+</details>
+
+<details>
+<summary>When do you use thiserror and when anyhow in a service?</summary>
+
+Use thiserror for error types that callers need to match on, such as the application error the HTTP layer maps to status codes, or domain errors that become specific variants. Use anyhow where the only thing to do with an error is report it with context: startup code, CLI tools, and deep infrastructure helpers whose failures are all "internal" to the client. The two compose: an `Internal(#[from] anyhow::Error)` variant lets anyhow errors flow through `?` into the typed error. The heuristic "thiserror for libraries, anyhow for applications" is a simplification of this.
+
+</details>
+
+<details>
+<summary>How do you avoid leaking internal details in error responses?</summary>
+
+Separate messages written for clients from messages produced by third-party errors. Only your own variants carry client-facing text; anything from a database driver, HTTP client or serializer goes into an internal variant that is logged in full and returned as a generic 500 with no detail. Give clients a correlation id (the request id header) so support can find the logged error. Review any place that forwards an error's `to_string()` to a response; extractor rejections that describe the client's own input are acceptable, database errors are not.
+
+</details>
+
+<details>
+<summary>How does layered configuration work, and where should secrets come from?</summary>
+
+Defaults live in a checked-in base file, per-environment files override only what differs, and environment variables override both, typically using a prefix and a separator for nesting such as `ORDERS_HTTP__PORT`. The merged result is deserialized into typed structs once at startup, so invalid configuration fails fast with a clear error. Secrets never live in committed files; they are injected through the environment or mounted files from a secret store, and are wrapped in a type like `secrecy::SecretString` so they cannot be printed through `Debug`. Configuration is then shared through application state rather than global statics, which keeps it testable.
+
+</details>
+
+<details>
+<summary>What is the difference between a span and an event in tracing, and why does it matter for request correlation?</summary>
+
+An event is a point-in-time record with fields; a span is a duration with fields, and spans nest. Events emitted while a span is active are associated with it and all its ancestors. If the outermost span for a request carries the request id, every event emitted during that request can be logged with that id without threading it through function parameters. In async code this only works if spans are attached to futures correctly, with `#[instrument]` or `.instrument()`, rather than entered with a guard that lives across `.await` points.
+
+</details>
+
+<details>
+<summary>In what order should request id, tracing and propagation layers be applied, and why?</summary>
+
+The layer that sets the request id must be outermost so the id exists before anything else runs. The trace layer comes next so its span can read the id from the request headers. The propagation layer is inside them so it copies the id onto the response on the way out. With tower's `ServiceBuilder`, layers listed first are outermost; with repeated `Router::layer` calls, the last call is outermost. Getting this wrong produces spans without ids or responses without the header.
+
+</details>
+
+<details>
+<summary>Why record the route template rather than the raw path in request spans?</summary>
+
+The raw path contains ids, so every order produces a distinct value such as `/orders/8c1f...`. That makes logs harder to aggregate and is disastrous once the field becomes a metric label, because each distinct value creates a new time series. The route template, available in axum through `MatchedPath`, has one value per endpoint, which keeps cardinality bounded while still identifying the endpoint. The specific id can be recorded as a separate span field where it is useful.
+
+</details>
+
+## Key takeaways
+
+- Give the service one error enum whose variants are client-visible categories, and one `IntoResponse` implementation that maps them to problem+json.
+- Convert axum's extractor rejections into the same type, with `From` impls, a custom `ValidatedJson` extractor, and derived `AppPath`/`AppQuery` wrappers.
+- Use thiserror where callers branch on errors and anyhow where they only report them; `Internal(#[from] anyhow::Error)` connects the two.
+- Internal errors are logged once with full context and returned with no detail; the request id ties the two together.
+- Load configuration in layers (base file, environment file, prefixed environment variables) into typed structs at startup, and fail fast if it is invalid.
+- Secrets come from the environment or a secret store, and live in `SecretString` so they cannot be logged by accident.
+- `tracing` spans carry context such as the request id to every event inside them; use `#[instrument(skip_all, fields(...))]` and JSON output with the full span list.
+- Order matters: set the request id, then trace, then propagate.
+
+Previous: [Part 1: Your First HTTP Service with Axum](/blog/rust-backend-01-first-http-service) · Next: [Part 3: PostgreSQL with SQLx](/blog/rust-backend-03-postgres-sqlx)

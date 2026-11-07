@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Four ways to hold the text "orders" and what each costs</title>
+  <desc id="d">On a 64-bit target, String is 24 bytes on the stack (pointer, capacity, length) and owns a growable heap buffer. Box str is 16 bytes (pointer, length) and owns an exact-size buffer. A str reference is 16 bytes and borrows. Arc str is 16 bytes and points to one heap block holding a strong count, a weak count and the bytes, so cloning only increments a counter.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Same six bytes of text, four ownership shapes</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Sizes of the handle on a 64-bit target, from size_of. Heap blocks shown on the right.</text>
+  <text x="32" y="112" fill="#f78166" font-size="14" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">String</text>
+  <text x="32" y="130" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">24 B, growable</text>
+  <rect x="170" y="98" width="72" height="34" rx="6" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="185" y="120" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ptr</text>
+  <rect x="242" y="98" width="72" height="34" rx="6" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="257" y="120" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">cap</text>
+  <rect x="314" y="98" width="72" height="34" rx="6" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="329" y="120" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">len</text>
+  <line x1="386" y1="115" x2="470" y2="115" stroke="#f78166" stroke-width="1.5"/>
+  <polygon points="470,110 480,115 470,120" fill="#f78166"/>
+  <rect x="482" y="98" width="190" height="34" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="494" y="120" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">orders</text>
+  <text x="560" y="120" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">+ spare cap</text>
+  <text x="32" y="192" fill="#ffa657" font-size="14" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Box&lt;str&gt;</text>
+  <text x="32" y="210" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">16 B, exact size</text>
+  <rect x="170" y="178" width="72" height="34" rx="6" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="185" y="200" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ptr</text>
+  <rect x="242" y="178" width="72" height="34" rx="6" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="257" y="200" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">len</text>
+  <line x1="314" y1="195" x2="470" y2="195" stroke="#ffa657" stroke-width="1.5"/>
+  <polygon points="470,190 480,195 470,200" fill="#ffa657"/>
+  <rect x="482" y="178" width="80" height="34" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="494" y="200" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">orders</text>
+  <text x="578" y="200" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">owned, immutable</text>
+  <text x="32" y="272" fill="#79c0ff" font-size="14" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">&amp;str</text>
+  <text x="32" y="290" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">16 B, borrowed</text>
+  <rect x="170" y="258" width="72" height="34" rx="6" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="185" y="280" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ptr</text>
+  <rect x="242" y="258" width="72" height="34" rx="6" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="257" y="280" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">len</text>
+  <line x1="314" y1="275" x2="470" y2="275" stroke="#79c0ff" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polygon points="470,270 480,275 470,280" fill="#79c0ff"/>
+  <text x="482" y="280" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">someone else's bytes; no free on drop</text>
+  <text x="32" y="352" fill="#7ee787" font-size="14" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Arc&lt;str&gt;</text>
+  <text x="32" y="370" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">16 B, shared</text>
+  <rect x="170" y="338" width="72" height="34" rx="6" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="185" y="360" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ptr</text>
+  <rect x="242" y="338" width="72" height="34" rx="6" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="257" y="360" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">len</text>
+  <line x1="314" y1="355" x2="470" y2="355" stroke="#7ee787" stroke-width="1.5"/>
+  <polygon points="470,350 480,355 470,360" fill="#7ee787"/>
+  <rect x="482" y="338" width="78" height="34" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="492" y="360" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">strong</text>
+  <rect x="560" y="338" width="70" height="34" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="574" y="360" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">weak</text>
+  <rect x="630" y="338" width="80" height="34" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="642" y="360" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">orders</text>
+  <text x="482" y="392" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">clone = one atomic increment, no copy</text>
+  <rect x="32" y="414" width="736" height="40" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="52" y="439" fill="#d2a8ff" font-size="13" font-family="Inter, system-ui, sans-serif">Rule of thumb: build with String, store finished text as Box&lt;str&gt;, share read-only text as Arc&lt;str&gt;.</text>
+</svg>

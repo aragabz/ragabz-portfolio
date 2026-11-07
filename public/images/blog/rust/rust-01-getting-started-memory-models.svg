@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Three ways to manage memory</title>
+  <desc id="d">Manual memory management in C and C++ is fast but allows use-after-free and buffer overflows. Garbage collection in Java, Kotlin and Go is safe but needs a runtime and costs pauses or CPU. Rust's ownership model frees memory when the owner goes out of scope and checks safety at compile time, with no collector.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Who frees memory, and when?</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Three answers. Rust keeps the speed of the first and the safety of the second.</text>
+  <rect x="24" y="92" width="236" height="248" rx="12" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="42" y="122" fill="#f78166" font-size="16" font-weight="600" font-family="Inter, system-ui, sans-serif">Manual</text>
+  <text x="42" y="142" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">C, C++</text>
+  <text x="42" y="174" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">You call free or delete</text>
+  <text x="42" y="193" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">or rely on destructors</text>
+  <line x1="42" y1="210" x2="242" y2="210" stroke="#30363d" stroke-width="1"/>
+  <text x="42" y="234" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">+ Fast and predictable</text>
+  <text x="42" y="253" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">+ No runtime needed</text>
+  <text x="42" y="286" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">- Use-after-free, double free</text>
+  <text x="42" y="305" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">- Overflows, data races</text>
+  <rect x="282" y="92" width="236" height="248" rx="12" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="300" y="122" fill="#79c0ff" font-size="16" font-weight="600" font-family="Inter, system-ui, sans-serif">Garbage collected</text>
+  <text x="300" y="142" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Java, Kotlin, Go, C#</text>
+  <text x="300" y="174" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Runtime finds objects</text>
+  <text x="300" y="193" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">that are unreachable</text>
+  <line x1="300" y1="210" x2="500" y2="210" stroke="#30363d" stroke-width="1"/>
+  <text x="300" y="234" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">+ Memory-safe by default</text>
+  <text x="300" y="253" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">+ Very productive</text>
+  <text x="300" y="286" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">- Pauses or background CPU</text>
+  <text x="300" y="305" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">- Memory headroom, runtime</text>
+  <rect x="540" y="92" width="236" height="248" rx="12" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="558" y="122" fill="#7ee787" font-size="16" font-weight="600" font-family="Inter, system-ui, sans-serif">Ownership</text>
+  <text x="558" y="142" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Rust</text>
+  <text x="558" y="174" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">One owner per value;</text>
+  <text x="558" y="193" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">freed at end of its scope</text>
+  <line x1="558" y1="210" x2="758" y2="210" stroke="#30363d" stroke-width="1"/>
+  <text x="558" y="234" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">+ Memory-safe, no collector</text>
+  <text x="558" y="253" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">+ Deterministic cleanup</text>
+  <text x="558" y="286" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">- Stricter compiler</text>
+  <text x="558" y="305" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">- Steeper learning curve</text>
+  <rect x="24" y="358" width="236" height="40" rx="20" fill="#0d1117" stroke="#f78166" stroke-width="1.5"/>
+  <text x="142" y="383" fill="#f78166" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Safety checked: by you</text>
+  <rect x="282" y="358" width="236" height="40" rx="20" fill="#0d1117" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="400" y="383" fill="#79c0ff" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Safety checked: at runtime</text>
+  <rect x="540" y="358" width="236" height="40" rx="20" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="658" y="383" fill="#7ee787" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Safety checked: at compile time</text>
+  <text x="400" y="424" fill="#8b949e" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Rust's cost moves from runtime to compile time: errors you fix before the program ever runs.</text>
+</svg>

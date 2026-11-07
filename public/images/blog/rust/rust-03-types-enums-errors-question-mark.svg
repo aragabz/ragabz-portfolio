@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">What the question mark operator does</title>
+  <desc id="d">An expression returning Result reaches the question mark. If it is Ok, the value is unwrapped and the function continues to the next line. If it is Err, the error is converted with From into the function's own error type, such as ParseIntError into OrderLineError, and the function returns immediately with that error.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <defs>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f78166"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#79c0ff"/></marker>
+  </defs>
+  <text x="32" y="44" fill="#e6edf3" font-size="17" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">let quantity: u32 = qty_text.trim().parse()?;</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">One character, two outcomes. The function's return type decides what an error turns into.</text>
+  <rect x="240" y="96" width="320" height="56" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="400" y="122" fill="#8b949e" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">parse() returns</text>
+  <text x="400" y="141" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Result&lt;u32, ParseIntError&gt;</text>
+  <line x1="400" y1="152" x2="400" y2="182" stroke="#79c0ff" stroke-width="2" marker-end="url(#ab)"/>
+  <rect x="350" y="186" width="100" height="40" rx="20" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="400" y="211" fill="#d2a8ff" font-size="18" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">?</text>
+  <path d="M 350 206 L 200 206 L 200 252" fill="none" stroke="#7ee787" stroke-width="2" marker-end="url(#ag)"/>
+  <text x="260" y="198" fill="#7ee787" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Ok(3)</text>
+  <rect x="40" y="256" width="320" height="96" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="60" y="284" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Unwrap and continue</text>
+  <text x="60" y="308" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">quantity = 3</text>
+  <text x="60" y="332" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">next line of the function runs</text>
+  <path d="M 450 206 L 600 206 L 600 252" fill="none" stroke="#f78166" stroke-width="2" marker-end="url(#ao)"/>
+  <text x="540" y="198" fill="#f78166" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Err(e)</text>
+  <rect x="440" y="256" width="320" height="96" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="460" y="284" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Convert and return early</text>
+  <text x="460" y="308" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">return Err(From::from(e))</text>
+  <text x="460" y="332" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">ParseIntError to OrderLineError</text>
+  <text x="32" y="388" fill="#e6edf3" font-size="12" font-family="Inter, system-ui, sans-serif">The conversion comes from impl From&lt;ParseIntError&gt; for OrderLineError (or #[from] in thiserror).</text>
+  <text x="32" y="410" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">On an Option, ? returns None early instead. It only compiles where the return type can hold the failure.</text>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 430" role="img" aria-labelledby="t d">
+  <title id="t">What fearless concurrency guarantees and what it does not</title>
+  <desc id="d">Left column lists what the Rust compiler rejects at compile time: data races, sending non thread safe types, borrowing locals that a thread could outlive, and touching lock-protected data without the lock. Right column lists bugs that still compile: deadlocks, check-then-act logic races, starvation, contention, and weak atomic orderings that break your own invariants.</desc>
+  <rect width="800" height="430" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">"Fearless concurrency" has a precise scope</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Safe Rust rules out undefined behavior from shared memory. It does not prove your program is correct.</text>
+  <rect x="32" y="92" width="360" height="300" rx="12" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="52" y="124" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Rejected at compile time</text>
+  <text x="52" y="160" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Data races on ordinary memory</text>
+  <text x="52" y="180" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">&amp;mut XOR &amp;, enforced across threads</text>
+  <text x="52" y="214" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Moving Rc or Cell into another thread</text>
+  <text x="52" y="234" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">E0277: Send / Sync not implemented</text>
+  <text x="52" y="268" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Threads outliving borrowed locals</text>
+  <text x="52" y="288" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">E0373: use move, Arc, or thread::scope</text>
+  <text x="52" y="322" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Reading guarded data without the lock</text>
+  <text x="52" y="342" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Mutex&lt;T&gt; owns T; the guard is the only door</text>
+  <rect x="408" y="92" width="360" height="300" rx="12" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="428" y="124" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Compiles fine, still your job</text>
+  <text x="428" y="160" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Deadlocks</text>
+  <text x="428" y="180" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">A locks then B, B locks then A</text>
+  <text x="428" y="214" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Logic races (check, then act)</text>
+  <text x="428" y="234" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Each step locked, the pair is not atomic</text>
+  <text x="428" y="268" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Contention, starvation, livelock</text>
+  <text x="428" y="288" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Correct but slow; one hot lock serializes all</text>
+  <text x="428" y="322" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Too-weak atomic orderings</text>
+  <text x="428" y="342" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">No UB, but other threads may see stale state</text>
+  <text x="428" y="370" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Also: leaks (Arc cycles), panics in workers</text>
+  <text x="32" y="416" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Design rule: make shared state small, keep critical sections short, and prefer message passing for ownership handoff.</text>
+</svg>

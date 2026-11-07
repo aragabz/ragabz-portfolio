@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">How handler arguments map to parts of the HTTP request</title>
+  <desc id="d">A handler signature on the left with State, Path, Query and Json arguments. Each argument points to the part of the request it reads on the right: router state, URI path, URI query and body. State cannot fail, Path and Query reject with 400, and Json rejects with 415, 400 or 422. Json reads the body, so it must be the last argument.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Extractors: each argument reads one part of the request</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">If any extractor rejects, axum responds immediately and the handler body never runs.</text>
+  <rect x="24" y="84" width="384" height="312" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="40" y="108" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">async fn handler(</text>
+  <text x="40" y="139" fill="#79c0ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">  State(s): State&lt;AppState&gt;,</text>
+  <text x="40" y="201" fill="#d2a8ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">  Path(id): Path&lt;Uuid&gt;,</text>
+  <text x="40" y="263" fill="#ffa657" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">  Query(p): Query&lt;ListParams&gt;,</text>
+  <text x="40" y="333" fill="#f78166" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">  Json(req): Json&lt;CreateOrder&gt;,</text>
+  <text x="40" y="378" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">) -&gt; impl IntoResponse</text>
+  <line x1="372" y1="135" x2="436" y2="135" stroke="#79c0ff" stroke-width="2"/>
+  <polygon points="436,129 448,135 436,141" fill="#79c0ff"/>
+  <line x1="372" y1="197" x2="436" y2="197" stroke="#d2a8ff" stroke-width="2"/>
+  <polygon points="436,191 448,197 436,203" fill="#d2a8ff"/>
+  <line x1="372" y1="259" x2="436" y2="259" stroke="#ffa657" stroke-width="2"/>
+  <polygon points="436,253 448,259 436,265" fill="#ffa657"/>
+  <line x1="372" y1="329" x2="436" y2="329" stroke="#f78166" stroke-width="2"/>
+  <polygon points="436,323 448,329 436,335" fill="#f78166"/>
+  <rect x="452" y="110" width="324" height="50" rx="8" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="466" y="130" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Router state, set by with_state</text>
+  <text x="466" y="150" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Not from the request. Checked at compile time.</text>
+  <rect x="452" y="172" width="324" height="50" rx="8" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="466" y="192" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">URI path: /orders/{id}</text>
+  <text x="466" y="212" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Request head. 400 if not a valid Uuid.</text>
+  <rect x="452" y="234" width="324" height="50" rx="8" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="466" y="254" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">URI query: ?customer_id=...&amp;limit=20</text>
+  <text x="466" y="274" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Request head. 400 if a value fails to parse.</text>
+  <rect x="452" y="296" width="324" height="68" rx="8" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="466" y="316" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Body: read once, so it goes last</text>
+  <text x="466" y="336" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">415 without application/json content type</text>
+  <text x="466" y="354" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">400 invalid JSON, 422 wrong shape</text>
+  <text x="32" y="422" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">FromRequestParts (head): any number, any order. FromRequest (body): at most one, and last.</text>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Latency under rising load, with and without load shedding</title>
+  <desc id="d">Illustrative curves. Without load shedding, p99 latency grows without bound once offered load passes capacity, because requests queue. With a concurrency limit and load shedding, p99 stays flat for accepted requests and the excess is rejected quickly with 503.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Past capacity, you either queue or you shed</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Illustrative shape, not a benchmark. X: offered load. Y: p99 latency of requests that succeed.</text>
+
+  <line x1="90" y1="360" x2="760" y2="360" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="90" y1="100" x2="90" y2="360" stroke="#8b949e" stroke-width="1.5"/>
+  <text x="425" y="392" text-anchor="middle" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">offered load (requests per second)</text>
+  <text x="40" y="232" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif" transform="rotate(-90 40 232)" text-anchor="middle">p99 latency</text>
+
+  <line x1="470" y1="96" x2="470" y2="360" stroke="#30363d" stroke-dasharray="5 4" stroke-width="1.5"/>
+  <text x="478" y="112" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">capacity</text>
+
+  <path d="M90 330 C 250 328, 380 322, 430 300 C 460 280, 480 220, 500 160 C 515 120, 525 104, 535 96" fill="none" stroke="#f78166" stroke-width="3"/>
+  <text x="548" y="104" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">no limit: queues grow,</text>
+  <text x="548" y="122" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">every request gets slow</text>
+
+  <path d="M90 330 C 250 328, 380 322, 430 306 C 460 296, 480 292, 760 290" fill="none" stroke="#7ee787" stroke-width="3"/>
+  <text x="480" y="278" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">limit + shed: accepted p99 stays flat</text>
+
+  <rect x="500" y="310" width="250" height="40" rx="8" fill="#161b22" stroke="#79c0ff"/>
+  <text x="512" y="335" fill="#79c0ff" font-size="13" font-family="Inter, system-ui, sans-serif">excess gets a fast 503</text>
+
+  <text x="32" y="420" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">A fast, honest 503 lets the client retry elsewhere. A 30 s timeout ties up both sides.</text>
+</svg>

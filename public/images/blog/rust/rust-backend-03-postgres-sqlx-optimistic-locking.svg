@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Optimistic locking with a version column</title>
+  <desc id="d">Two concurrent pay requests both read order version 3. Request A updates with WHERE version = 3, matches one row and the version becomes 4. Request B then updates with WHERE version = 3, matches zero rows because the version is now 4, and returns 409 Conflict instead of overwriting A and emitting a second event.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Two pay requests race for the same order</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">No locks are held. The WHERE clause detects that the row changed after it was read.</text>
+  <line x1="120" y1="392" x2="770" y2="392" stroke="#30363d" stroke-width="2"/>
+  <polygon points="770,386 782,392 770,398" fill="#30363d"/>
+  <text x="730" y="414" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">time</text>
+  <text x="32" y="134" fill="#79c0ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Request A</text>
+  <text x="32" y="234" fill="#ffa657" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">orders row</text>
+  <text x="32" y="334" fill="#d2a8ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Request B</text>
+  <rect x="120" y="104" width="120" height="48" rx="8" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="132" y="124" fill="#e6edf3" font-size="12" font-family="Inter, system-ui, sans-serif">read</text>
+  <text x="132" y="142" fill="#8b949e" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">version = 3</text>
+  <rect x="300" y="96" width="220" height="64" rx="8" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="312" y="116" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">UPDATE ... SET version + 1</text>
+  <text x="312" y="134" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">WHERE version = 3</text>
+  <text x="312" y="152" fill="#7ee787" font-size="12" font-family="Inter, system-ui, sans-serif">1 row updated, commit</text>
+  <rect x="160" y="304" width="120" height="48" rx="8" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="172" y="324" fill="#e6edf3" font-size="12" font-family="Inter, system-ui, sans-serif">read</text>
+  <text x="172" y="342" fill="#8b949e" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">version = 3</text>
+  <rect x="540" y="296" width="230" height="64" rx="8" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="552" y="316" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">UPDATE ... SET version + 1</text>
+  <text x="552" y="334" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">WHERE version = 3</text>
+  <text x="552" y="352" fill="#f78166" font-size="12" font-family="Inter, system-ui, sans-serif">0 rows: 409 Conflict</text>
+  <rect x="120" y="208" width="400" height="40" rx="8" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="136" y="233" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">status pending, version 3</text>
+  <rect x="520" y="208" width="250" height="40" rx="8" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="536" y="233" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">awaiting_payment, version 4</text>
+  <line x1="410" y1="160" x2="510" y2="206" stroke="#7ee787" stroke-width="1.5"/>
+  <polygon points="503,206 514,208 507,198" fill="#7ee787"/>
+  <line x1="640" y1="296" x2="640" y2="252" stroke="#f78166" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="650" y="276" fill="#f78166" font-size="12" font-family="Inter, system-ui, sans-serif">version is 4, no match</text>
+  <text x="32" y="378" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">B rolls back: no second outbox event and no silent overwrite of A.</text>
+</svg>

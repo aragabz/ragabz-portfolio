@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Where each kind of test cuts orders-api</title>
+  <desc id="d">The call path runs from the HTTP router through middleware and handlers to the domain, then to Postgres and the payment provider. Domain tests cover only the domain. Handler tests with oneshot cover router, middleware and handlers with a lazy pool. sqlx::test covers handlers and SQL against a real database. The payment provider is always replaced by a fake or a mock.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Each test type starts somewhere and stops somewhere</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Fake what you do not own. Run what you do own for real.</text>
+  <rect x="32" y="96" width="120" height="56" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="92" y="129" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Router</text>
+  <rect x="172" y="96" width="120" height="56" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="232" y="129" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Middleware</text>
+  <rect x="312" y="96" width="120" height="56" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="372" y="129" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Handlers</text>
+  <rect x="452" y="96" width="120" height="56" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="512" y="129" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Domain</text>
+  <rect x="612" y="80" width="156" height="44" rx="10" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="690" y="107" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Postgres</text>
+  <rect x="612" y="132" width="156" height="44" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="690" y="159" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Payment provider</text>
+  <line x1="152" y1="124" x2="172" y2="124" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="292" y1="124" x2="312" y2="124" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="432" y1="124" x2="452" y2="124" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="572" y1="114" x2="612" y2="102" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="572" y1="134" x2="612" y2="154" stroke="#8b949e" stroke-width="1.5"/>
+  <rect x="452" y="200" width="120" height="30" rx="6" fill="#7ee787" fill-opacity="0.18" stroke="#7ee787" stroke-width="1.2"/>
+  <text x="32" y="220" fill="#7ee787" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Domain + proptest</text>
+  <text x="590" y="220" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">no I/O at all</text>
+  <rect x="32" y="250" width="540" height="30" rx="6" fill="#79c0ff" fill-opacity="0.15" stroke="#79c0ff" stroke-width="1.2"/>
+  <text x="44" y="270" fill="#79c0ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Handler tests via oneshot</text>
+  <text x="590" y="270" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">lazy pool, no socket</text>
+  <rect x="32" y="300" width="736" height="30" rx="6" fill="#ffa657" fill-opacity="0.15" stroke="#ffa657" stroke-width="1.2"/>
+  <text x="44" y="320" fill="#ffa657" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">sqlx::test, optionally through the router: real SQL, real constraints</text>
+  <rect x="612" y="350" width="156" height="30" rx="6" fill="#f78166" fill-opacity="0.15" stroke="#f78166" stroke-width="1.2"/>
+  <text x="32" y="370" fill="#f78166" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Always replaced: FakeGateway or MockPaymentGateway</text>
+  <text x="32" y="412" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Time and randomness are inputs too: pass Instant in, use tokio::time::pause for sleeps.</text>
+</svg>

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">A String on the stack and heap, before and after a move</title>
+  <desc id="d">Left: s1 is a stack value holding a pointer, a length of 5 and a capacity of 5, pointing at the heap bytes h e l l o. Right: after let s2 = s1, the three stack words are copied into s2, which now points at the same heap buffer, and s1 is marked as moved and unusable. No heap bytes are copied, and only s2 will free the buffer.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#79c0ff"/></marker>
+  </defs>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">A move copies the handle, not the data</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Three words on the stack point at a heap buffer. After the move there is still exactly one owner.</text>
+  <rect x="24" y="88" width="366" height="300" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <rect x="410" y="88" width="366" height="300" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="44" y="116" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">let s1 = String::from("hello");</text>
+  <text x="430" y="116" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">let s2 = s1;</text>
+  <text x="44" y="146" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Stack</text>
+  <text x="430" y="146" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Stack</text>
+  <text x="44" y="162" fill="#79c0ff" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">s1</text>
+  <rect x="44" y="170" width="140" height="28" rx="4" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="56" y="189" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ptr</text>
+  <rect x="44" y="200" width="140" height="28" rx="4" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="56" y="219" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">len</text>
+  <text x="172" y="219" fill="#e6edf3" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">5</text>
+  <rect x="44" y="230" width="140" height="28" rx="4" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="56" y="249" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">cap</text>
+  <text x="172" y="249" fill="#e6edf3" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">5</text>
+  <text x="430" y="162" fill="#7ee787" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">s2</text>
+  <rect x="430" y="170" width="140" height="28" rx="4" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="442" y="189" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ptr</text>
+  <rect x="430" y="200" width="140" height="28" rx="4" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="442" y="219" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">len</text>
+  <text x="558" y="219" fill="#e6edf3" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">5</text>
+  <rect x="430" y="230" width="140" height="28" rx="4" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="442" y="249" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">cap</text>
+  <text x="558" y="249" fill="#e6edf3" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">5</text>
+  <rect x="612" y="162" width="150" height="96" rx="6" fill="#161b22" stroke="#f78166" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="626" y="186" fill="#f78166" font-size="13" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">s1: moved</text>
+  <text x="626" y="208" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">bytes still there,</text>
+  <text x="626" y="226" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">but the compiler</text>
+  <text x="626" y="244" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">forbids any use</text>
+  <text x="44" y="290" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Heap</text>
+  <text x="430" y="290" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Heap</text>
+  <rect x="180" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="196" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">h</text>
+  <rect x="214" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="230" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">e</text>
+  <rect x="248" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="264" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">l</text>
+  <rect x="282" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="298" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">l</text>
+  <rect x="316" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="332" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">o</text>
+  <rect x="566" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="582" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">h</text>
+  <rect x="600" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="616" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">e</text>
+  <rect x="634" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="650" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">l</text>
+  <rect x="668" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="684" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">l</text>
+  <rect x="702" y="304" width="32" height="32" rx="4" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="718" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">o</text>
+  <path d="M 184 184 C 220 184, 230 250, 236 300" fill="none" stroke="#79c0ff" stroke-width="2" marker-end="url(#arr)"/>
+  <path d="M 570 184 C 588 200, 592 260, 596 300" fill="none" stroke="#79c0ff" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="44" y="370" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">s1 owns the buffer; it frees it at scope end</text>
+  <text x="430" y="370" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">s2 owns the same buffer; freed once</text>
+  <text x="32" y="418" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Copying the handle and keeping both usable would mean two frees (double free).</text>
+  <text x="32" y="440" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Copying the bytes on every assignment would hide allocations. Rust moves instead; .clone() is opt-in.</text>
+</svg>

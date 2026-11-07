@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 430" role="img" aria-labelledby="t d">
+  <title id="t">One blocking call stalls a runtime worker</title>
+  <desc id="d">Two timelines of a Tokio runtime with four worker threads. In the first, worker 2 runs a synchronous password hash for 300 milliseconds, so the tasks queued on it wait and their latency spikes. In the second, the hash runs on the separate blocking thread pool via spawn_blocking, and all four workers keep switching between short task slices.</desc>
+  <rect width="800" height="430" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Async is cooperative: a task that never awaits holds its worker hostage</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Illustrative timeline, 4 worker threads. Small blocks are task slices that run until their next .await.</text>
+  <text x="32" y="106" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Blocking call inside an async task</text>
+  <text x="32" y="138" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">worker 1</text>
+  <text x="32" y="164" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">worker 2</text>
+  <text x="32" y="190" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">worker 3</text>
+  <text x="32" y="216" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">worker 4</text>
+  <rect x="120" y="126" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="160" y="126" width="22" height="16" rx="3" fill="#79c0ff"/><rect x="192" y="126" width="34" height="16" rx="3" fill="#79c0ff"/><rect x="236" y="126" width="26" height="16" rx="3" fill="#79c0ff"/><rect x="272" y="126" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="312" y="126" width="24" height="16" rx="3" fill="#79c0ff"/><rect x="346" y="126" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="386" y="126" width="22" height="16" rx="3" fill="#79c0ff"/><rect x="418" y="126" width="30" height="16" rx="3" fill="#79c0ff"/>
+  <rect x="120" y="152" width="28" height="16" rx="3" fill="#79c0ff"/>
+  <rect x="156" y="152" width="300" height="16" rx="3" fill="#f78166"/>
+  <text x="166" y="165" fill="#0d1117" font-size="12" font-weight="600" font-family="Inter, system-ui, sans-serif">argon2 hash, 300 ms, no .await</text>
+  <rect x="120" y="178" width="26" height="16" rx="3" fill="#79c0ff"/><rect x="156" y="178" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="196" y="178" width="24" height="16" rx="3" fill="#79c0ff"/><rect x="230" y="178" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="270" y="178" width="26" height="16" rx="3" fill="#79c0ff"/><rect x="306" y="178" width="34" height="16" rx="3" fill="#79c0ff"/><rect x="350" y="178" width="24" height="16" rx="3" fill="#79c0ff"/><rect x="384" y="178" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="424" y="178" width="26" height="16" rx="3" fill="#79c0ff"/>
+  <rect x="120" y="204" width="34" height="16" rx="3" fill="#79c0ff"/><rect x="164" y="204" width="26" height="16" rx="3" fill="#79c0ff"/><rect x="200" y="204" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="240" y="204" width="22" height="16" rx="3" fill="#79c0ff"/><rect x="272" y="204" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="312" y="204" width="26" height="16" rx="3" fill="#79c0ff"/><rect x="348" y="204" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="388" y="204" width="24" height="16" rx="3" fill="#79c0ff"/><rect x="422" y="204" width="30" height="16" rx="3" fill="#79c0ff"/>
+  <text x="480" y="148" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">Tasks in worker 2's local queue wait</text>
+  <text x="480" y="168" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">until others steal them. Timers, I/O</text>
+  <text x="480" y="188" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">wakeups and p99 latency all suffer.</text>
+  <text x="480" y="208" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">On current_thread, everything stops.</text>
+  <text x="32" y="266" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Same work moved to spawn_blocking</text>
+  <text x="32" y="298" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">workers 1-4</text>
+  <rect x="120" y="286" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="160" y="286" width="22" height="16" rx="3" fill="#79c0ff"/><rect x="192" y="286" width="34" height="16" rx="3" fill="#79c0ff"/><rect x="236" y="286" width="26" height="16" rx="3" fill="#79c0ff"/><rect x="272" y="286" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="312" y="286" width="24" height="16" rx="3" fill="#79c0ff"/><rect x="346" y="286" width="30" height="16" rx="3" fill="#79c0ff"/><rect x="386" y="286" width="22" height="16" rx="3" fill="#79c0ff"/><rect x="418" y="286" width="30" height="16" rx="3" fill="#79c0ff"/>
+  <text x="480" y="299" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">All workers keep interleaving tasks</text>
+  <text x="32" y="338" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">blocking pool</text>
+  <rect x="156" y="326" width="300" height="16" rx="3" fill="#d2a8ff"/>
+  <text x="166" y="339" fill="#0d1117" font-size="12" font-weight="600" font-family="Inter, system-ui, sans-serif">argon2 hash on a dedicated thread</text>
+  <text x="480" y="339" fill="#d2a8ff" font-size="13" font-family="Inter, system-ui, sans-serif">The calling task just awaits the result</text>
+  <text x="32" y="388" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">let hash = spawn_blocking(move || argon2_hash(&amp;pw)).await?;</text>
+  <text x="32" y="412" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Rule of thumb: keep the time between two .await points short (Tokio maintainers suggest roughly 10-100 microseconds).</text>
+</svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="t d">
+  <title id="t">Multi-stage Docker build for orders-api with cargo-chef</title>
+  <desc id="d">The planner stage turns the workspace into a recipe of dependencies. The builder stage cooks only the dependencies from that recipe, which Docker caches as a layer until Cargo.lock changes, then compiles the application on top. The runtime stage copies just the release binary into a distroless image, so the shipped image contains no compiler, shell or source code.</desc>
+  <rect width="800" height="500" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Three stages, one cached layer that matters</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">A code-only change reuses the cooked dependency layer and recompiles just the orders-api crate.</text>
+  <rect x="32" y="96" width="232" height="220" rx="12" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="48" y="124" fill="#79c0ff" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">planner</text>
+  <text x="48" y="150" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">COPY . .</text>
+  <text x="48" y="172" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">cargo chef prepare</text>
+  <text x="48" y="204" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Reads Cargo.toml and</text>
+  <text x="48" y="222" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Cargo.lock, emits</text>
+  <rect x="48" y="244" width="140" height="32" rx="8" fill="#0d1117" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="62" y="265" fill="#79c0ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">recipe.json</text>
+  <rect x="284" y="96" width="232" height="220" rx="12" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="300" y="124" fill="#ffa657" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">builder</text>
+  <rect x="300" y="138" width="200" height="72" rx="8" fill="#0d1117" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="314" y="160" fill="#7ee787" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">cargo chef cook</text>
+  <text x="314" y="180" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">all dependencies</text>
+  <text x="314" y="198" fill="#7ee787" font-size="12" font-family="Inter, system-ui, sans-serif">cached until deps change</text>
+  <rect x="300" y="222" width="200" height="72" rx="8" fill="#0d1117" stroke="#f78166" stroke-width="1.5"/>
+  <text x="314" y="244" fill="#f78166" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">cargo build --release</text>
+  <text x="314" y="264" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">only orders-api code</text>
+  <text x="314" y="282" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">SQLX_OFFLINE=true</text>
+  <rect x="536" y="96" width="232" height="220" rx="12" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="552" y="124" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">runtime</text>
+  <text x="552" y="150" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">distroless/cc, nonroot</text>
+  <text x="552" y="182" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">+ /app/orders-api</text>
+  <text x="552" y="202" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">+ CA certs, glibc</text>
+  <text x="552" y="234" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">no shell, no cargo,</text>
+  <text x="552" y="254" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">no source, no curl</text>
+  <text x="552" y="290" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">tens of MB, not GB</text>
+  <line x1="190" y1="260" x2="296" y2="174" stroke="#79c0ff" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polygon points="300,171 288,172 294,181" fill="#79c0ff"/>
+  <line x1="500" y1="258" x2="526" y2="258" stroke="#f78166" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polygon points="536,258 525,252 525,264" fill="#f78166"/>
+  <text x="32" y="356" fill="#e6edf3" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">What each kind of change rebuilds</text>
+  <rect x="32" y="372" width="736" height="104" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="52" y="402" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Edit a handler in src/</text>
+  <text x="300" y="402" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">cook layer reused; recompile one crate</text>
+  <text x="52" y="428" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Bump a dependency in Cargo.lock</text>
+  <text x="300" y="428" fill="#ffa657" font-size="13" font-family="Inter, system-ui, sans-serif">recipe changes; cook and build again</text>
+  <text x="52" y="454" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Change the Rust toolchain image</text>
+  <text x="300" y="454" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">everything rebuilds; pin the base image tag</text>
+</svg>

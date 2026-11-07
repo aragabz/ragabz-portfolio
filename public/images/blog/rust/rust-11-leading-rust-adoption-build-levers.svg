@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Where Rust build time goes and which lever moves it</title>
+  <desc id="d">Five sources of build time with the lever for each: cold dependency compiles are fixed by CI caching and sccache; recompiling your own crates by splitting the workspace and using cargo check; linking by a faster linker; proc macros and build scripts by pruning features; test runs by cargo-nextest and fewer test binaries.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Build time is several problems, not one</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Measure first with cargo build --timings, then pull the lever that matches the bottleneck.</text>
+  <text x="48" y="102" fill="#8b949e" font-size="12" font-weight="600" font-family="Inter, system-ui, sans-serif">WHERE THE TIME GOES</text>
+  <text x="440" y="102" fill="#8b949e" font-size="12" font-weight="600" font-family="Inter, system-ui, sans-serif">LEVER</text>
+  <rect x="32" y="114" width="340" height="56" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="48" y="138" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Cold dependency compiles</text>
+  <text x="48" y="158" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">hundreds of crates on a fresh runner</text>
+  <line x1="372" y1="142" x2="420" y2="142" stroke="#30363d" stroke-width="2"/>
+  <rect x="424" y="114" width="344" height="56" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="440" y="138" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">CI cache of target/ and sccache</text>
+  <text x="440" y="158" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">key on Cargo.lock and toolchain</text>
+  <rect x="32" y="184" width="340" height="56" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="48" y="208" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Recompiling your own crates</text>
+  <text x="48" y="228" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">one huge crate rebuilds on every edit</text>
+  <line x1="372" y1="212" x2="420" y2="212" stroke="#30363d" stroke-width="2"/>
+  <rect x="424" y="184" width="344" height="56" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="440" y="208" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Split the workspace, cargo check</text>
+  <text x="440" y="228" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">stable leaf crates, thin binaries</text>
+  <rect x="32" y="254" width="340" height="56" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="48" y="278" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Linking</text>
+  <text x="48" y="298" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">paid on every test and binary</text>
+  <line x1="372" y1="282" x2="420" y2="282" stroke="#30363d" stroke-width="2"/>
+  <rect x="424" y="254" width="344" height="56" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="440" y="278" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Faster linker: lld or mold</text>
+  <text x="440" y="298" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">less debuginfo in dev and CI</text>
+  <rect x="32" y="324" width="340" height="56" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="48" y="348" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Proc macros and build scripts</text>
+  <text x="48" y="368" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">serialized early in the build graph</text>
+  <line x1="372" y1="352" x2="420" y2="352" stroke="#30363d" stroke-width="2"/>
+  <rect x="424" y="324" width="344" height="56" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="440" y="348" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Prune features and heavy deps</text>
+  <text x="440" y="368" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">default-features = false by policy</text>
+  <rect x="32" y="394" width="340" height="56" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="48" y="418" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Running the tests</text>
+  <text x="48" y="438" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">many test binaries, run serially</text>
+  <line x1="372" y1="422" x2="420" y2="422" stroke="#30363d" stroke-width="2"/>
+  <rect x="424" y="394" width="344" height="56" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="440" y="418" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">cargo-nextest, fewer test binaries</text>
+  <text x="440" y="438" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">one tests/ crate per package</text>
+</svg>

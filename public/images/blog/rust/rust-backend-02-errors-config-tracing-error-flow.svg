@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">Every failure flows through AppError into one response format</title>
+  <desc id="d">Four sources of failure on the left: extractor rejections, validation, domain rules and infrastructure errors. All convert into the AppError enum in the middle. One IntoResponse implementation produces problem+json: client errors get a 4xx with a detail message, internal errors get a 500 with no detail while the full error chain goes to the logs.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Many failure sources, one error type, one format</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Conversions happen through From and the ? operator; the mapping to HTTP lives in one place.</text>
+  <rect x="24" y="92" width="210" height="62" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="40" y="116" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Extractor rejections</text>
+  <text x="40" y="138" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">JsonRejection, PathRejection</text>
+  <rect x="24" y="170" width="210" height="62" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="40" y="194" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Validation</text>
+  <text x="40" y="216" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">ValidatedJson, FieldError list</text>
+  <rect x="24" y="248" width="210" height="62" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="40" y="272" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Domain rules</text>
+  <text x="40" y="294" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">TransitionError</text>
+  <rect x="24" y="326" width="210" height="62" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="40" y="350" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Infrastructure</text>
+  <text x="40" y="372" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">anyhow::Error, later sqlx</text>
+  <line x1="234" y1="123" x2="290" y2="210" stroke="#d2a8ff" stroke-width="1.5"/>
+  <line x1="234" y1="201" x2="290" y2="230" stroke="#79c0ff" stroke-width="1.5"/>
+  <line x1="234" y1="279" x2="290" y2="250" stroke="#7ee787" stroke-width="1.5"/>
+  <line x1="234" y1="357" x2="290" y2="270" stroke="#f78166" stroke-width="1.5"/>
+  <rect x="290" y="150" width="200" height="180" rx="12" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="306" y="176" fill="#ffa657" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">enum AppError</text>
+  <text x="306" y="204" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">NotFound</text>
+  <text x="306" y="226" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Validation</text>
+  <text x="306" y="248" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">BadRequest</text>
+  <text x="306" y="270" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Conflict</text>
+  <text x="306" y="292" fill="#f78166" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Internal</text>
+  <text x="306" y="316" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">impl IntoResponse</text>
+  <line x1="490" y1="210" x2="540" y2="150" stroke="#7ee787" stroke-width="1.5"/>
+  <polygon points="534,148 544,146 541,156" fill="#7ee787"/>
+  <line x1="490" y1="290" x2="540" y2="262" stroke="#f78166" stroke-width="1.5"/>
+  <polygon points="533,259 544,259 538,268" fill="#f78166"/>
+  <line x1="490" y1="300" x2="540" y2="360" stroke="#f78166" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polygon points="533,358 544,366 542,355" fill="#f78166"/>
+  <rect x="546" y="100" width="230" height="96" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="562" y="124" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">400 / 404 / 409 / 415 / 422</text>
+  <text x="562" y="146" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">application/problem+json</text>
+  <text x="562" y="166" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">type, title, status, detail</text>
+  <text x="562" y="184" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">plus errors for validation</text>
+  <rect x="546" y="218" width="230" height="78" rx="10" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="562" y="242" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">500 Internal Server Error</text>
+  <text x="562" y="264" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">type about:blank</text>
+  <text x="562" y="284" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">no detail for the client</text>
+  <rect x="546" y="318" width="230" height="70" rx="10" fill="#0d1117" stroke="#f78166" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="562" y="342" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">error log, once</text>
+  <text x="562" y="364" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">full chain plus request_id</text>
+  <text x="32" y="430" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Client-facing text comes only from your own variants. Third-party messages go to logs, never to responses.</text>
+</svg>

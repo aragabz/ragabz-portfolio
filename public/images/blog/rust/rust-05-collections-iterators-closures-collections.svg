@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">How the main std collections are laid out in memory</title>
+  <desc id="d">Vec is a pointer, length and capacity to one contiguous heap buffer, the default choice. VecDeque is a ring buffer with head and tail wrapping around, for queues. HashMap is an array of buckets indexed by hash, for point lookups. BTreeMap is a tree of sorted nodes holding several keys each, for ordered keys and range queries.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Four collections, four memory shapes</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">The layout explains the performance. Contiguous memory is the fastest thing a CPU can scan.</text>
+  <text x="32" y="108" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Vec&lt;T&gt;</text>
+  <text x="32" y="128" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">default choice</text>
+  <rect x="170" y="94" width="150" height="34" rx="6" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="182" y="116" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ptr | len 4 | cap 6</text>
+  <line x1="320" y1="111" x2="366" y2="111" stroke="#7ee787" stroke-width="1.5"/>
+  <polygon points="368,111 358,106 358,116" fill="#7ee787"/>
+  <rect x="370" y="94" width="50" height="34" fill="#7ee787" fill-opacity="0.35" stroke="#7ee787"/>
+  <rect x="420" y="94" width="50" height="34" fill="#7ee787" fill-opacity="0.35" stroke="#7ee787"/>
+  <rect x="470" y="94" width="50" height="34" fill="#7ee787" fill-opacity="0.35" stroke="#7ee787"/>
+  <rect x="520" y="94" width="50" height="34" fill="#7ee787" fill-opacity="0.35" stroke="#7ee787"/>
+  <rect x="570" y="94" width="50" height="34" fill="#161b22" stroke="#30363d"/>
+  <rect x="620" y="94" width="50" height="34" fill="#161b22" stroke="#30363d"/>
+  <text x="682" y="116" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">spare cap</text>
+  <text x="32" y="198" fill="#79c0ff" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">VecDeque&lt;T&gt;</text>
+  <text x="32" y="218" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">queues, windows</text>
+  <rect x="170" y="184" width="50" height="34" fill="#79c0ff" fill-opacity="0.35" stroke="#79c0ff"/>
+  <rect x="220" y="184" width="50" height="34" fill="#79c0ff" fill-opacity="0.35" stroke="#79c0ff"/>
+  <rect x="270" y="184" width="50" height="34" fill="#161b22" stroke="#30363d"/>
+  <rect x="320" y="184" width="50" height="34" fill="#161b22" stroke="#30363d"/>
+  <rect x="370" y="184" width="50" height="34" fill="#79c0ff" fill-opacity="0.35" stroke="#79c0ff"/>
+  <rect x="420" y="184" width="50" height="34" fill="#79c0ff" fill-opacity="0.35" stroke="#79c0ff"/>
+  <text x="378" y="240" fill="#79c0ff" font-size="13" font-family="Inter, system-ui, sans-serif">head</text>
+  <text x="228" y="240" fill="#79c0ff" font-size="13" font-family="Inter, system-ui, sans-serif">tail</text>
+  <text x="490" y="206" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">ring buffer: O(1) push/pop at both ends</text>
+  <text x="32" y="298" fill="#ffa657" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">HashMap&lt;K, V&gt;</text>
+  <text x="32" y="318" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">point lookups</text>
+  <text x="170" y="290" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">hash("ana") % n</text>
+  <line x1="290" y1="296" x2="316" y2="314" stroke="#ffa657" stroke-width="1.5"/>
+  <rect x="170" y="318" width="40" height="30" fill="#161b22" stroke="#30363d"/>
+  <rect x="210" y="318" width="40" height="30" fill="#ffa657" fill-opacity="0.35" stroke="#ffa657"/>
+  <rect x="250" y="318" width="40" height="30" fill="#161b22" stroke="#30363d"/>
+  <rect x="290" y="318" width="40" height="30" fill="#ffa657" fill-opacity="0.6" stroke="#ffa657"/>
+  <rect x="330" y="318" width="40" height="30" fill="#161b22" stroke="#30363d"/>
+  <rect x="370" y="318" width="40" height="30" fill="#ffa657" fill-opacity="0.35" stroke="#ffa657"/>
+  <rect x="410" y="318" width="40" height="30" fill="#161b22" stroke="#30363d"/>
+  <text x="490" y="330" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">average O(1), unordered,</text>
+  <text x="490" y="348" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">iteration order is random</text>
+  <text x="32" y="398" fill="#d2a8ff" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">BTreeMap&lt;K, V&gt;</text>
+  <text x="32" y="418" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">sorted, ranges</text>
+  <rect x="250" y="378" width="120" height="28" rx="6" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="270" y="397" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">300 | 404</text>
+  <line x1="270" y1="406" x2="215" y2="420" stroke="#d2a8ff" stroke-width="1.5"/>
+  <line x1="310" y1="406" x2="310" y2="420" stroke="#d2a8ff" stroke-width="1.5"/>
+  <line x1="350" y1="406" x2="405" y2="420" stroke="#d2a8ff" stroke-width="1.5"/>
+  <rect x="170" y="420" width="90" height="26" rx="6" fill="#161b22" stroke="#d2a8ff"/>
+  <text x="182" y="438" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">200 201</text>
+  <rect x="270" y="420" width="80" height="26" rx="6" fill="#161b22" stroke="#d2a8ff"/>
+  <text x="282" y="438" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">302</text>
+  <rect x="360" y="420" width="90" height="26" rx="6" fill="#161b22" stroke="#d2a8ff"/>
+  <text x="372" y="438" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">500 503</text>
+  <text x="490" y="412" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">O(log n), keys in order,</text>
+  <text x="490" y="430" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">many keys per node</text>
+</svg>

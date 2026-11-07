@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Send and Sync: four quadrants of thread safety</title>
+  <desc id="d">A two by two grid. Send means a value can be moved to another thread; Sync means a shared reference can be used from another thread. Most types are both, like i32, String, Arc and Mutex. Cell and RefCell are Send but not Sync. MutexGuard is Sync but not Send. Rc and raw pointers are neither.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Send and Sync, the two marker traits behind fearless concurrency</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Send: ownership may move to another thread. Sync: &amp;T may be shared (T: Sync iff &amp;T: Send).</text>
+  <text x="290" y="104" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif" text-anchor="middle">Sync</text>
+  <text x="590" y="104" fill="#f78166" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif" text-anchor="middle">not Sync</text>
+  <text x="70" y="200" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif" text-anchor="middle">Send</text>
+  <text x="70" y="350" fill="#f78166" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif" text-anchor="middle">not Send</text>
+  <rect x="140" y="118" width="300" height="150" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="160" y="146" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Send + Sync (the common case)</text>
+  <text x="160" y="176" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">i32, String, Vec&lt;T&gt;</text>
+  <text x="160" y="198" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Arc&lt;T&gt;, Mutex&lt;T&gt;, RwLock&lt;T&gt;</text>
+  <text x="160" y="220" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">AtomicU64, &amp;str</text>
+  <text x="160" y="250" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Move it or share it; both are fine.</text>
+  <rect x="460" y="118" width="300" height="150" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="480" y="146" fill="#79c0ff" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Send, not Sync</text>
+  <text x="480" y="176" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Cell&lt;T&gt;, RefCell&lt;T&gt;</text>
+  <text x="480" y="198" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">mpsc::Receiver&lt;T&gt;</text>
+  <text x="480" y="228" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Unsynchronized interior mutability:</text>
+  <text x="480" y="248" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">one owner thread at a time, never shared.</text>
+  <rect x="140" y="282" width="300" height="150" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="160" y="310" fill="#d2a8ff" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Sync, not Send</text>
+  <text x="160" y="340" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">MutexGuard&lt;'_, T&gt;</text>
+  <text x="160" y="370" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Some OS lock APIs require the thread</text>
+  <text x="160" y="390" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">that locked to be the one that unlocks.</text>
+  <text x="160" y="414" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Why guards can't cross .await in spawn.</text>
+  <rect x="460" y="282" width="300" height="150" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="480" y="310" fill="#f78166" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Neither</text>
+  <text x="480" y="340" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Rc&lt;T&gt;, *const T, *mut T</text>
+  <text x="480" y="370" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Rc's refcount is a plain integer: two</text>
+  <text x="480" y="390" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">threads cloning at once would race on it.</text>
+  <text x="480" y="414" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Use Arc, which pays for atomic counts.</text>
+  <text x="32" y="456" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Auto traits: a struct is Send/Sync when all its fields are. thread::spawn needs F: Send + 'static.</text>
+</svg>

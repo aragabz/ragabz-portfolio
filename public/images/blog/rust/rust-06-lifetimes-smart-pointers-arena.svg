@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="t d">
+  <title id="t">Rc RefCell graph versus an arena with indices</title>
+  <desc id="d">Left: each node is a separate heap allocation wrapped in Rc and RefCell, linked by pointers, with borrow checks at runtime that can panic. Right: all nodes live contiguously in one Vec owned by the Tree, and refer to each other by NodeId index. Mutation goes through ampersand mut self and is checked at compile time; cycles are only numbers.</desc>
+  <rect width="800" height="420" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Same tree, two ownership models</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Pointers between scattered nodes, or one owner and plain indices.</text>
+  <rect x="32" y="90" width="360" height="300" rx="12" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="52" y="118" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Rc&lt;RefCell&lt;Node&gt;&gt;</text>
+  <rect x="60" y="140" width="96" height="40" rx="8" fill="#0d1117" stroke="#f78166"/>
+  <text x="76" y="165" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">root</text>
+  <rect x="226" y="176" width="96" height="40" rx="8" fill="#0d1117" stroke="#f78166"/>
+  <text x="242" y="201" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">src</text>
+  <rect x="100" y="236" width="110" height="40" rx="8" fill="#0d1117" stroke="#f78166"/>
+  <text x="116" y="261" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">main.rs</text>
+  <line x1="156" y1="164" x2="224" y2="190" stroke="#7ee787" stroke-width="2"/>
+  <line x1="240" y1="216" x2="200" y2="236" stroke="#7ee787" stroke-width="2"/>
+  <line x1="226" y1="182" x2="158" y2="172" stroke="#79c0ff" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="52" y="310" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">one allocation per node</text>
+  <text x="52" y="332" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">borrow checks at runtime (panic)</text>
+  <text x="52" y="354" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">cycles leak unless back edge is Weak</text>
+  <text x="52" y="376" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">not Send: needs Arc + Mutex</text>
+  <rect x="408" y="90" width="360" height="300" rx="12" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="428" y="118" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Tree { nodes: Vec&lt;ArenaNode&gt; }</text>
+  <rect x="428" y="140" width="106" height="64" fill="#0d1117" stroke="#7ee787"/>
+  <rect x="534" y="140" width="106" height="64" fill="#0d1117" stroke="#7ee787"/>
+  <rect x="640" y="140" width="106" height="64" fill="#0d1117" stroke="#7ee787"/>
+  <text x="440" y="160" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">[0] root</text>
+  <text x="440" y="180" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">kids [1]</text>
+  <text x="440" y="198" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">up None</text>
+  <text x="546" y="160" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">[1] src</text>
+  <text x="546" y="180" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">kids [2]</text>
+  <text x="546" y="198" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">up 0</text>
+  <text x="652" y="160" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">[2] main</text>
+  <text x="652" y="180" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">kids []</text>
+  <text x="652" y="198" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">up 1</text>
+  <text x="428" y="236" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">contiguous, one owner, ids are plain numbers</text>
+  <text x="428" y="310" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">one growable buffer</text>
+  <text x="428" y="332" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">&amp;mut self, checked at compile time</text>
+  <text x="428" y="354" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">cycles are harmless indices</text>
+  <text x="428" y="376" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">stale ids: use slotmap generations</text>
+</svg>

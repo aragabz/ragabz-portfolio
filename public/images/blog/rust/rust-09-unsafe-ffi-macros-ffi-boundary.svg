@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 452" role="img" aria-labelledby="t d">
+  <title id="t">Ownership across the Rust and C boundary</title>
+  <desc id="d">Rust allocates a Tokenizer with Box::into_raw and hands an opaque pointer to C. C may only pass the pointer back to Rust functions. C must call tokenizer_free exactly once, which turns the pointer back into a Box and drops it. Freeing with C free, using after free or freeing twice is undefined behavior. A panic must never unwind into C; catch it at the boundary and return an error code.</desc>
+  <rect width="800" height="452" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Whoever allocates, frees: an opaque handle across FFI</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">The C side never sees inside the struct. It holds a pointer and gives it back.</text>
+  <rect x="32" y="92" width="330" height="236" rx="12" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="52" y="122" fill="#ffa657" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Rust side (owns the memory)</text>
+  <text x="52" y="156" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">tokenizer_new()</text>
+  <text x="52" y="174" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Box::new, then Box::into_raw</text>
+  <text x="52" y="212" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">tokenizer_count(ptr)</text>
+  <text x="52" y="230" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">ptr.as_ref(): null check, borrow</text>
+  <text x="52" y="268" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">tokenizer_free(ptr)</text>
+  <text x="52" y="286" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Box::from_raw, then drop, once</text>
+  <rect x="438" y="92" width="330" height="236" rx="12" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="458" y="122" fill="#79c0ff" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">C side (holds a handle)</text>
+  <text x="458" y="156" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Tokenizer *t = tokenizer_new(s);</text>
+  <text x="458" y="212" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">size_t n = tokenizer_count(t);</text>
+  <text x="458" y="268" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">tokenizer_free(t);</text>
+  <text x="458" y="304" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Struct is opaque: declared, never defined</text>
+  <line x1="362" y1="152" x2="436" y2="152" stroke="#7ee787" stroke-width="2"/>
+  <polygon points="436,147 446,152 436,157" fill="#7ee787"/>
+  <line x1="438" y1="208" x2="372" y2="208" stroke="#7ee787" stroke-width="2"/>
+  <polygon points="372,203 362,208 372,213" fill="#7ee787"/>
+  <line x1="438" y1="264" x2="372" y2="264" stroke="#7ee787" stroke-width="2"/>
+  <polygon points="372,259 362,264 372,269" fill="#7ee787"/>
+  <rect x="32" y="348" width="736" height="84" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="52" y="376" fill="#f78166" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Undefined behavior</text>
+  <text x="52" y="400" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">free(t) from C (wrong allocator), use after tokenizer_free, double free,</text>
+  <text x="52" y="420" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">or a Rust panic unwinding out of an extern "C" fn (since Rust 1.81 that aborts instead).</text>
+</svg>

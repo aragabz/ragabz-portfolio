@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" role="img" aria-labelledby="t d">
+  <title id="t">The orders-api middleware onion</title>
+  <desc id="d">Nested layers from outermost to innermost: server timing, CORS, per-IP rate limit, compression, timeout, the router, the request body limit, then for protected routes require_auth and the per-user rate limit around the handler. Requests travel inward, responses travel back outward through the same layers.</desc>
+  <rect width="800" height="560" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Request in, response out, through every layer</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Outer layers see everything, including rejections produced by inner layers.</text>
+  <rect x="32" y="88" width="560" height="448" rx="14" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="48" y="112" fill="#d2a8ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">ServerTimingLayer (hand-written Service)</text>
+  <rect x="52" y="124" width="520" height="400" rx="12" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="68" y="148" fill="#79c0ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">CorsLayer: preflight answered here</text>
+  <rect x="72" y="160" width="480" height="352" rx="12" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="88" y="184" fill="#f78166" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">per-IP rate limit (from_fn): 429</text>
+  <rect x="92" y="196" width="440" height="304" rx="12" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="108" y="220" fill="#7ee787" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">CompressionLayer</text>
+  <rect x="112" y="232" width="400" height="256" rx="12" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="128" y="256" fill="#ffa657" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">TimeoutLayer: 503 after 10 s</text>
+  <rect x="132" y="268" width="360" height="208" rx="12" fill="#0d1117" stroke="#8b949e" stroke-width="1.2"/>
+  <text x="148" y="292" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Router: no match gives 404</text>
+  <rect x="152" y="304" width="320" height="160" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.2"/>
+  <text x="168" y="328" fill="#79c0ff" font-size="13" font-family="Inter, system-ui, sans-serif">RequestBodyLimitLayer: 413</text>
+  <rect x="172" y="340" width="280" height="112" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.2"/>
+  <text x="188" y="364" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">require_auth (route_layer): 401</text>
+  <rect x="192" y="376" width="240" height="64" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.2"/>
+  <text x="208" y="400" fill="#d2a8ff" font-size="13" font-family="Inter, system-ui, sans-serif">per-user limit: 429</text>
+  <text x="208" y="424" fill="#e6edf3" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">handler: 403 or 404</text>
+  <text x="612" y="120" fill="#e6edf3" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Reading the code</text>
+  <text x="612" y="146" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">ServiceBuilder:</text>
+  <text x="612" y="166" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">first listed = outermost</text>
+  <text x="612" y="198" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Chained .layer calls:</text>
+  <text x="612" y="218" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">last call = outermost</text>
+  <line x1="612" y1="260" x2="612" y2="420" stroke="#79c0ff" stroke-width="2"/>
+  <polygon points="606,414 618,414 612,428" fill="#79c0ff"/>
+  <text x="624" y="300" fill="#79c0ff" font-size="13" font-family="Inter, system-ui, sans-serif">request</text>
+  <text x="624" y="318" fill="#79c0ff" font-size="13" font-family="Inter, system-ui, sans-serif">goes inward</text>
+  <line x1="740" y1="428" x2="740" y2="268" stroke="#7ee787" stroke-width="2"/>
+  <polygon points="734,274 746,274 740,260" fill="#7ee787"/>
+  <text x="728" y="380" text-anchor="end" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">response</text>
+  <text x="728" y="398" text-anchor="end" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">goes out</text>
+  <text x="612" y="470" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">CORS sits outside the</text>
+  <text x="612" y="490" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">limiter so a 429 still</text>
+  <text x="612" y="510" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">reaches browser code.</text>
+</svg>

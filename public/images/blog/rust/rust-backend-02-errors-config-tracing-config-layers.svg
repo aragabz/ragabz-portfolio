@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="t d">
+  <title id="t">Layered configuration merging into a typed Config</title>
+  <desc id="d">Three layers stacked by precedence: base.toml at the bottom with defaults, production.toml above it overriding the log format, and ORDERS_ environment variables on top overriding the port and the database URL. The merged values are deserialized once at startup into a typed Config struct, where the database URL is a SecretString that prints as REDACTED.</desc>
+  <rect width="800" height="420" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Configuration layers: later wins</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">figment merges providers in order, then serde deserializes the result once at startup.</text>
+  <text x="32" y="100" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">highest precedence</text>
+  <rect x="24" y="110" width="420" height="76" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="40" y="134" fill="#7ee787" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">Environment variables (ORDERS_ prefix)</text>
+  <text x="40" y="156" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ORDERS_HTTP__PORT=8080</text>
+  <text x="40" y="174" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ORDERS_DATABASE__URL=postgres://...</text>
+  <rect x="24" y="198" width="420" height="76" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="40" y="222" fill="#79c0ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">config/production.toml (APP_ENV)</text>
+  <text x="40" y="244" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">environment = "production"</text>
+  <text x="40" y="262" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">log.format = "json"</text>
+  <rect x="24" y="286" width="420" height="76" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="40" y="310" fill="#d2a8ff" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">config/base.toml (checked in)</text>
+  <text x="40" y="332" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">http.port = 3000, log.format = "pretty"</text>
+  <text x="40" y="350" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">database.url = local dev only</text>
+  <text x="32" y="384" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">lowest precedence</text>
+  <line x1="452" y1="236" x2="500" y2="236" stroke="#ffa657" stroke-width="2"/>
+  <polygon points="500,230 512,236 500,242" fill="#ffa657"/>
+  <text x="456" y="226" fill="#ffa657" font-size="12" font-family="Inter, system-ui, sans-serif">extract</text>
+  <rect x="518" y="110" width="258" height="252" rx="12" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="534" y="136" fill="#ffa657" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Config (typed)</text>
+  <text x="534" y="164" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">environment: Production</text>
+  <text x="534" y="186" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">http.port: 8080</text>
+  <text x="534" y="208" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">log.format: Json</text>
+  <text x="534" y="230" fill="#e6edf3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">database.url:</text>
+  <text x="550" y="250" fill="#f78166" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">SecretString</text>
+  <text x="550" y="270" fill="#f78166" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Debug: [REDACTED]</text>
+  <text x="534" y="300" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Invalid values fail at startup,</text>
+  <text x="534" y="318" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">not on the first request.</text>
+  <text x="534" y="344" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">Shared as Arc in AppState.</text>
+  <text x="32" y="406" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Real secrets arrive through the environment or a secret store, never through a committed file.</text>
+</svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380" role="img" aria-labelledby="t d">
+  <title id="t">Layout of a dyn Shape fat pointer</title>
+  <desc id="d">A Box of dyn Shape is two words. The data pointer points to a Circle value on the heap. The vtable pointer points to a static table generated for Circle as Shape, holding drop_in_place, size, align, and pointers to area, name and describe. Calling area loads the vtable slot and makes an indirect call.</desc>
+  <rect width="800" height="380" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Box&lt;dyn Shape&gt; is a fat pointer: data + vtable</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Two machine words on the stack. One vtable per (concrete type, trait) pair, stored in the binary.</text>
+  <text x="32" y="108" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">stack</text>
+  <rect x="32" y="118" width="220" height="44" rx="8" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="48" y="145" fill="#79c0ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">data ptr</text>
+  <rect x="32" y="162" width="220" height="44" rx="8" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="48" y="189" fill="#d2a8ff" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">vtable ptr</text>
+  <text x="330" y="108" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">heap</text>
+  <rect x="330" y="118" width="200" height="56" rx="8" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+  <text x="346" y="142" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Circle</text>
+  <text x="346" y="162" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">radius: 2.0</text>
+  <line x1="252" y1="140" x2="328" y2="140" stroke="#79c0ff" stroke-width="2"/>
+  <polygon points="328,140 318,135 318,145" fill="#79c0ff"/>
+  <text x="560" y="108" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">vtable: Circle as Shape</text>
+  <rect x="560" y="118" width="208" height="36" rx="0" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="574" y="141" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">drop_in_place</text>
+  <rect x="560" y="154" width="208" height="36" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="574" y="177" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">size = 8</text>
+  <rect x="560" y="190" width="208" height="36" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="574" y="213" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">align = 8</text>
+  <rect x="560" y="226" width="208" height="36" fill="#161b22" stroke="#ffa657" stroke-width="2"/>
+  <text x="574" y="249" fill="#ffa657" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">area -&gt; Circle::area</text>
+  <rect x="560" y="262" width="208" height="36" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="574" y="285" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">name</text>
+  <rect x="560" y="298" width="208" height="36" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="574" y="321" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">describe</text>
+  <path d="M252 184 L300 184 L300 230 L540 230 L540 136 L558 136" fill="none" stroke="#d2a8ff" stroke-width="2"/>
+  <polygon points="558,136 548,131 548,141" fill="#d2a8ff"/>
+  <text x="32" y="262" fill="#ffa657" font-size="13" font-weight="600" font-family="Inter, system-ui, sans-serif">shape.area() at runtime</text>
+  <text x="32" y="286" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">1. load vtable ptr</text>
+  <text x="32" y="306" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">2. load the area slot</text>
+  <text x="32" y="326" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">3. indirect call with data ptr as self</text>
+  <text x="32" y="356" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Cheap per call, but the optimizer cannot inline through it.</text>
+</svg>

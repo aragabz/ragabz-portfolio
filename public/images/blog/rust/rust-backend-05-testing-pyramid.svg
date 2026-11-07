@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">The orders-api test pyramid</title>
+  <desc id="d">Four layers. Base: many domain unit and property tests that run in microseconds. Above: handler tests through the real router with oneshot, in milliseconds without a network. Above: sqlx::test database tests, one fresh Postgres database per test. Top: a few container-based end-to-end tests that take seconds.</desc>
+  <rect width="800" height="480" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Cheap tests at the bottom, few expensive ones at the top</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Counts and timings are illustrative for a service the size of orders-api.</text>
+  <polygon points="250,96 310,96 340,170 220,170" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="280" y="140" fill="#d2a8ff" font-size="13" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">e2e</text>
+  <polygon points="215,182 345,182 380,262 180,262" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="280" y="228" fill="#ffa657" font-size="13" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">sqlx::test</text>
+  <polygon points="175,274 385,274 420,354 140,354" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="280" y="320" fill="#79c0ff" font-size="13" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">handler tests (oneshot)</text>
+  <polygon points="135,366 425,366 460,446 100,446" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="280" y="412" fill="#7ee787" font-size="13" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">domain unit + property tests</text>
+  <text x="480" y="124" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">testcontainers, real wiring</text>
+  <text x="480" y="144" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">~3 tests, seconds each</text>
+  <text x="480" y="214" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">SQL, constraints, auth queries</text>
+  <text x="480" y="234" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">~20 tests, fresh DB per test</text>
+  <text x="480" y="306" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">status codes, auth, layer order</text>
+  <text x="480" y="326" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">~40 tests, ms each, no network</text>
+  <text x="480" y="398" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">business rules, money, states</text>
+  <text x="480" y="418" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">hundreds of cases, microseconds</text>
+  <line x1="60" y1="440" x2="60" y2="110" stroke="#8b949e" stroke-width="1.5"/>
+  <polygon points="54,116 66,116 60,102" fill="#8b949e"/>
+  <text x="48" y="470" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">more realism, more cost, slower feedback going up</text>
+</svg>

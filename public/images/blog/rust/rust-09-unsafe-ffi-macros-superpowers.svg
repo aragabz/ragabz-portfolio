@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">What an unsafe block unlocks and what it leaves switched on</title>
+  <desc id="d">Left column: the five operations unsafe permits, namely dereferencing raw pointers, calling unsafe functions, accessing mutable statics, implementing unsafe traits and reading union fields. Right column: checks that stay on inside unsafe, namely the borrow checker on references, type checking, lifetimes, bounds checks on indexing and overflow checks in debug builds. Bottom: unsafe moves the proof obligation from the compiler to the programmer.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">unsafe { ... } is a narrow key, not an off switch</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">It unlocks five operations. Everything else the compiler checks stays checked.</text>
+  <rect x="32" y="92" width="356" height="276" rx="12" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+  <text x="52" y="122" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Unlocked: you must prove it is OK</text>
+  <text x="52" y="158" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">1. Dereference a raw pointer</text>
+  <text x="52" y="194" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">2. Call an unsafe fn (including C via FFI)</text>
+  <text x="52" y="230" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">3. Read or write a static mut</text>
+  <text x="52" y="266" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">4. Implement an unsafe trait (Send, Sync)</text>
+  <text x="52" y="302" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">5. Read a field of a union</text>
+  <text x="52" y="344" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Each one has preconditions the compiler</text>
+  <text x="52" y="362" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">cannot verify. You write them as SAFETY notes.</text>
+  <rect x="412" y="92" width="356" height="276" rx="12" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+  <text x="432" y="122" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Still enforced inside unsafe</text>
+  <text x="432" y="158" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Borrow rules on references (&amp;T, &amp;mut T)</text>
+  <text x="432" y="194" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Type checking and trait bounds</text>
+  <text x="432" y="230" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Lifetimes of references</text>
+  <text x="432" y="266" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Bounds checks on v[i]</text>
+  <text x="432" y="302" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Overflow checks (debug builds)</text>
+  <text x="432" y="344" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Raw pointers escape these checks,</text>
+  <text x="432" y="362" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">which is why only their deref is unsafe.</text>
+  <rect x="32" y="392" width="736" height="44" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text x="52" y="419" fill="#d2a8ff" font-size="13" font-family="Inter, system-ui, sans-serif">Sound = no safe caller can cause UB, whatever it passes. That is the bar for a safe wrapper.</text>
+</svg>

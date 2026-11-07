@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">Many readers or one writer, checked over time</title>
+  <desc id="d">Three timelines of borrows on a vector v. First: two shared references overlap, which is allowed. Second: a shared reference is still used after v.push needs a mutable borrow, so the borrows overlap and the compiler reports E0502. Third: the shared reference is last used before the push, so under non-lexical lifetimes its borrow has already ended and the code compiles.</desc>
+  <rect width="800" height="480" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Many readers or one writer, never both at once</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Each bar is a borrow, from creation to last use. Time runs left to right through the function.</text>
+  <line x1="290" y1="462" x2="720" y2="462" stroke="#30363d" stroke-width="2"/>
+  <text x="732" y="466" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">time</text>
+  <rect x="24" y="96" width="752" height="104" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="40" y="126" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Allowed</text>
+  <text x="40" y="148" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">two shared borrows overlap</text>
+  <rect x="24" y="216" width="752" height="104" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="40" y="246" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Error E0502</text>
+  <text x="40" y="268" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">shared borrow still live at push</text>
+  <rect x="24" y="336" width="752" height="104" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="40" y="366" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Allowed (NLL)</text>
+  <text x="40" y="388" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">shared borrow ended before push</text>
+  <rect x="290" y="112" width="290" height="20" rx="10" fill="#79c0ff" fill-opacity="0.22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="302" y="127" fill="#79c0ff" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">r1 = &amp;v</text>
+  <rect x="380" y="150" width="340" height="20" rx="10" fill="#79c0ff" fill-opacity="0.22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="392" y="165" fill="#79c0ff" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">r2 = &amp;v</text>
+  <rect x="470" y="226" width="70" height="80" fill="#f78166" fill-opacity="0.12"/>
+  <rect x="290" y="232" width="350" height="20" rx="10" fill="#79c0ff" fill-opacity="0.22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="302" y="247" fill="#79c0ff" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">first = &amp;v[0]</text>
+  <circle cx="640" cy="242" r="5" fill="#79c0ff"/>
+  <text x="650" y="247" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">last use</text>
+  <rect x="470" y="270" width="70" height="20" rx="10" fill="#f78166" fill-opacity="0.22" stroke="#f78166" stroke-width="1.5"/>
+  <text x="482" y="285" fill="#f78166" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">&amp;mut v</text>
+  <text x="550" y="285" fill="#f78166" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">v.push(40)</text>
+  <rect x="290" y="352" width="130" height="20" rx="10" fill="#79c0ff" fill-opacity="0.22" stroke="#79c0ff" stroke-width="1.5"/>
+  <text x="302" y="367" fill="#79c0ff" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">first = &amp;v[0]</text>
+  <circle cx="420" cy="362" r="5" fill="#79c0ff"/>
+  <text x="430" y="367" fill="#8b949e" font-size="12" font-family="Inter, system-ui, sans-serif">last use</text>
+  <rect x="470" y="390" width="70" height="20" rx="10" fill="#7ee787" fill-opacity="0.22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="482" y="405" fill="#7ee787" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">&amp;mut v</text>
+  <text x="550" y="405" fill="#7ee787" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">v.push(40)</text>
+</svg>

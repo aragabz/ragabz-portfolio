@@ -1,0 +1,811 @@
+---
+title: "Rust Backend, Part 8: Shipping to Production"
+date: 2026-11-07
+excerpt: "Take orders-api from a working service to a production deployment: cached multi-stage Docker builds, small images, a CI pipeline with supply-chain gates, Kubernetes probes and graceful shutdown, zero-downtime migrations, and a readiness checklist."
+tags: ["Rust", "Backend", "DevOps", "Kubernetes", "PostgreSQL", "Microservices"]
+readingTime: 26
+level: staff
+series: "Backend Services in Rust"
+seriesOrder: 8
+draft: false
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Over seven parts, orders-api grew from a handful of in-memory handlers into a service with Postgres, authentication, background jobs, messaging, tracing and metrics. None of that matters until it runs somewhere other than a laptop, survives deploys without dropping requests, and can be changed safely by people who didn't write it. This last part is for the engineer who owns that path: you will build a reproducible, cached container image, wire a CI pipeline that enforces formatting, lints, tests, SQLx metadata and dependency policy, deploy to Kubernetes with probes and a shutdown sequence that actually drains, run schema migrations without downtime, and finish with the architecture and checklist a staff engineer would sign off on.
+
+<Callout variant="note" title="You should already know">
+This part assumes the orders-api built so far: the router, `AppState` and handlers from [Part 1](/blog/rust-backend-01-first-http-service), `AppError` and tracing from [Part 2](/blog/rust-backend-02-errors-config-tracing), SQLx and migrations from [Part 3](/blog/rust-backend-03-postgres-sqlx), the test suite from [Part 5](/blog/rust-backend-05-testing), the outbox relay and consumers from [Part 6](/blog/rust-backend-06-async-jobs-messaging-grpc), and health endpoints and OpenTelemetry from [Part 7](/blog/rust-backend-07-observability-performance). The Kubernetes shutdown mechanics are covered in general terms in [graceful shutdown for microservices](/blog/graceful-shutdown-microservices).
+</Callout>
+
+## What "production" means for orders-api
+
+"Production-ready" is vague until you write the properties down. For orders-api I use these:
+
+- **Reproducible builds.** The same commit produces the same binary, built with `--locked` against a pinned toolchain, with no network fetches beyond a known registry.
+- **Small, boring images.** No compiler, no shell, no package manager in the runtime image. A non-root user. Fast to pull, little to patch.
+- **Gated changes.** Nothing reaches `main` without passing format, lints, tests against real Postgres, a check that SQLx's offline query metadata is current, and the dependency policy.
+- **Deploys that drop nothing.** Rolling updates where in-flight requests finish, background workers stop cleanly, and the database pool closes before the process exits.
+- **Schema changes without downtime.** Old and new versions of the code can run against the same schema during a rollout.
+- **Observable from minute one.** JSON logs, traces, metrics, a version endpoint, and alerts on the RED signals from Part 7.
+
+What is Rust-specific is *how*: compile times shape images and CI, near-static binaries change which base images make sense, and the async runtime shapes signal handling and shutdown.
+
+## The release binary
+
+Before any Docker work, decide what the release binary looks like. This is the release profile for orders-api:
+
+```toml
+# Cargo.toml
+[package]
+name = "orders-api"
+version = "0.8.0"
+edition = "2024"
+publish = false
+
+[profile.release]
+lto = "thin"          # cross-crate inlining at a moderate build-time cost
+codegen-units = 1     # better optimization, slower compile; fine for release only
+strip = "debuginfo"   # drop DWARF but keep symbol names for readable backtraces
+# panic = "abort"     # deliberately NOT set; see below
+```
+
+Two decisions deserve an explanation.
+
+**Keep `panic = "unwind"` for services.** With unwinding, a panic inside a Tokio task is caught by the runtime and surfaced as a `JoinError`, and a panic inside an axum handler kills that one request's task while the server keeps running (and with tower-http's `CatchPanicLayer` it becomes a 500). With `panic = "abort"`, any panic anywhere takes down the whole process and every in-flight request with it. Abort saves a little binary size and makes sense for CLIs and embedded code; for a multi-tenant HTTP server it trades a bug in one request for an outage of all of them.
+
+**Strip debuginfo, not symbols.** `strip = "symbols"` makes the binary smaller, but panic backtraces and profiler output then show raw addresses. `strip = "debuginfo"` keeps function names, which is what you want in production logs. If you need full line-level symbolication, keep debug info in a separate artifact instead of shipping it in the image.
+
+### Build metadata
+
+When an incident starts, the first question is "what is running?". Bake the version and commit into the binary and expose it:
+
+```rust
+async fn version() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "service": env!("CARGO_PKG_NAME"),
+        "version": env!("CARGO_PKG_VERSION"),
+        "git_sha": option_env!("GIT_SHA").unwrap_or("unknown"),
+    }))
+}
+```
+
+`env!` fails the build if the variable is missing; `option_env!` reads `GIT_SHA` at compile time if CI provides it and falls back otherwise, so local builds still work. Pass it as a Docker build argument. Add the same fields as resource attributes on your OpenTelemetry tracer from Part 7, so every trace carries the version that produced it.
+
+## A Docker build that caches
+
+The naive Dockerfile copies the source, runs `cargo build --release`, and is done. It works, and on every commit it recompiles every dependency from scratch, because copying the source invalidates the layer before the build. For orders-api's few hundred transitive crates that is minutes of CPU per image, every time.
+
+The fix is to build dependencies in a layer that only depends on the dependency graph. [`cargo-chef`](https://github.com/LukeMathWalker/cargo-chef) automates this: `cargo chef prepare` reduces the workspace to a `recipe.json` describing manifests and the lockfile, and `cargo chef cook` builds just the dependencies from that recipe. Docker caches the cook layer until the recipe changes.
+
+![Multi-stage Docker build with cargo-chef: a planner stage writes recipe.json, the builder cooks dependencies into a cached layer and then compiles orders-api, and the runtime stage ships only the binary in a distroless image](/images/blog/rust/rust-backend-08-shipping-production-docker-stages.svg)
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+# Pin the exact toolchain in real builds, e.g. rust:1.NN-slim-bookworm.
+FROM rust:1-slim-bookworm AS chef
+RUN cargo install cargo-chef --locked
+WORKDIR /app
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+# Dependencies only: this layer is cached until Cargo.toml or Cargo.lock change.
+RUN cargo chef cook --release --locked --recipe-path recipe.json
+COPY . .
+# Use the committed .sqlx metadata instead of a live database at compile time.
+ENV SQLX_OFFLINE=true
+ARG GIT_SHA=unknown
+ENV GIT_SHA=${GIT_SHA}
+RUN cargo build --release --locked --bin orders-api
+
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+WORKDIR /app
+COPY --from=builder /app/target/release/orders-api /app/orders-api
+# Part 2's layered config reads config/base.toml and config/{APP_ENV}.toml relative to the working directory.
+COPY config /app/config
+USER nonroot:nonroot
+EXPOSE 8080
+ENTRYPOINT ["/app/orders-api"]
+CMD ["serve"]
+```
+
+A few details that are easy to get wrong:
+
+- **`.dockerignore` must exclude `target/`.** Otherwise `COPY . .` sends gigabytes of build output into the context and invalidates layers for no reason. Also exclude `.git` and local `.env` files, which may hold secrets.
+- **`SQLX_OFFLINE=true`** makes the `query!` macros read the `.sqlx/` directory committed in Part 3 instead of connecting to a database during the image build. The CI pipeline below fails if that metadata is stale, so the image build can trust it.
+- **Match the Debian release between builder and runtime.** The builder above links against bookworm's glibc; `distroless/cc-debian12` is also bookworm. If you build on a newer Debian (the unversioned `rust:1-slim` tag moves over time) and run on an older one, the binary can fail at startup with a "GLIBC_2.xx not found" error. Pin both explicitly and move them together.
+- **`ENTRYPOINT` plus `CMD`.** The binary takes a subcommand (`serve` or `migrate`, shown later), so the Kubernetes migration Job can reuse the same image with different args.
+- **No `HEALTHCHECK`.** Distroless has no shell or `curl`, and Kubernetes ignores Docker health checks anyway; probes are configured in the Deployment.
+
+### Why distroless/cc and not scratch
+
+orders-api uses rustls (no OpenSSL) but is still dynamically linked against glibc, the default for `x86_64-unknown-linux-gnu`. `distroless/cc` provides glibc, `libgcc`, CA certificates, timezone data and a `nonroot` user, and nothing else. The result is typically tens of megabytes, most of which is your binary.
+
+To get down to `scratch` or `distroless/static`, you need a fully static binary, which on Linux usually means the musl target. That works, with trade-offs:
+
+- **Allocator performance.** musl's default `malloc` is known to perform poorly under multi-threaded contention, and an async server allocates from many threads. The usual remedy is a different global allocator on musl builds only:
+
+```rust
+// musl's allocator is slow under multi-threaded contention; swap it on musl builds only.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+```
+
+```toml
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = "0.1"
+```
+
+  Measure with your own load test (Part 7) before and after; allocator effects vary by workload.
+
+- **C dependencies need a musl C toolchain.** Any crate with C or assembly in its build script needs a cross C compiler for the target. orders-api pulls in `ring` through rustls, so a plain `cargo build --target x86_64-unknown-linux-musl` on a macOS laptop fails like this:
+
+```text
+error: failed to run custom build command for `ring v0.17.14`
+  ...
+  error occurred in cc-rs: failed to find tool "x86_64-linux-musl-gcc": No such file or directory (os error 2)
+```
+
+- **Other behavioral differences** (DNS resolution details, locale handling) rarely matter for a service like this, but they are another axis to test.
+
+My default: glibc plus `distroless/cc` for services. The image is already small, the allocator is reasonable, and there is nothing exotic to debug. Reach for musl and `scratch` when you have a concrete reason, such as a size budget or a platform that requires static binaries.
+
+## Cross-compiling and multi-arch images
+
+Mixed x86_64 and ARM fleets (Graviton, Ampere, Apple Silicon laptops) mean you probably need both `linux/amd64` and `linux/arm64` images. There are three approaches, from slowest to fastest:
+
+1. **`docker buildx` with QEMU emulation.** Simple, but `rustc` under emulation is often many times slower than native.
+2. **Cross-compile inside a native builder.** Pure-Rust crates cross-compile easily; crates with C code (like `ring` above) need a cross C toolchain. [`cargo-zigbuild`](https://github.com/rust-cross/cargo-zigbuild) uses Zig as the cross compiler and linker; [`cross`](https://github.com/cross-rs/cross) builds in a prepared container per target.
+3. **Native runners per architecture.** Build each image on a matching runner, then combine them with `docker buildx imagetools create` into one multi-arch manifest. Least clever, usually fastest.
+
+Use option 3 if your CI has ARM runners, option 2 otherwise, and keep emulated `rustc` out of the critical path.
+
+## The CI pipeline
+
+The pipeline's job is to make "merged to `main`" mean "safe to deploy". For orders-api it runs four independent jobs in parallel and builds the image only if all pass.
+
+```mermaid
+flowchart LR
+  PR["Pull request"] --> L["lint<br/>fmt and clippy -D warnings"]
+  PR --> T["test<br/>nextest with Postgres"]
+  PR --> S["sqlx prepare --check"]
+  PR --> D["cargo deny<br/>advisories licenses bans"]
+  L --> G["all green"]
+  T --> G
+  S --> G
+  D --> G
+  G -->|"main only"| I["build and push image<br/>tag with git sha"]
+  I --> CD["deploy pipeline"]
+```
+
+```yaml
+# .github/workflows/ci.yml
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orders
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/orders
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: cargo nextest run --locked --all-features
+
+  sqlx-metadata:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orders
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/orders
+      SQLX_OFFLINE: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install sqlx-cli --no-default-features --features rustls,postgres --locked
+      - run: sqlx migrate run
+      - run: cargo sqlx prepare --check -- --all-targets
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  image:
+    needs: [lint, test, sqlx-metadata, deny]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          push: true
+          build-args: GIT_SHA=${{ github.sha }}
+          tags: registry.example.com/orders-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+```
+
+Why each gate exists:
+
+- **`cargo fmt --check`** removes formatting from code review entirely.
+- **`clippy -D warnings`** turns lints into errors in CI only. Developers still see warnings locally without being blocked mid-edit, but nothing with warnings merges. Pair it with `[lints]` in `Cargo.toml` so the lint set is versioned with the code rather than scattered across CI flags.
+- **`cargo nextest`** runs the Part 5 suite, including `#[sqlx::test]` tests that create a fresh database per test against the service container. nextest runs tests as separate processes in parallel, which is usually faster and isolates crashes.
+- **`cargo sqlx prepare --check`** fails if the committed `.sqlx/` metadata no longer matches the queries and the migrated schema. Without it, someone changes a query, forgets to regenerate, and the Docker build (which uses `SQLX_OFFLINE=true`) fails on `main` instead of in the PR. Note that this job runs migrations first: the check is only meaningful against the schema the migrations produce.
+- **`cargo deny`** enforces the advisory, license, ban and source policy. Series A Part 11 discusses that policy and shows a full `deny.toml`; for orders-api the notable lines ban `openssl-sys` (we standardized on rustls) and allow `webpki-roots`' CA-bundle license as a one-crate exception. Add a scheduled nightly run on `main` too, because advisories are published after you merge. `cargo-deny` covers RustSec advisories, so a separate `cargo audit` step is optional.
+- **`--locked` everywhere.** If `Cargo.lock` doesn't match `Cargo.toml`, the build fails instead of silently resolving new versions.
+
+`Swatinem/rust-cache` caches the registry and `target/` keyed on the lockfile and toolchain; on a warm cache, lint and test jobs mostly compile your own crates. The Docker build uses BuildKit's GitHub Actions cache so the `cargo chef cook` layer survives between runs.
+
+## Configuration from the environment
+
+Part 2 already gave orders-api the right shape for containers: defaults in `config/base.toml`, per-environment overrides in `config/{APP_ENV}.toml`, and `ORDERS_*` environment variables on top, with `__` for nesting. The Dockerfile copies the `config/` directory into the image, so the only things a deployment has to supply are `APP_ENV` and the values that differ per cluster, secrets above all. Production needs two settings the earlier parts didn't, so they get their own section:
+
+```rust
+use std::time::Duration;
+
+use serde::Deserialize;
+
+// New field on Part 2's Config: `pub shutdown: ShutdownConfig`
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShutdownConfig {
+    /// How long to keep serving after SIGTERM, while load balancers catch up.
+    pub drain_delay_secs: u64,
+    /// How long background workers get to finish after the server stops.
+    pub worker_stop_timeout_secs: u64,
+}
+
+impl ShutdownConfig {
+    pub fn drain_delay(&self) -> Duration {
+        Duration::from_secs(self.drain_delay_secs)
+    }
+
+    pub fn worker_stop_timeout(&self) -> Duration {
+        Duration::from_secs(self.worker_stop_timeout_secs)
+    }
+}
+```
+
+```toml
+# config/base.toml
+[shutdown]
+drain_delay_secs = 5
+worker_stop_timeout_secs = 10
+```
+
+In Kubernetes these map to `ORDERS_SHUTDOWN__DRAIN_DELAY_SECS`, `ORDERS_DATABASE__MAX_CONNECTIONS` and so on, and the database URL arrives as `ORDERS_DATABASE__URL` from a Secret. Note that `base.toml` must not contain a production URL: keep the local-development default there and let the environment override it.
+
+Two rules matter more than the mechanism. **Fail fast:** `Config::load()` runs before anything else in `main`, so a missing or malformed value crashes at startup, where Kubernetes surfaces the crash loop and the rollout stops, not on the first request at 3 a.m. To make a missing secret fail rather than fall back to the local default, put no `[database] url` in `production.toml` and validate after loading that the URL doesn't point at `localhost` when `environment` is production. **Never log secrets:** the URL stays a `SecretString`, so it is redacted in `Debug` output and in the startup log line that prints the loaded config.
+
+## Graceful shutdown on Kubernetes
+
+Rolling deploys, autoscaling and node drains all end the same way: Kubernetes deletes a pod. If orders-api handles that badly, every deploy produces a burst of connection resets and half-processed requests. The sequence is subtle because two things happen at once when a pod is deleted:
+
+1. The kubelet runs any `preStop` hook, then sends `SIGTERM` to the container.
+2. In parallel, the control plane removes the pod from the Service's endpoints, and kube-proxy, ingress controllers and service meshes pick that up *eventually*.
+
+There is no ordering guarantee between them. If orders-api stops listening the moment it gets `SIGTERM`, some proxies still route new connections to it for a few seconds.
+
+```mermaid
+sequenceDiagram
+  participant K as Kubernetes
+  participant LB as Ingress or kube-proxy
+  participant A as orders-api
+  participant W as Workers and pool
+  K->>A: SIGTERM
+  K-->>LB: remove endpoint, propagates async
+  A->>A: readyz returns 503
+  LB->>A: late requests still served
+  A->>A: drain delay elapses, stop accepting
+  A->>A: in-flight requests finish
+  A->>W: cancel token, join workers
+  W-->>A: workers stopped
+  A->>W: close PgPool
+  A-->>K: exit 0 before grace period
+```
+
+![Graceful shutdown timeline for an orders-api pod: SIGTERM and endpoint removal race, the app fails readiness and keeps serving through a drain delay, stops accepting, finishes in-flight work, cancels workers, closes the pool and exits before terminationGracePeriodSeconds](/images/blog/rust/rust-backend-08-shipping-production-shutdown-timeline.svg)
+
+### Listening for the signal
+
+Tokio exposes Unix signals directly. orders-api listens for both `SIGTERM` (Kubernetes) and Ctrl+C (local development):
+
+```rust
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c().await.expect("install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("install SIGTERM handler")
+            .recv()
+            .await;
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        () = ctrl_c => {},
+        () = terminate => {},
+    }
+}
+```
+
+A subtle trap: the process must be PID 1's direct child or PID 1 itself to receive the signal. With `ENTRYPOINT ["/app/orders-api"]` in exec form, the binary *is* PID 1 and receives `SIGTERM`. With the shell form (`ENTRYPOINT /app/orders-api`), a shell is PID 1 and may not forward signals; on distroless there is no shell, so the shell form would not start at all.
+
+### Readiness, liveness and draining
+
+The health endpoints from Part 7 get one more input: a `draining` flag in `AppState`.
+
+```rust
+#[derive(Clone)]
+pub struct AppState {
+    pub db: PgPool,
+    pub config: Arc<Config>,
+    pub draining: Arc<AtomicBool>,
+}
+
+async fn livez() -> StatusCode {
+    StatusCode::OK
+}
+
+async fn readyz(State(state): State<AppState>) -> StatusCode {
+    if state.draining.load(Ordering::Relaxed) {
+        return StatusCode::SERVICE_UNAVAILABLE;
+    }
+    match sqlx::query("SELECT 1").execute(&state.db).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::SERVICE_UNAVAILABLE,
+    }
+}
+```
+
+`livez` answers "is the process alive and able to serve at all?" and must not depend on the database: if Postgres has a blip and liveness fails, Kubernetes restarts every pod at once, turning a dependency hiccup into a full outage. `readyz` answers "should this pod receive traffic now?", so it checks the pool and the draining flag. `Relaxed` ordering is enough because the flag is an independent signal, not a guard for other memory.
+
+Strictly, a terminating pod is removed from endpoints because it is terminating, not because readiness fails. Failing readiness during the drain is belt and braces: it helps load balancers outside Kubernetes that health-check the pod directly, and it makes the state visible in dashboards.
+
+### Putting the sequence together
+
+Here is the tail of `main` for orders-api. The shutdown future flips the draining flag, waits out the drain delay while still serving, and only then lets axum stop accepting connections. After `serve` returns, it cancels background workers (the outbox relay and the payment consumer from Part 6) through a `CancellationToken`, waits for them with a timeout, and closes the pool.
+
+```rust
+let cancel = CancellationToken::new();
+let mut workers = JoinSet::new();
+workers.spawn(run_outbox_relay(db.clone(), cancel.child_token()));
+
+let addr = SocketAddr::new(config.http.host, config.http.port);
+let listener = TcpListener::bind(addr).await?;
+tracing::info!(%addr, "orders-api listening");
+
+let draining = state.draining.clone();
+let worker_stop_timeout = config.shutdown.worker_stop_timeout();
+let drain_delay = config.shutdown.drain_delay();
+let shutdown = async move {
+    shutdown_signal().await;
+    tracing::info!("shutdown signal received, failing readiness");
+    draining.store(true, Ordering::Relaxed);
+    // Keep serving while endpoints and load balancers notice we are not ready.
+    tokio::time::sleep(drain_delay).await;
+    tracing::info!("drain delay over, refusing new connections");
+};
+
+axum::serve(listener, router(state))
+    .with_graceful_shutdown(shutdown)
+    .await?;
+
+// HTTP is drained; now stop background work, bounded so we exit before SIGKILL.
+cancel.cancel();
+if tokio::time::timeout(worker_stop_timeout, async {
+    while workers.join_next().await.is_some() {}
+})
+.await
+.is_err()
+{
+    tracing::warn!("background workers did not stop in time; aborting");
+    workers.abort_all();
+}
+
+db.close().await;
+tracing::info!("shutdown complete");
+Ok(())
+```
+
+Each worker cooperates by selecting on the token, so cancellation happens between batches rather than in the middle of one:
+
+```rust
+async fn run_outbox_relay(db: PgPool, cancel: CancellationToken) {
+    let mut tick = tokio::time::interval(Duration::from_millis(500));
+    loop {
+        tokio::select! {
+            () = cancel.cancelled() => break,
+            _ = tick.tick() => {
+                // publish one batch of outbox rows (Part 6)
+            }
+        }
+    }
+    tracing::info!("outbox relay stopped");
+}
+```
+
+Because the outbox relay and consumers are idempotent (Part 6), aborting one mid-batch after the timeout is safe: the rows stay unpublished or the message stays unacknowledged and is processed again by another pod. Graceful shutdown is an optimization for fewer retries, not a correctness requirement. If your correctness depends on shutdown completing, you have a bug that a `kill -9` or a node failure will eventually expose. The [duplicate payments case study](/blog/case-03-duplicate-payments-retries) is a long illustration of why.
+
+`with_graceful_shutdown` waits for in-flight requests to complete, with no time limit of its own. The `TimeoutLayer` from Part 4 (10 seconds for orders-api) is what bounds that, and it is why the timeout must exist. Remember to flush the OpenTelemetry exporter from Part 7 as well, or the last spans before shutdown are lost; do it right after closing the pool.
+
+### Budgeting the grace period
+
+Add it up: drain delay (5 s) + longest request (10 s timeout) + worker stop (10 s) + pool close and telemetry flush (about 1 s) = 26 s, under Kubernetes' default `terminationGracePeriodSeconds` of 30. If your sum exceeds the grace period, the kubelet sends `SIGKILL` and the careful sequence above is cut short. Either shorten the steps or raise the grace period; write the arithmetic in a comment next to the manifest.
+
+### The Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-api
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels: { app: orders-api }
+  template:
+    metadata:
+      labels: { app: orders-api }
+    spec:
+      terminationGracePeriodSeconds: 30   # 5 drain + 10 request + 10 workers + slack
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: orders-api
+          image: registry.example.com/orders-api:3f9c2e1
+          args: ["serve"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: RUST_LOG
+              value: info,orders_api=debug
+            - name: TOKIO_WORKER_THREADS
+              value: "2"
+            - name: APP_ENV
+              value: production
+            - name: ORDERS_HTTP__PORT
+              value: "8080"
+            - name: ORDERS_DATABASE__MAX_CONNECTIONS
+              value: "10"
+            - name: ORDERS_SHUTDOWN__DRAIN_DELAY_SECS
+              value: "5"
+            - name: ORDERS_DATABASE__URL
+              valueFrom:
+                secretKeyRef: { name: orders-api-db, key: url }
+          resources:
+            requests: { cpu: 500m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          startupProbe:
+            httpGet: { path: /livez, port: 8080 }
+            periodSeconds: 1
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /livez, port: 8080 }
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 2
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orders-api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: orders-api }
+```
+
+Notes that are specific to a Rust service:
+
+- **Memory requests can be small.** An idle axum service with a pool of ten connections typically uses tens of megabytes. Set the request from observed steady-state usage under load (Part 7's load tests) and the limit with headroom for spikes; there is no `-Xmx` to tune, and exceeding the limit is an `OOMKilled` with exit code 137, not a graceful error.
+- **Align Tokio workers with CPU.** By default the multi-threaded runtime starts one worker per available CPU. Recent Rust standard library versions take cgroup CPU quotas into account when reporting available parallelism, but behavior depends on the quota setup, and with no CPU limit the pod sees every core on the node. Set `TOKIO_WORKER_THREADS` explicitly to match the CPU request so a 0.5-CPU pod on a 64-core node doesn't start 64 workers.
+- **No CPU limit, deliberately.** CPU limits cause CFS throttling, which shows up as tail latency spikes that look like application problems. Many teams set a CPU request and no CPU limit for latency-sensitive services; follow your platform's policy, but know the trade-off.
+- **Startup probe is cheap.** A Rust binary is usually ready in well under a second, so the startup probe mostly protects against slow database connections at boot, not JIT warm-up.
+- **Pool size times replicas.** Three replicas with ten connections each is 30 connections; during a rolling update with `maxSurge: 1` there are four pods, so 40; with autoscaling, more. Check this against Postgres `max_connections` or your PgBouncer limits. [Case study 1](/blog/case-01-connection-pool-exhaustion) shows what happens when nobody does this sum.
+
+### preStop on distroless
+
+Many guides add `preStop: exec: command: ["sleep", "5"]` to delay `SIGTERM` until endpoints have updated. On distroless that fails: there is no `sleep` binary. You have two options. orders-api does the delay *in the application* (the drain delay above), which works on any image and any orchestrator. Alternatively, recent Kubernetes versions support a native sleep action (`lifecycle.preStop.sleep.seconds`, beta and enabled by default from 1.30) that needs nothing in the image; if you use it, set `ORDERS_SHUTDOWN__DRAIN_DELAY_SECS=0` so you don't wait twice, since the preStop hook runs *before* the kubelet sends `SIGTERM` and its duration counts against the grace period.
+
+## Zero-downtime migrations
+
+During a rolling deploy, old and new versions of orders-api run at the same time against one database. Every migration must therefore be compatible with both the code before it and the code after it. That is the expand and contract discipline: first expand the schema in a backward-compatible way, deploy code that uses it, and only later contract by removing what the old code needed.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Expand
+  Expand --> DeployV2: nullable column or new table added
+  DeployV2 --> Backfill: new code writes both shapes
+  Backfill --> Enforce: batches done, constraint validated
+  Enforce --> Contract: no reader of the old shape left
+  Contract --> [*]: old column dropped in a later release
+```
+
+### Running migrations: a Job, not every pod
+
+orders-api embeds its migrations with `sqlx::migrate!` and exposes them as a subcommand of the same binary:
+
+```rust
+static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+
+async fn migrate(config: &Config) -> anyhow::Result<()> {
+    let db = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(config.database.url.expose_secret())
+        .await?;
+    MIGRATOR.run(&db).await?;
+    tracing::info!("migrations applied");
+    Ok(())
+}
+
+// in main(), after loading config:
+match std::env::args().nth(1).as_deref() {
+    Some("migrate") => return migrate(&config).await,
+    Some("serve") | None => {}
+    Some(other) => anyhow::bail!("unknown command {other:?}; expected `serve` or `migrate`"),
+}
+```
+
+Run it as a Kubernetes Job (or a Helm pre-upgrade hook, or an Argo CD sync wave) with the same image tag, *before* the Deployment rolls out. You could run migrations at startup in every pod; SQLx takes a Postgres advisory lock while migrating, so concurrent runners wait for each other rather than colliding. But running them in a separate step has better failure behavior: a failed migration stops the release before any new pod starts, the migration's logs are in one place, and the service's startup path stays fast and side-effect free. It also lets you run the migration with a more privileged database role than the service uses day to day.
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: orders-api-migrate-3f9c2e1
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: registry.example.com/orders-api:3f9c2e1
+          args: ["migrate"]
+          env:
+            - name: APP_ENV
+              value: production
+            - name: ORDERS_DATABASE__URL
+              valueFrom:
+                secretKeyRef: { name: orders-api-db-migrator, key: url }
+```
+
+### Writing safe migrations
+
+The SQL is where downtime actually comes from. Postgres takes locks for DDL, and an `ALTER TABLE` waiting behind a long-running query blocks every query queued behind *it*. Habits that keep orders-api's migrations safe:
+
+```sql
+-- migrations/20261107120000_add_orders_currency.sql
+-- Fail fast instead of queueing behind a long transaction and blocking traffic.
+SET lock_timeout = '3s';
+
+-- Expand: nullable column; a constant default is metadata-only in modern Postgres.
+ALTER TABLE orders ADD COLUMN currency TEXT DEFAULT 'EUR';
+```
+
+```sql
+-- migrations/20261107120100_orders_currency_index.sql
+-- no-transaction
+CREATE INDEX CONCURRENTLY IF NOT EXISTS orders_currency_idx ON orders (currency);
+```
+
+- **`lock_timeout`** makes a blocked DDL statement fail after a few seconds instead of stalling the table; the migration Job fails and you retry at a quieter moment.
+- **`CREATE INDEX CONCURRENTLY`** builds an index without blocking writes, but it cannot run inside a transaction. SQLx wraps each migration in a transaction by default; the `-- no-transaction` directive on the first line opts that file out. Keep such files to a single statement, because a failure halfway leaves no rollback, and an interrupted concurrent build can leave an invalid index you must drop and recreate.
+- **Backfill in batches from application code or a script**, not in one `UPDATE` over millions of rows, which holds locks and bloats the table. Update a few thousand rows per transaction, keyed by primary key.
+- **Add `NOT NULL` in steps:** add a `CHECK (currency IS NOT NULL) NOT VALID` constraint, then `VALIDATE CONSTRAINT` (which doesn't block writes), then set the column `NOT NULL`, which Postgres can do without a full scan when a validated check constraint already proves it.
+- **Never rename or drop in the same release that stops using something.** Rename is add, dual-write, backfill, switch reads, then drop several releases later.
+- **Remember `cargo sqlx prepare`.** After a schema change, regenerate `.sqlx/` and commit it; the CI gate catches you if you forget.
+
+Rollback deserves a sentence: with expand and contract, rolling back the *code* is always safe because the schema is still compatible with the previous version. Down migrations are rarely run in production and should not be part of your incident plan.
+
+## The final architecture of orders-api
+
+Here is what eight parts add up to.
+
+```mermaid
+flowchart LR
+  C["Clients"] --> IG["Ingress<br/>TLS, routing"]
+  IG --> API["orders-api pods<br/>axum, tower layers"]
+  API --> PG[("Postgres<br/>customers orders<br/>order_items outbox")]
+  API --> RL["Outbox relay<br/>in-process worker"]
+  RL --> PG
+  RL --> BR["Message broker"]
+  BR --> CON["Payment-confirmed<br/>consumer"]
+  CON --> PG
+  API --> OT["OTel collector"]
+  OT --> OBS["Traces, metrics, logs"]
+  J["Migration Job"] --> PG
+```
+
+- **HTTP:** axum 0.8 extractors, `AppError` mapped to problem+json, tower layers for tracing, timeouts, limits, rate limiting and load shedding.
+- **Auth:** argon2, short-lived JWTs with rotating refresh tokens, an `AuthUser` extractor.
+- **Data:** SQLx 0.8, compile-time checked queries, keyset pagination, optimistic locking, migrations run by a Job.
+- **Async work:** transactional outbox, an in-process relay, an idempotent payment consumer, all tied to a `CancellationToken`.
+- **Observability and delivery:** JSON logs, OTLP traces, RED metrics, health and version endpoints, distroless images, gated CI and a budgeted shutdown.
+
+The in-process outbox relay is a deliberate simplification. With three replicas, three relays compete for outbox rows, which works because Part 6 used `FOR UPDATE SKIP LOCKED` and idempotent publishing. When throughput or isolation demands it, move the relay and consumer into separate Deployments built from the same crate as different binaries; nothing in the code needs to change beyond `main`.
+
+## Production readiness checklist
+
+Use this before the first production deploy and revisit it every quarter.
+
+**Build and supply chain**
+- Toolchain pinned with `rust-toolchain.toml`; builds use `--locked`.
+- `cargo deny` gate on PRs and nightly on `main`; documented exceptions with owners and review dates.
+- Images built by CI only, tagged by commit SHA, scanned, and pushed to a registry you control.
+- Runtime image is distroless or equivalent, non-root, read-only root filesystem.
+
+**Runtime behavior**
+- Config from environment; startup fails fast on missing or invalid values; secrets never logged.
+- `SIGTERM` handled; drain delay, request timeout and worker stop add up to less than the grace period.
+- Liveness independent of dependencies; readiness checks the pool and the draining flag.
+- Request timeouts, body limits and load shedding configured (Parts 4 and 7).
+- Pool size times maximum replicas fits the database's connection budget.
+- `panic = "unwind"` in release; panics in handlers become 500s, not crashes.
+
+**Data**
+- Migrations run as a separate step before rollout, with `lock_timeout` set.
+- Every migration is backward compatible with the currently deployed version.
+- Backups and point-in-time recovery tested by actually restoring, not by reading the config.
+
+**Observability and operations**
+- JSON logs with request ids and trace ids; `/version` reports version and commit.
+- Traces exported via OTLP; RED metrics with dashboards and alerts on error rate and latency SLOs.
+- Runbook covering: high latency, pool exhaustion, crash loop, failed migration, broker lag, and how to roll back.
+- Load test results recorded with the resource settings they justify.
+- At least two people who can debug the service under pressure, on the on-call rotation.
+
+## What a staff engineer weighs before running Rust services org-wide
+
+One well-run Rust service is an engineering achievement. Ten of them across several teams is a platform decision, and the questions change.
+
+**A paved road, not ten snowflakes.** If each team assembles its own axum stack, you will have ten error formats, ten ways of loading config and ten tracing setups. Extract what this series built into a template repository and a few internal crates: a `platform-telemetry` crate that initializes tracing, OTel and metrics with your conventions; a `platform-config` crate; an auth extractor that validates your identity provider's tokens; the CI workflow and `deny.toml`. Version them, own them, and make the template the default starting point.
+
+**Ownership of the internal ecosystem.** Every internal SDK that exists for the JVM (feature flags, service discovery, secrets, the audit-log client) needs a Rust equivalent or a sidecar-based alternative. Someone has to own those crates with the same seriousness as any shared library. If nobody will, that is a strong signal to limit how many Rust services you run.
+
+**Upgrade cadence.** Rust ships a stable release every six weeks, and axum, hyper, SQLx and the OpenTelemetry crates have all had breaking releases. Bump the pinned toolchain on a fixed cadence, keep `Cargo.lock` fresh with weekly bot PRs, and migrate core crates' major versions across all services together. A fleet pinned to five different axum majors is expensive to maintain.
+
+**Operations parity.** On-call engineers need Rust-specific runbooks: how to read a panic message and backtrace in the logs, how to use `tokio-console` or a profiler on a live pod, what an `OOMKilled` means without a GC to blame, how to spot a blocking call in async code. Run game days where someone other than the author debugs a Rust service.
+
+**The cost model.** The usual Rust argument is lower infrastructure cost per request and fewer latency incidents; the usual cost is slower initial delivery and scarcer expertise. Measure both for the services you already run before expanding. [Rust, Part 11: Leading Rust Adoption](/blog/rust-11-leading-rust-adoption) covers how to frame that decision, the adoption ladder, supply-chain policy and the training plan in detail.
+
+## Common mistakes
+
+- **Rebuilding dependencies on every Docker build.** Copying the whole source before building means every commit recompiles hundreds of crates. Use cargo-chef or an equivalent dependency layer, and exclude `target/` from the build context.
+- **Mismatched glibc between builder and runtime.** Building on a newer Debian than the runtime image produces a binary that fails at startup. Pin both and move them together.
+- **Liveness probes that check the database.** A Postgres blip restarts every pod at once. Keep liveness about the process; put dependencies in readiness.
+- **Stopping the listener immediately on `SIGTERM`.** Endpoint removal is asynchronous, so late requests hit a closed port. Fail readiness and keep serving for a short drain delay.
+- **Exec `preStop` hooks on distroless.** `sleep` doesn't exist in the image. Use an in-app delay or the native sleep action.
+- **Grace period arithmetic nobody did.** If drain plus request timeout plus worker shutdown exceeds `terminationGracePeriodSeconds`, SIGKILL cuts the sequence short.
+- **Running migrations in every pod at startup** with no lock timeout and no backward compatibility. One slow `ALTER TABLE` then blocks the table during a rollout.
+- **`panic = "abort"` copied from a size-optimization guide.** One panicking request takes the whole server down.
+
+## Interview questions
+
+<details>
+<summary>How do you make Docker builds of a Rust service fast?</summary>
+
+Separate dependency compilation from application compilation so Docker can cache it. cargo-chef does this by generating a recipe from the manifests and lockfile, cooking dependencies in one layer, then copying the source and building only the workspace crates. Add a `.dockerignore` excluding `target/`, use BuildKit's cache backend in CI so the cooked layer survives between runners, pin the toolchain image so it doesn't invalidate everything unexpectedly, and avoid compiling under QEMU emulation for other architectures; use native runners or cross-compilation instead.
+
+</details>
+
+<details>
+<summary>What are the trade-offs of a fully static musl binary versus glibc on distroless?</summary>
+
+musl lets you ship on `scratch` or `distroless/static` with no libc dependency, which is the smallest and simplest runtime. The costs: musl's default allocator performs poorly under multi-threaded contention, so services usually swap in mimalloc or jemalloc; crates with C code need a musl cross toolchain (cargo-zigbuild or cross help); and there are minor behavioral differences such as DNS resolution. glibc on `distroless/cc` is a few megabytes larger but avoids those issues, which is why I default to it and use musl only with a concrete reason.
+
+</details>
+
+<details>
+<summary>Walk through what happens when Kubernetes terminates an orders-api pod and how the service handles it.</summary>
+
+The kubelet runs any preStop hook, then sends SIGTERM, while endpoint removal propagates to proxies asynchronously. orders-api's signal handler sets a draining flag so readiness returns 503, keeps serving for a drain delay so late-routed requests succeed, then lets axum's graceful shutdown stop accepting and wait for in-flight requests, which are bounded by a request timeout. After that it cancels background workers via a CancellationToken, waits for them with a timeout and aborts stragglers, closes the database pool, flushes telemetry and exits. The sum of those steps must fit within terminationGracePeriodSeconds or SIGKILL interrupts it.
+
+</details>
+
+<details>
+<summary>Why should liveness and readiness probes check different things?</summary>
+
+Liveness failures cause restarts, readiness failures remove the pod from load balancing. If liveness checks a shared dependency like Postgres, a brief database outage makes every pod fail liveness at once and Kubernetes restarts the whole fleet, which adds a cold-start storm to the original problem. Liveness should answer only whether the process can serve; readiness should include dependencies and the draining state so traffic moves away from pods that can't serve right now.
+
+</details>
+
+<details>
+<summary>How do you run schema migrations without downtime during a rolling deploy?</summary>
+
+Assume old and new code run simultaneously, so every migration must be compatible with both: expand and contract. Add nullable columns or new tables first, deploy code that writes both shapes, backfill in batches, enforce constraints with NOT VALID then VALIDATE, switch reads, and drop old columns only in a later release. Run migrations as a separate step before the rollout with a lock timeout, use CREATE INDEX CONCURRENTLY outside a transaction, and keep code rollback safe because the schema stays backward compatible.
+
+</details>
+
+<details>
+<summary>Why would you keep panic = "unwind" in a release build of an HTTP service?</summary>
+
+With unwinding, a panic in a handler or spawned task is contained: Tokio catches it at the task boundary and returns a JoinError, and a panic-catching layer can turn it into a 500 for that request while the server keeps serving everyone else. With abort, any panic terminates the whole process, dropping every in-flight request and possibly causing restarts across replicas if the trigger is a common input. The binary-size and minor performance gains from abort aren't worth that for a multi-tenant server.
+
+</details>
+
+<details>
+<summary>What do you standardize before letting many teams run Rust services?</summary>
+
+A paved road: a template service with telemetry, config, error format, auth extractor, health endpoints, CI workflow and dependency policy; internal crates for those concerns with clear owners; a toolchain and dependency upgrade cadence so the fleet doesn't fragment across major versions; Rust-specific runbooks and on-call training; and measured evidence from existing services on cost and reliability before expanding. Without these, each team rebuilds the platform differently and maintenance cost grows with every service.
+
+</details>
+
+## Key takeaways
+
+- Keep the release profile deliberate: thin LTO and one codegen unit for speed, `strip = "debuginfo"` for readable backtraces, and `panic = "unwind"` so one bad request can't kill the server.
+- Cache dependency compilation in Docker with cargo-chef, ship only the binary in a non-root distroless image, and match glibc versions between builder and runtime.
+- Prefer glibc on `distroless/cc`; choose musl and `scratch` only with a reason, and swap the allocator if you do.
+- Gate merges on fmt, clippy with warnings denied, nextest against real Postgres, `cargo sqlx prepare --check`, and cargo-deny, all with `--locked`.
+- Shutdown is a sequence: fail readiness, drain, stop accepting, finish requests, cancel workers, close the pool, flush telemetry, exit, all within the grace period.
+- Keep liveness free of dependencies, set Tokio worker counts to match CPU, and check pool size times replicas against the database.
+- Migrations run as a separate step, use expand and contract, set lock timeouts, and build indexes concurrently.
+- Running Rust org-wide is a platform decision: a paved road, owned internal crates, an upgrade cadence and on-call parity.
+
+Previous: [Rust Backend, Part 7: Observability and Performance](/blog/rust-backend-07-observability-performance) · Next: [Rust, Part 11: Leading Rust Adoption](/blog/rust-11-leading-rust-adoption)
