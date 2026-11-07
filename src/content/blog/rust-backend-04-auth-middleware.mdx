@@ -1101,5 +1101,3 @@ Each replica has its own buckets, so the effective limit is the configured limit
 - Fold ownership into queries and return 404 for resources the caller doesn't own.
 - Prefer `from_fn`, then tower-http, then a hand-written `Service`, and when you write one, honor `poll_ready` with the clone-and-swap pattern.
 - Layer order is behavior: CORS outside rejections, cheap limits before expensive work, auth as `route_layer`, per-user limits inside auth.
-
-Previous: [Part 3: PostgreSQL with SQLx](/blog/rust-backend-03-postgres-sqlx) · Next: [Part 5: Testing a Rust Service](/blog/rust-backend-05-testing)

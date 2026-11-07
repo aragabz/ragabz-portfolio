@@ -881,5 +881,3 @@ RAII ties a resource's lifetime to an owning value: acquire in the constructor, 
 - `Rc<RefCell<T>>` trades compile-time checks for runtime panics; prefer an arena with indices for trees and graphs.
 - `Drop` gives deterministic cleanup for every resource, not just memory. Watch `let _ =` and drop order.
 - `Cow` avoids allocation when most inputs pass through unchanged.
-
-Previous: [Part 5: Collections, Iterators, and Closures](/blog/rust-05-collections-iterators-closures) · Next: [Part 7: Concurrency](/blog/rust-07-concurrency)

@@ -13,5 +13,7 @@ const rank = LEVELS.indexOf(level) + 1;
   <span class="level-dots" aria-hidden="true">
     {LEVELS.map((_, i) => <span class={i < rank ? 'is-on' : undefined} />)}
   </span>
+  <span class="sr-only">Level:</span>
   {LEVEL_LABELS[level]}
+  <span class="sr-only">({rank} of {LEVELS.length}, junior to principal)</span>
 </span>

@@ -1116,5 +1116,3 @@ A signal listener cancels a shared `CancellationToken`. Each task selects on the
 - At-least-once is the realistic guarantee. Make consumers idempotent with an inbox table written in the same transaction as the state change, and store offsets only after commit.
 - Classify errors before retrying, use exponential backoff with full jitter, cap attempts, and dead-letter what cannot succeed.
 - gRPC with tonic is a good fit for internal, typed, high-volume calls. Since tonic 0.14, codegen uses `tonic-prost-build`. Always set deadlines, and never leak internal errors into a `Status`.
-
-Previous: [Part 5: Testing a Rust Service](/blog/rust-backend-05-testing) · Next: [Part 7: Observability and Performance](/blog/rust-backend-07-observability-performance)

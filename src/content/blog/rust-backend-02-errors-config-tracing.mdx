@@ -939,5 +939,3 @@ The raw path contains ids, so every order produces a distinct value such as `/or
 - Secrets come from the environment or a secret store, and live in `SecretString` so they cannot be logged by accident.
 - `tracing` spans carry context such as the request id to every event inside them; use `#[instrument(skip_all, fields(...))]` and JSON output with the full span list.
 - Order matters: set the request id, then trace, then propagate.
-
-Previous: [Part 1: Your First HTTP Service with Axum](/blog/rust-backend-01-first-http-service) · Next: [Part 3: PostgreSQL with SQLx](/blog/rust-backend-03-postgres-sqlx)

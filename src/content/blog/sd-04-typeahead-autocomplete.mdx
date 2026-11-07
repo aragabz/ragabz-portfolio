@@ -457,5 +457,3 @@ Check the inputs first: normalization (one client might not apply NFKC or trims 
 - Get freshness from a **small trending overlay** computed by a stream job and merged at serve time, and removals from a **blocklist fast path** plus edge purge.
 - The **network dominates the latency budget**: debounce, cancel stale requests, cache on the client and at the edge with a normalized, non-personal URL.
 - Personalize by **merging on the client** or re-ranking candidates, never by making the shared response uncacheable.
-
-Previous: [Design a Chat System](/blog/sd-03-chat-system) · Next: [Design a Distributed Job Scheduler](/blog/sd-05-distributed-job-scheduler)

@@ -25,6 +25,7 @@ const seriesPosts = series
       .filter((p) => p.data.series === series)
       .sort((a, b) => (a.data.seriesOrder ?? 0) - (b.data.seriesOrder ?? 0))
   : [];
+const isSeries = Boolean(series) && seriesPosts.length > 1;
 
 interface TocNode {
   depth: number;
@@ -77,76 +78,111 @@ function formatDate(date: Date) {
   title={post.data.title}
   description={post.data.excerpt}
   type="article"
+  publishedDate={post.data.date}
 >
+  <a href="#main" class="skip-link">Skip to article</a>
   <Navbar />
 
   <div class="reading-progress" aria-hidden="true"></div>
+  <p class="sr-only" aria-live="polite" data-live-status></p>
 
-  <article class="min-h-screen pt-24 pb-24 px-6">
+  <main id="main" tabindex="-1">
+  <article class="min-h-screen pt-24 pb-24 px-6" data-article={post.id}>
     <div class="max-w-5xl mx-auto">
-      <!-- Back Button -->
       <div class="mb-12">
-        <a 
-          href={`${base}blog`}
-          class="back-link"
-        >
-          ← All articles
-        </a>
+        <a href={`${base}blog`} class="back-link">← All articles</a>
       </div>
 
-      <!-- Article Header -->
       <header class="mb-14 max-w-[720px]">
-        <p class="eyebrow">{series ?? 'Blog'}</p>
-
-        <h1 data-pagefind-meta="title" class="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.08] font-bold tracking-tight mb-8" style="color: var(--color-text);">
+        <h1 data-pagefind-meta="title" class="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.08] font-bold tracking-tight mb-8 text-balance" style="color: var(--color-text);">
           {post.data.title}
         </h1>
 
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" style="color: var(--color-text-tertiary);">
-          <time datetime={post.data.date.toISOString()}>
-            {formatDate(post.data.date)}
-          </time>
+        <p class="article-meta">
+          <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
           <span aria-hidden="true">·</span>
           <span>{post.data.readingTime || 5} min read</span>
           {post.data.author && (
-            <span style={{ marginLeft: '1rem', color: 'var(--color-text-tertiary)' }}>
-              by {post.data.author}
-            </span>
+            <>
+              <span aria-hidden="true">·</span>
+              <span>by {post.data.author}</span>
+            </>
           )}
-        </div>
+        </p>
 
         <div class="flex flex-wrap items-center gap-2 mt-6">
           {post.data.level && <LevelBadge level={post.data.level} />}
           {post.data.tags.map(tag => (
-            <span class="tag">
-              {tag}
-            </span>
+            <span class="tag">{tag}</span>
           ))}
         </div>
       </header>
 
-      <!-- Article Body + TOC -->
       <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:gap-16">
         <div class="max-w-[720px] min-w-0">
-          {series && seriesPosts.length > 1 && (
-            <SeriesNav series={series} posts={seriesPosts} currentId={post.id} variant="outline" />
+          {isSeries && (
+            <SeriesNav series={series!} posts={seriesPosts} currentId={post.id} variant="outline" />
           )}
+
+          {toc.length > 0 && (
+            <details class="toc-mobile lg:hidden">
+              <summary>
+                <span>On this page</span>
+                <span class="toc-mobile-count">{toc.length} sections</span>
+              </summary>
+              <ol>
+                {toc.map(section => (
+                  <li>
+                    <a href={`#${section.slug}`} class="toc-link" data-toc-link>
+                      <span class="toc-num">{section.number}</span>
+                      {section.text}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
+
           <div class="blog-content" data-pagefind-body>
             <Content />
           </div>
-          {series && seriesPosts.length > 1 && (
-            <SeriesNav series={series} posts={seriesPosts} currentId={post.id} variant="pager" />
+
+          {isSeries && (
+            <SeriesNav series={series!} posts={seriesPosts} currentId={post.id} variant="pager" />
           )}
+
+          <div class:list={['article-actions', { 'is-standalone': !isSeries }]}>
+            <div class="article-share">
+              <span class="article-share-label">Share</span>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(articleURL.href)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="share-btn"
+              >X</a>
+              <a
+                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleURL.href)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="share-btn"
+              >LinkedIn</a>
+              <button type="button" class="share-btn" data-copy-link>Copy link</button>
+              <button type="button" class="share-btn" data-print>Print</button>
+            </div>
+            <a href={`${base}blog`} class="back-link">All articles</a>
+          </div>
+
+          <RelatedPosts currentSlug={post.id} currentTags={post.data.tags} currentSeries={isSeries ? series : undefined} />
         </div>
 
         {toc.length > 0 && (
           <aside class="hidden lg:block" aria-label="Table of contents">
-            <nav class="toc sticky top-10">
+            <nav class="toc" data-toc>
               <p class="toc-label">On this page</p>
               <ul class="toc-root">
                 {toc.map(section => (
                   <li>
-                    <a href={`#${section.slug}`} class="toc-link toc-h2">
+                    <a href={`#${section.slug}`} class="toc-link toc-h2" data-toc-link>
                       <span class="toc-num">{section.number}</span>
                       {section.text}
                     </a>
@@ -154,7 +190,7 @@ function formatDate(date: Date) {
                       <ul class="toc-sub">
                         {section.children.map(sub => (
                           <li>
-                            <a href={`#${sub.slug}`} class="toc-link toc-h3">
+                            <a href={`#${sub.slug}`} class="toc-link toc-h3" data-toc-link>
                               <span class="toc-num">{sub.number}</span>
                               {sub.text}
                             </a>
@@ -162,7 +198,7 @@ function formatDate(date: Date) {
                               <ul class="toc-sub">
                                 {sub.children.map(detail => (
                                   <li>
-                                    <a href={`#${detail.slug}`} class="toc-link toc-h4">
+                                    <a href={`#${detail.slug}`} class="toc-link toc-h4" data-toc-link>
                                       <span class="toc-num">{detail.number}</span>
                                       {detail.text}
                                     </a>
@@ -181,65 +217,13 @@ function formatDate(date: Date) {
           </aside>
         )}
       </div>
-
-      <!-- Author/Share Section -->
-      <div class="max-w-[720px] mt-20 pt-10 border-t" style="border-color: var(--color-border);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-          <div>
-            <p class="text-xs uppercase tracking-[0.15em] mb-3" style="color: var(--color-text-tertiary);">
-              Share this article
-            </p>
-            <div class="flex gap-2">
-              <a 
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(articleURL.href)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="share-btn"
-                aria-label="Share on X (Twitter)"
-              >
-                X
-              </a>
-              <a 
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleURL.href)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="share-btn"
-                aria-label="Share on LinkedIn"
-              >
-                LinkedIn
-              </a>
-              <button type="button" class="share-btn copy-link" aria-label="Copy link to article">
-                Copy link
-              </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button 
-              onclick="window.print()"
-              class="share-btn"
-              style={{ padding: '0.5rem 1rem', fontSize: '0.8125rem' }}
-              aria-label="Print this article"
-            >
-              Print →
-            </button>
-          </div>
-
-          <a 
-            href={`${base}blog`}
-            class="back-link"
-          >
-            All articles →
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Related Posts -->
-    <div class="max-w-5xl mx-auto mt-20">
-      <RelatedPosts currentSlug={post.id} currentTags={post.data.tags} />
     </div>
   </article>
+  </main>
+
+  <a href="#main" class="back-to-top" data-back-to-top aria-label="Back to top">
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" /></svg>
+  </a>
 
   <style is:global>
     .reading-progress {
@@ -268,13 +252,66 @@ function formatDate(date: Date) {
       color: var(--color-accent-strong);
     }
 
-    .eyebrow {
-      margin-bottom: 1rem;
-      font-size: 0.75rem;
+    .article-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      color: var(--color-text-tertiary);
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 200;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      background: var(--color-text);
+      color: var(--color-bg);
+      font-size: 0.875rem;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
+      text-decoration: none;
+      transform: translateY(-200%);
+    }
+
+    .skip-link:focus-visible {
+      transform: none;
+    }
+
+    #main:focus {
+      outline: none;
+    }
+
+    .back-to-top {
+      position: fixed;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      z-index: 40;
+      display: grid;
+      place-items: center;
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--color-border-secondary);
+      background: var(--color-bg);
+      color: var(--color-text-secondary);
+      opacity: 0;
+      transform: translateY(0.5rem);
+      pointer-events: none;
+      transition: opacity 0.2s ease-out, transform 0.2s ease-out, color 0.2s, border-color 0.2s;
+    }
+
+    .back-to-top.is-visible {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+
+    .back-to-top:hover {
       color: var(--color-accent-strong);
+      border-color: var(--color-accent-strong);
     }
 
     .tag {
@@ -288,16 +325,72 @@ function formatDate(date: Date) {
 
     /* ---- Table of contents ---- */
     .toc {
-      font-size: 0.8125rem;
+      position: sticky;
+      top: 6rem;
+      max-height: calc(100vh - 7.5rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-right: 0.25rem;
+      font-size: 0.875rem;
+      scrollbar-width: thin;
     }
 
     .toc-label {
-      font-size: 0.6875rem;
+      font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.15em;
+      letter-spacing: 0.12em;
       color: var(--color-text-tertiary);
       margin-bottom: 0.875rem;
+    }
+
+    /* Once the script runs, only the current section's subsections stay expanded. */
+    .toc[data-ready] li:not(.is-open) > .toc-sub {
+      display: none;
+    }
+
+    .toc-mobile {
+      margin: 0 0 3rem;
+      border: 1px solid var(--color-border);
+      border-radius: 0.75rem;
+    }
+
+    .toc-mobile summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      padding: 0.875rem 1.25rem;
+      font-weight: 600;
+      color: var(--color-text);
+      cursor: pointer;
+      list-style: none;
+      border-radius: 0.75rem;
+    }
+
+    .toc-mobile summary::-webkit-details-marker { display: none; }
+
+    .toc-mobile-count {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: var(--color-text-tertiary);
+    }
+
+    .toc-mobile ol {
+      margin: 0;
+      padding: 0 0.75rem 0.75rem 0.375rem;
+      list-style: none;
+      font-size: 0.9375rem;
+    }
+
+    .toc-mobile .toc-link {
+      border-left: none;
+      padding: 0.5rem 0.875rem;
+      border-radius: 0.5rem;
+    }
+
+    .toc-mobile .toc-link.active {
+      background: var(--color-bg-secondary);
     }
 
     .toc ul {
@@ -345,13 +438,41 @@ function formatDate(date: Date) {
     .toc-h3 { padding-left: 2rem; }
     .toc-h4 { padding-left: 3.25rem; }
 
-    /* ---- Share buttons ---- */
+    /* ---- Article end ---- */
+    .article-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .article-actions.is-standalone {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .article-share {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .article-share-label {
+      margin-right: 0.25rem;
+      font-size: 0.875rem;
+      color: var(--color-text-tertiary);
+    }
+
     .share-btn {
       display: inline-flex;
       align-items: center;
-      padding: 0.5rem 1rem;
+      padding: 0.375rem 0.875rem;
       border-radius: 999px;
-      font-size: 0.8125rem;
+      font-size: 0.875rem;
       background: transparent;
       color: var(--color-text-secondary);
       border: 1px solid var(--color-border);
@@ -384,17 +505,18 @@ function formatDate(date: Date) {
       line-height: 1.2;
       margin-top: 3rem;
       margin-bottom: 1.125rem;
-      scroll-margin-top: 2rem;
+      scroll-margin-top: 6rem;
+      text-wrap: balance;
     }
 
     .blog-content h1 {
-      font-size: 2.25rem;
+      font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.25rem);
       padding-bottom: 1rem;
       border-bottom: 1px solid var(--color-border);
     }
 
     .blog-content h2 {
-      font-size: 1.875rem;
+      font-size: clamp(1.5rem, 1.25rem + 1.1vw, 1.875rem);
       position: relative;
       padding-bottom: 0.875rem;
     }
@@ -407,17 +529,15 @@ function formatDate(date: Date) {
       width: 3.5rem;
       height: 3px;
       border-radius: 999px;
-      background: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
+      background: var(--color-accent);
     }
 
     .blog-content h3 {
-      font-size: 1.5rem;
-      padding-left: 0.875rem;
-      border-left: 3px solid var(--color-accent);
+      font-size: clamp(1.3125rem, 1.15rem + 0.7vw, 1.5rem);
     }
 
     .blog-content h4 {
-      font-size: 1.25rem;
+      font-size: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
       color: var(--color-accent-strong);
     }
 
@@ -524,14 +644,19 @@ function formatDate(date: Date) {
       cursor: pointer;
     }
 
+    /* github-dark comments (#6a737d) are 3:1 on the code surface; lift them to readable contrast. */
+    .blog-content pre span[style*="#6A737D" i] {
+      color: #8b949e !important;
+    }
+
     .code-copy-btn:hover {
       background-color: #30363d;
       color: #ffffff;
     }
 
     .code-copy-btn.copied {
-      background-color: var(--color-accent);
-      border-color: var(--color-accent);
+      background-color: var(--color-accent-strong);
+      border-color: var(--color-accent-strong);
       color: #ffffff;
     }
 
@@ -583,6 +708,21 @@ function formatDate(date: Date) {
       border: none;
     }
 
+    .figure-link {
+      display: block;
+      margin: 2.5rem 0;
+      border-radius: 0.75rem;
+      cursor: zoom-in;
+    }
+
+    .figure-link img {
+      margin: 0 !important;
+    }
+
+    .blog-content .figure-link {
+      text-decoration: none;
+    }
+
     .blog-content hr {
       border: none;
       height: 1rem;
@@ -599,15 +739,38 @@ function formatDate(date: Date) {
       font-size: 0.875rem;
     }
 
+    .table-scroll {
+      margin: 2.5rem 0;
+      overflow-x: auto;
+      border: 1px solid var(--color-border);
+      border-radius: 0.75rem;
+      /* Scroll shadows: the cover gradients scroll with the content, the shadows stay put. */
+      background:
+        linear-gradient(to right, var(--color-bg), var(--color-bg)) left / 1.5rem 100% no-repeat local,
+        linear-gradient(to left, var(--color-bg), var(--color-bg)) right / 1.5rem 100% no-repeat local,
+        radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.14), transparent) left / 0.75rem 100% no-repeat scroll,
+        radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.14), transparent) right / 0.75rem 100% no-repeat scroll;
+    }
+
     .blog-content table {
       width: 100%;
       border-collapse: separate;
       border-spacing: 0;
-      margin: 2.5rem 0;
       font-size: 0.9375rem;
+    }
+
+    .blog-content > table {
+      margin: 2.5rem 0;
       border: 1px solid var(--color-border);
       border-radius: 0.75rem;
-      overflow: hidden;
+    }
+
+    .blog-content td {
+      min-width: 8rem;
+    }
+
+    .blog-content td:first-child {
+      min-width: 6rem;
     }
 
     .blog-content thead {
@@ -630,7 +793,7 @@ function formatDate(date: Date) {
     }
 
     .blog-content tbody tr:nth-child(even) {
-      background-color: var(--color-bg-secondary);
+      background-color: color-mix(in srgb, var(--color-bg-secondary) 85%, transparent);
     }
 
     .blog-content tbody tr:hover {
@@ -652,10 +815,6 @@ function formatDate(date: Date) {
 
     @media (max-width: 768px) {
       .blog-content { font-size: 1rem; }
-      .blog-content h1 { font-size: 1.75rem; }
-      .blog-content h2 { font-size: 1.5625rem; }
-      .blog-content h3 { font-size: 1.375rem; }
-      .blog-content h4 { font-size: 1.1875rem; }
 
       .code-block {
         margin-left: -1.5rem;
@@ -663,57 +822,55 @@ function formatDate(date: Date) {
         border-radius: 0;
       }
 
-      .blog-content table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
+      .back-to-top {
+        right: 1rem;
+        bottom: 1rem;
       }
+
+      /* Printing from a phone is rare; dropping it keeps the share row on one line. */
+      .share-btn[data-print] {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .back-to-top { transition: none; }
     }
   </style>
 
-  <script is:inline>
-    const progress = document.querySelector('.reading-progress');
-    const updateProgress = () => {
-      const doc = document.documentElement;
-      const scrollTop = doc.scrollTop || document.body.scrollTop;
-      const height = doc.scrollHeight - doc.clientHeight;
-      progress.style.transform = `scaleX(${height > 0 ? Math.min(scrollTop / height, 1) : 0})`;
-    };
-    document.addEventListener('scroll', updateProgress, { passive: true });
-    updateProgress();
-
-    const tocLinks = Array.from(document.querySelectorAll('.toc-link'));
-    const tocTargets = tocLinks
-      .map(link => document.getElementById(link.getAttribute('href').slice(1)))
-      .filter(Boolean);
-
-    const setActiveToc = () => {
-      const pos = window.scrollY + 140;
-      let current = tocTargets[0] && tocTargets[0].id;
-      for (const heading of tocTargets) {
-        if (heading.offsetTop <= pos) current = heading.id;
-      }
-      tocLinks.forEach(link => {
-        link.classList.toggle('active', link.getAttribute('href') === `#${current}`);
-      });
-    };
-    document.addEventListener('scroll', setActiveToc, { passive: true });
-    setActiveToc();
-
-    document.querySelectorAll('.copy-link').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const url = window.location.href;
-        try {
-          await navigator.clipboard.writeText(url);
-          const original = btn.textContent;
-          btn.textContent = 'Copied!';
-          setTimeout(() => (btn.textContent = original), 2000);
-        } catch (e) {}
-      });
-    });
-  </script>
-
   <script>
+    // Everything here is (re)initialised on every `astro:page-load` (first load and each
+    // view-transition navigation) and torn down on `astro:before-swap`, so state never goes stale.
+    const READ_KEY = 'read-posts';
+    let teardown: (() => void) | undefined;
+
+    const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function announce(message: string) {
+      const live = document.querySelector<HTMLElement>('[data-live-status]');
+      if (!live) return;
+      live.textContent = '';
+      requestAnimationFrame(() => (live.textContent = message));
+    }
+
+    function readPosts(): string[] {
+      try {
+        const value = JSON.parse(localStorage.getItem(READ_KEY) ?? '[]');
+        return Array.isArray(value) ? value : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function markRead(id: string) {
+      try {
+        const read = readPosts();
+        if (!read.includes(id)) localStorage.setItem(READ_KEY, JSON.stringify([...read, id]));
+      } catch {
+        // Storage unavailable (private mode, blocked): read state is a convenience only.
+      }
+    }
+
     function addCodeToolbars() {
       // Mermaid blocks are replaced by rendered diagrams (see BaseLayout), so skip them.
       document.querySelectorAll<HTMLPreElement>('.blog-content pre:not([data-language="mermaid"])').forEach((pre) => {
@@ -744,11 +901,12 @@ function formatDate(date: Date) {
           try {
             await navigator.clipboard.writeText(text);
             btn.textContent = 'Copied!';
-            btn.classList.add('copied');
+            announce('Code copied to clipboard');
           } catch {
             btn.textContent = 'Copy failed';
-            btn.classList.add('copied');
+            announce('Copy failed. Select the code and copy it manually.');
           }
+          btn.classList.add('copied');
           setTimeout(() => {
             btn.textContent = 'Copy';
             btn.classList.remove('copied');
@@ -757,7 +915,169 @@ function formatDate(date: Date) {
       });
     }
 
-    // Fires on the initial load and after every view-transition navigation.
-    document.addEventListener('astro:page-load', addCodeToolbars);
+    function enhanceContent() {
+      // Tables scroll inside a wrapper on narrow screens instead of stretching the page.
+      document.querySelectorAll<HTMLTableElement>('.blog-content table').forEach((table) => {
+        if (table.parentElement?.classList.contains('table-scroll')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'table-scroll';
+        wrap.tabIndex = 0;
+        wrap.setAttribute('role', 'region');
+        wrap.setAttribute('aria-label', 'Table, scrolls horizontally');
+        table.replaceWith(wrap);
+        wrap.append(table);
+      });
+
+      // Figures open full size, so their small text stays readable on phones.
+      document.querySelectorAll<HTMLImageElement>('.blog-content img[src$=".svg"]').forEach((img) => {
+        if (img.closest('a')) return;
+        const link = document.createElement('a');
+        link.href = img.getAttribute('src') ?? '';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = 'figure-link';
+        link.setAttribute('aria-label', `Open figure full size: ${img.alt}`);
+        img.replaceWith(link);
+        link.append(img);
+      });
+    }
+
+    function initArticle() {
+      teardown?.();
+      teardown = undefined;
+
+      const article = document.querySelector<HTMLElement>('[data-article]');
+      if (!article) return;
+
+      addCodeToolbars();
+      enhanceContent();
+
+      const postId = article.dataset.article!;
+      const controller = new AbortController();
+      const { signal } = controller;
+
+      const progress = document.querySelector<HTMLElement>('.reading-progress');
+      const backToTop = document.querySelector<HTMLElement>('[data-back-to-top]');
+      const toc = document.querySelector<HTMLElement>('[data-toc]');
+      const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
+      const headings = Array.from(
+        new Set(tocLinks.map((link) => link.getAttribute('href')!.slice(1))),
+      )
+        .map((id) => document.getElementById(id))
+        .filter((el): el is HTMLElement => el !== null);
+
+      // Read state in the series outline.
+      const read = readPosts();
+      document.querySelectorAll<HTMLElement>('[data-series-outline] li[data-post-id]').forEach((li) => {
+        const mark = li.querySelector<HTMLElement>('.series-read');
+        if (mark) mark.hidden = !read.includes(li.dataset.postId!) || li.classList.contains('is-current');
+      });
+      let markedRead = read.includes(postId);
+
+      toc?.setAttribute('data-ready', '');
+      let activeId: string | undefined;
+      let frame = 0;
+
+      const update = () => {
+        frame = 0;
+        const doc = document.documentElement;
+        const max = doc.scrollHeight - doc.clientHeight;
+        const ratio = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+        if (progress) progress.style.transform = `scaleX(${ratio})`;
+        backToTop?.classList.toggle('is-visible', window.scrollY > window.innerHeight * 2);
+
+        if (!markedRead && ratio > 0.6) {
+          markRead(postId);
+          markedRead = true;
+        }
+
+        if (headings.length === 0) return;
+        const atBottom = window.innerHeight + window.scrollY >= doc.scrollHeight - 4;
+        let current = headings[0].id;
+        if (atBottom) {
+          current = headings[headings.length - 1].id;
+        } else {
+          for (const heading of headings) {
+            if (heading.getBoundingClientRect().top <= 120) current = heading.id;
+            else break;
+          }
+        }
+        if (current === activeId) return;
+        activeId = current;
+
+        tocLinks.forEach((link) => {
+          const isActive = link.getAttribute('href') === `#${current}`;
+          link.classList.toggle('active', isActive);
+          if (isActive) link.setAttribute('aria-current', 'location');
+          else link.removeAttribute('aria-current');
+        });
+
+        if (toc) {
+          toc.querySelectorAll('li.is-open').forEach((li) => li.classList.remove('is-open'));
+          const active = toc.querySelector<HTMLElement>('.toc-link.active');
+          let li = active?.closest('li');
+          while (li && toc.contains(li)) {
+            li.classList.add('is-open');
+            li = li.parentElement?.closest('li');
+          }
+          // Keep the active entry visible inside the scrollable TOC.
+          if (active) {
+            const top = active.offsetTop;
+            if (top < toc.scrollTop + 48 || top > toc.scrollTop + toc.clientHeight - 48) {
+              toc.scrollTo({ top: top - toc.clientHeight / 3, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+            }
+          }
+        }
+      };
+
+      const schedule = () => {
+        if (!frame) frame = requestAnimationFrame(update);
+      };
+      window.addEventListener('scroll', schedule, { passive: true, signal });
+      window.addEventListener('resize', schedule, { passive: true, signal });
+      update();
+
+      // Mobile "On this page": close after jumping to a section.
+      document.querySelectorAll<HTMLDetailsElement>('.toc-mobile').forEach((details) => {
+        details.addEventListener('click', (event) => {
+          if ((event.target as HTMLElement).closest('a')) details.open = false;
+        }, { signal });
+      });
+
+      backToTop?.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+        document.getElementById('main')?.focus({ preventScroll: true });
+      }, { signal });
+
+      document.querySelectorAll<HTMLButtonElement>('[data-copy-link]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(window.location.href);
+            btn.textContent = 'Copied!';
+            announce('Link copied to clipboard');
+          } catch {
+            btn.textContent = 'Copy failed';
+            announce('Copy failed. Copy the address from the browser bar.');
+          }
+          setTimeout(() => (btn.textContent = 'Copy link'), 2000);
+        }, { signal });
+      });
+
+      document.querySelectorAll<HTMLButtonElement>('[data-print]').forEach((btn) => {
+        btn.addEventListener('click', () => window.print(), { signal });
+      });
+
+      teardown = () => {
+        controller.abort();
+        if (frame) cancelAnimationFrame(frame);
+      };
+    }
+
+    document.addEventListener('astro:page-load', initArticle);
+    document.addEventListener('astro:before-swap', () => {
+      teardown?.();
+      teardown = undefined;
+    });
   </script>
 </BaseLayout>

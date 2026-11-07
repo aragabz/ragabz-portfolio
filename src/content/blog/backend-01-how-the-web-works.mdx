@@ -451,5 +451,3 @@ Each request holds a worker thread for its whole duration. If a dependency goes 
 - HTTP semantics (methods, status codes, headers) are the same across HTTP/1.1, /2 and /3; only the framing and transport differ.
 - Inside the server, a request flows through filters, routing, your controller and service, and back out as serialized bytes, usually holding one thread the whole time.
 - Think in round trips and orders of magnitude: network hops dominate latency.
-
-Next: [Part 2: REST API Design](/blog/backend-02-rest-api-design)

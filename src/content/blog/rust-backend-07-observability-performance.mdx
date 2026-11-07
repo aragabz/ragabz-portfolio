@@ -830,5 +830,3 @@ Ask what was measured. A microbenchmark of allocation speed does not predict a s
 - Uniform latency increases with spare CPU usually mean blocked runtime workers. Use `spawn_blocking`, runtime metrics, and tokio-console to find and fix them.
 - Profile under realistic load with a profiling build, load test with a fixed arrival rate, and treat allocator changes as experiments.
 - Bound work in flight with `GlobalConcurrencyLimitLayer` plus `LoadShedLayer`, return fast 503s, and keep the pool's `acquire_timeout` short so overload fails fast instead of queueing.
-
-Previous: [Part 6: Async Jobs, Messaging, and gRPC](/blog/rust-backend-06-async-jobs-messaging-grpc) · Next: [Part 8: Shipping to Production](/blog/rust-backend-08-shipping-production)

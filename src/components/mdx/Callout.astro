@@ -11,16 +11,35 @@ const labels: Record<string, string> = {
   tip: 'Tip',
   warning: 'Warning',
 };
+const label = title ?? labels[variant];
 ---
 
-<div class="callout callout-{variant}">
+<aside class:list={['callout', `callout-${variant}`]} aria-label={label}>
   <p class="callout-label">
-    {title ?? labels[variant]}
+    <svg class="callout-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      {variant === 'warning' ? (
+        <>
+          <path d="M8 1.75 15 14.25H1L8 1.75Z" />
+          <path d="M8 6.25v3.5M8 12h.01" />
+        </>
+      ) : variant === 'tip' ? (
+        <>
+          <path d="M5.75 11.25h4.5M6.5 14h3" />
+          <path d="M8 1.75a4.25 4.25 0 0 0-2.5 7.69c.47.34.75.88.75 1.46v.35h3.5v-.35c0-.58.28-1.12.75-1.46A4.25 4.25 0 0 0 8 1.75Z" />
+        </>
+      ) : (
+        <>
+          <circle cx="8" cy="8" r="6.25" />
+          <path d="M8 7.25v4M8 4.75h.01" />
+        </>
+      )}
+    </svg>
+    {label}
   </p>
   <div class="callout-body">
     <slot />
   </div>
-</div>
+</aside>
 
 <style>
   .callout {
@@ -28,24 +47,55 @@ const labels: Record<string, string> = {
     padding: 1.25rem 1.5rem;
     border-radius: 0.75rem;
     border: 1px solid var(--color-border);
-    border-left-width: 3px;
-    border-left-color: var(--color-accent);
     background: var(--color-bg-secondary);
   }
 
+  .callout-tip {
+    background: color-mix(in srgb, var(--color-accent) 4%, var(--color-bg-secondary));
+    border-color: color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  }
+
+  .callout-warning {
+    background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg));
+    border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+  }
+
   .callout-label {
-    font-size: 0.6875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
+    color: var(--color-text);
+  }
+
+  .callout-icon {
+    flex-shrink: 0;
+    fill: none;
+    stroke: var(--color-text-tertiary);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .callout-tip .callout-icon,
+  .callout-warning .callout-icon {
+    stroke: var(--color-accent-strong);
+  }
+
+  .callout-warning .callout-label {
     color: var(--color-accent-strong);
-    margin-bottom: 0.625rem;
   }
 
   .callout-body {
     font-size: 0.9375rem;
     line-height: 1.7;
     color: var(--color-text-secondary);
+  }
+
+  .callout-warning .callout-body {
+    color: var(--color-text);
   }
 
   .callout-body :global(p),
@@ -68,7 +118,7 @@ const labels: Record<string, string> = {
     background-color: var(--color-bg-tertiary);
     color: var(--color-accent-strong);
     padding: 0.2em 0.4em;
-    border-radius: 0.25rem;
+    border-radius: 0.375rem;
     font-size: 0.85em;
   }
 </style>

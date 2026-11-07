@@ -785,5 +785,3 @@ A concrete, `#[non_exhaustive]` enum implementing `std::error::Error`, `Display`
 - Tune the release profile (LTO, codegen units, panic strategy) and consider PGO, but measure each change and understand its operational cost.
 - Design libraries with the API Guidelines: conventional names, common traits, flexible inputs and concrete outputs, builders for options, typestate for linear protocols, sealed traits and `#[non_exhaustive]` for room to grow, and a concrete error enum.
 - Treat semver, MSRV and docs as part of the API: run `cargo-semver-checks`, declare `rust-version` and test it, and let doc tests keep your examples honest.
-
-Previous: [Part 9: Unsafe, FFI and Macros](/blog/rust-09-unsafe-ffi-macros) · Next: [Part 11: Leading Rust Adoption](/blog/rust-11-leading-rust-adoption)

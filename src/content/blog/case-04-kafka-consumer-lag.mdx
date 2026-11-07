@@ -520,5 +520,3 @@ Pause when the failure is about a dependency, not the record: the downstream dat
 - Keep listeners cheap: timeouts on every call, bulk enrichment, batched idempotent writes, bounded retries with a DLT, and pausing when a dependency is down.
 - Static membership and the **KIP-848** protocol make rebalances cheaper; they do not fix slow handlers.
 - Alert on **time lag** against the freshness SLO, rebalance rate, poll-loop time and per-partition utilization, and canary consumer deploys.
-
-Previous: [Duplicate Payments from Retries](/blog/case-03-duplicate-payments-retries) · Next: [A Retry Storm and a Cascading Failure](/blog/case-05-retry-storm-cascading-failure)

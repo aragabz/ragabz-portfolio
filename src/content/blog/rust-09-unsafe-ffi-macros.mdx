@@ -889,5 +889,3 @@ Either hand-write JNI functions with the `jni` crate, or use a binding generator
 - Edition 2024 makes unsafe assertions explicit: `unsafe extern`, `#[unsafe(no_mangle)]`, unsafe blocks inside `unsafe fn`, and no references to `static mut`.
 - For FFI, use `#[repr(C)]`, the `c_*` type aliases, opaque handles with paired constructor and destructor, and catch panics at the boundary. Generate bindings with bindgen or cbindgen, and use UniFFI, `jni` or PyO3 for Kotlin, the JVM and Python.
 - Prefer functions and traits over macros. Use `macro_rules!` for variadic helpers and repetitive items; use proc macros with syn and quote for derives and attributes, and always report errors as spanned `syn::Error`s.
-
-Previous: [Part 8: Async Rust](/blog/rust-08-async-rust) · Next: [Part 10: Performance and API Design](/blog/rust-10-performance-api-design)

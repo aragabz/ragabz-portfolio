@@ -678,5 +678,3 @@ Measure the ratio of requests a dependency receives to requests users send at th
 - If the outage outlives its trigger, it is metastable: mitigate by cutting load (kill switches, shedding, disabling retries), let it drain, then restore traffic gradually.
 - During the incident, prefer the fastest reversible action that removes load from the saturated component. Root cause can wait.
 - Retry policy is a property of the whole call graph. Give it an owner, usually the platform team, and test the failure path with load tests that check the system recovers by itself.
-
-Previous: [Kafka Consumer Lag After a Deploy](/blog/case-04-kafka-consumer-lag) · Next: [Splitting the Shared Database](/blog/case-06-splitting-the-shared-database)

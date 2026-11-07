@@ -77,6 +77,12 @@ html {
   scroll-padding-top: 80px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   background-color: var(--color-bg);
   color: var(--color-text);
@@ -236,34 +242,46 @@ a {
 /* Keyboard Focus Styles */
 a:focus-visible,
 button:focus-visible,
+summary:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* Mermaid Diagram Styles */
+/* Mermaid diagrams: themed from the color tokens at render time (BaseLayout.astro),
+   and re-rendered when the theme changes, so no color filters are needed here. */
 .mermaid {
   display: block;
-  margin: 2rem auto;
+  margin: 2.5rem auto;
   max-width: 100%;
   overflow-x: auto;
   text-align: center;
 }
 
+/* Mermaid wraps labels in <p>; keep article prose spacing out of them or the boxes clip their text. */
+.blog-content .mermaid p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .mermaid svg {
+  display: block;
+  margin: 0 auto;
   max-width: 100%;
   height: auto;
 }
 
-/* Dark mode adjustments for mermaid */
-[data-theme="dark"] .mermaid {
-  filter: invert(1) hue-rotate(180deg);
+.mermaid-fallback {
+  margin: 2.5rem 0;
 }
 
-[data-theme="dark"] .mermaid svg {
-  filter: invert(1) hue-rotate(180deg);
+.mermaid-fallback p {
+  margin: 0 0 0.5rem !important;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
 }
 
 /* Search (src/components/react/Search.tsx) */
@@ -297,7 +315,7 @@ dialog::backdrop {
   margin: 0 0 0.5rem;
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--color-brand-orange);
+  color: var(--color-accent-strong);
 }
 
 .search-result p {

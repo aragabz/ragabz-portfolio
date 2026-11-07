@@ -661,5 +661,3 @@ Decide it before you start, per phase. Until the application stops writing the o
 - Add constraints online with **`NOT VALID` then `VALIDATE`**, and indexes with **`CREATE INDEX CONCURRENTLY`** in their own non-transactional migration.
 - Give every phase a written **rollback target**, and make dropping the old column a separate step after a soak.
 - Run migrations as a **pipeline step**, not at pod startup, once tables are large enough for it to matter.
-
-Previous: [Connection Pool Exhaustion](/blog/case-01-connection-pool-exhaustion) · Next: [Duplicate Payments from Retries](/blog/case-03-duplicate-payments-retries)

@@ -675,5 +675,3 @@ Anything slow or unbounded inside a transaction: other HTTP or gRPC clients, syn
 - Put **timeouts** on every hop, set `connection-timeout` below the caller's deadline, and add server-side `statement_timeout` and `idle_in_transaction_session_timeout` as backstops.
 - Size pools from measured hold times, budget connections across **all pods**, and derive autoscaling limits from that budget.
 - Alert on **pending connections and hold time**, and add a test guardrail that fails the build when HTTP runs inside a transaction.
-
-Next: [A Zero-Downtime Schema Migration](/blog/case-02-zero-downtime-schema-migration)

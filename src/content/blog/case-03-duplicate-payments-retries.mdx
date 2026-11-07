@@ -554,5 +554,3 @@ The client, because it holds the idempotency key and the user's intent, and it c
 - Add a **database constraint** that makes duplicate live charges impossible, as the last line of defense.
 - **Reconcile against the PSP**, frequently, and alert on duplicates per order and PSP calls per checkout. Correctness needs its own SLI.
 - Remediate customers proactively, with deterministic refund keys, before they file chargebacks.
-
-Previous: [A Zero-Downtime Schema Migration](/blog/case-02-zero-downtime-schema-migration) · Next: [Kafka Consumer Lag After a Deploy](/blog/case-04-kafka-consumer-lag)

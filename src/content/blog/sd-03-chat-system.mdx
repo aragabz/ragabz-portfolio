@@ -530,5 +530,3 @@ Gaps mean the real-time path is losing or reordering messages, so look at the pa
 - Store messages in a **wide-column store partitioned by (conversation, bucket)** and clustered by `seq`.
 - **Read receipts are watermarks**, **presence is debounced transitions** with subscribe-on-view, and both are shed before messaging under load.
 - Large groups switch from fan-out on write to fan-out on read, just like celebrities in a news feed.
-
-Previous: [Design a Notification System](/blog/sd-02-notification-system) · Next: [Design Search Autocomplete](/blog/sd-04-typeahead-autocomplete)

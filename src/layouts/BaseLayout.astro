@@ -51,6 +51,8 @@ export interface Props {
   type?: string;
   keywords?: string[];
   noindex?: boolean;
+  /** Articles: the post's own date, used for datePublished/dateModified in the JSON-LD. */
+  publishedDate?: Date;
 }
 
 const {
@@ -59,6 +61,7 @@ const {
   image = '/og-image.jpg',
   type = 'website',
   noindex = false,
+  publishedDate,
   keywords = [
     'Software Engineer',
     'Technical Lead',
@@ -91,7 +94,7 @@ const siteName = locales.en.siteName;
     <meta name="generator" content={Astro.generator} />
     
     <!-- Performance & Mobile -->
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -108,6 +111,8 @@ const siteName = locales.en.siteName;
         return 'light';
       })();
       document.documentElement.setAttribute('data-theme', theme);
+      // Browser chrome follows the page background (--color-bg) in each theme.
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0f172a' : '#ffffff');
     </script>
     
     <!-- Primary Meta Tags -->
@@ -170,8 +175,8 @@ const siteName = locales.en.siteName;
           "name": "Ahmed Ragab"
         },
         "image": socialImageURL.toString(),
-        "datePublished": new Date().toISOString(),
-        "dateModified": new Date().toISOString(),
+        "datePublished": (publishedDate ?? new Date()).toISOString(),
+        "dateModified": (publishedDate ?? new Date()).toISOString(),
         "description": description,
         "mainEntityOfPage": canonicalURL.toString(),
         "keywords": keywords.join(', ')
@@ -219,46 +224,140 @@ const siteName = locales.en.siteName;
 
     <!-- Mermaid diagrams: loaded on demand, only on pages that contain one -->
     <script>
+      import type { MermaidConfig } from 'mermaid';
+
       const MERMAID_SELECTOR = '.blog-content pre[data-language="mermaid"]';
+      let renderCount = 0;
 
-      async function renderMermaidBlocks() {
-        const blocks = document.querySelectorAll<HTMLPreElement>(MERMAID_SELECTOR);
-        if (blocks.length === 0) return;
-
-        const { default: mermaid } = await import('mermaid');
-        mermaid.initialize({
+      /** Builds Mermaid's theme from the live color tokens, so diagrams match whichever theme is active. */
+      function themeFromTokens(): MermaidConfig {
+        const css = getComputedStyle(document.documentElement);
+        const token = (name: string) => css.getPropertyValue(name).trim();
+        const bg = token('--color-bg');
+        const surface = token('--color-bg-secondary');
+        const sunken = token('--color-bg-tertiary');
+        const text = token('--color-text');
+        const muted = token('--color-text-secondary');
+        const border = token('--color-border-secondary');
+        const accent = token('--color-accent-strong');
+        return {
           startOnLoad: false,
-          theme: 'default',
-          securityLevel: 'loose',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-          flowchart: {
-            useMaxWidth: true,
-            htmlLabels: true,
-            curve: 'basis'
-          }
-        });
+          theme: 'base',
+          securityLevel: 'strict',
+          fontFamily: "'Inter Variable', Inter, system-ui, sans-serif",
+          themeVariables: {
+            darkMode: document.documentElement.dataset.theme === 'dark',
+            background: bg,
+            fontSize: '15px',
+            primaryColor: surface,
+            primaryTextColor: text,
+            primaryBorderColor: border,
+            secondaryColor: sunken,
+            secondaryTextColor: text,
+            secondaryBorderColor: border,
+            tertiaryColor: bg,
+            tertiaryTextColor: text,
+            tertiaryBorderColor: border,
+            lineColor: muted,
+            textColor: text,
+            mainBkg: surface,
+            nodeBorder: border,
+            clusterBkg: bg,
+            clusterBorder: border,
+            edgeLabelBackground: bg,
+            titleColor: text,
+            actorBkg: surface,
+            actorBorder: border,
+            actorTextColor: text,
+            actorLineColor: border,
+            signalColor: muted,
+            signalTextColor: text,
+            labelBoxBkgColor: surface,
+            labelBoxBorderColor: border,
+            labelTextColor: text,
+            loopTextColor: text,
+            noteBkgColor: sunken,
+            noteBorderColor: border,
+            noteTextColor: text,
+            activationBkgColor: sunken,
+            activationBorderColor: accent,
+            sequenceNumberColor: bg,
+            stateBkg: surface,
+            stateLabelColor: text,
+            altBackground: sunken,
+            transitionColor: muted,
+            transitionLabelColor: muted,
+            attributeBackgroundColorOdd: surface,
+            attributeBackgroundColorEven: bg,
+          },
+          flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+          sequence: { useMaxWidth: true },
+        };
+      }
 
-        const nodes: HTMLElement[] = [];
-        blocks.forEach((pre) => {
-          const source = pre.querySelector('code')?.textContent;
-          if (!source?.trim()) return;
+      /** Short text alternative from the diagram's quoted labels; Mermaid's SVG has none of its own. */
+      function describe(source: string): string {
+        const kind = source.trim().split(/\s/)[0] ?? 'diagram';
+        const name = /^sequence/i.test(kind) ? 'Sequence diagram' : /^state/i.test(kind) ? 'State diagram' : /^er/i.test(kind) ? 'Entity relationship diagram' : 'Diagram';
+        const labels = [...new Set([...source.matchAll(/"([^"]{2,80})"/g)].map((m) => m[1].replace(/<br\s*\/?>/gi, ' ')))];
+        return labels.length ? `${name}: ${labels.slice(0, 12).join(', ')}` : name;
+      }
 
-          const diagram = document.createElement('div');
-          diagram.className = 'mermaid';
-          diagram.textContent = source;
-          pre.replaceWith(diagram);
-          nodes.push(diagram);
-        });
-
+      async function renderDiagram(mermaid: typeof import('mermaid').default, el: HTMLElement) {
+        const source = el.dataset.source ?? '';
         try {
-          await mermaid.run({ nodes });
-        } catch (e) {
-          console.warn('Mermaid rendering failed:', e);
+          const { svg, bindFunctions } = await mermaid.render(`mermaid-${++renderCount}`, source);
+          el.innerHTML = svg;
+          bindFunctions?.(el);
+          el.setAttribute('role', 'img');
+          el.setAttribute('aria-label', describe(source));
+        } catch (error) {
+          // Keep the diagram's source readable rather than leaving a broken or empty block.
+          console.warn('Mermaid rendering failed:', error);
+          el.removeAttribute('role');
+          el.removeAttribute('aria-label');
+          el.className = 'mermaid-fallback';
+          const note = document.createElement('p');
+          note.textContent = "This diagram couldn't be drawn. Here is its source:";
+          const pre = document.createElement('pre');
+          const code = document.createElement('code');
+          code.textContent = source;
+          pre.append(code);
+          el.replaceChildren(note, pre);
+          document.getElementById(`dmermaid-${renderCount}`)?.remove();
         }
       }
 
+      async function renderAll(fresh: boolean) {
+        if (fresh) {
+          document.querySelectorAll<HTMLPreElement>(MERMAID_SELECTOR).forEach((pre) => {
+            let source = pre.querySelector('code')?.textContent;
+            if (!source?.trim()) return;
+            // State diagrams print transition labels verbatim, so `a --> b: "label"` would show its quotes.
+            if (/^\s*stateDiagram/.test(source)) source = source.replace(/:\s*"([^"\n]*)"\s*$/gm, ': $1');
+            const diagram = document.createElement('div');
+            diagram.className = 'mermaid';
+            diagram.dataset.source = source;
+            pre.replaceWith(diagram);
+          });
+        }
+        const diagrams = Array.from(document.querySelectorAll<HTMLElement>('.mermaid[data-source]'));
+        if (diagrams.length === 0) return;
+
+        const { default: mermaid } = await import('mermaid');
+        mermaid.initialize(themeFromTokens());
+        for (const el of diagrams) await renderDiagram(mermaid, el);
+      }
+
       // Fires on the initial load and after every view-transition navigation.
-      document.addEventListener('astro:page-load', renderMermaidBlocks);
+      document.addEventListener('astro:page-load', () => renderAll(true));
+
+      // Theme toggle: redraw diagrams in the new palette and update the browser chrome color.
+      new MutationObserver(() => {
+        const dark = document.documentElement.dataset.theme === 'dark';
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f172a' : '#ffffff');
+        renderAll(false);
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     </script>
   </body>
 </html>

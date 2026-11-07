@@ -39,7 +39,7 @@ const socialLinks = [
           <ul class="space-y-2 list-none p-0">
             {footerLinks.map(link => (
               <li>
-                <a href={link.href} class="text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                <a href={link.href} class="text-[var(--color-text-secondary)] hover:text-[var(--color-accent-strong)] transition-colors">
                   {link.label}
                 </a>
               </li>
@@ -51,7 +51,7 @@ const socialLinks = [
           <ul class="space-y-2 list-none p-0">
             {socialLinks.map(link => (
               <li>
-                <a href={link.href} target="_blank" rel="noopener noreferrer" class="text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors">
+                <a href={link.href} target="_blank" rel="noopener noreferrer" class="text-[var(--color-text-secondary)] hover:text-[var(--color-accent-strong)] transition-colors">
                   {link.label}
                 </a>
               </li>
@@ -64,7 +64,7 @@ const socialLinks = [
     <div class="pt-8 border-t border-[var(--color-border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[var(--color-text-tertiary)] text-sm">
       <p>© {currentYear} Ahmed Ragab. All rights reserved.</p>
       <div class="flex gap-6">
-        <a href={`${base}rss.xml`} class="hover:text-[var(--color-accent)] transition-colors">RSS Feed</a>
+        <a href={`${base}rss.xml`} class="hover:text-[var(--color-accent-strong)] transition-colors">RSS Feed</a>
         <p>Made with Astro 7</p>
       </div>
     </div>

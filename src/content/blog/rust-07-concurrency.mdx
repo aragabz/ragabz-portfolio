@@ -790,5 +790,3 @@ Rayon for CPU-bound data parallelism over collections: it handles splitting and 
 - Use `Relaxed` for counters, `Release`/`Acquire` to publish data, and `SeqCst` when you can name why. Test lock-free code with `loom`.
 - Deadlocks and check-then-act races still compile. Lock ordering and single critical sections are your job.
 - Rayon is the default for CPU-bound parallelism; async (next part) is for I/O-bound concurrency.
-
-Previous: [Part 6: Lifetimes and Smart Pointers](/blog/rust-06-lifetimes-smart-pointers) · Next: [Part 8: Async Rust](/blog/rust-08-async-rust)

@@ -764,5 +764,3 @@ In Java and Kotlin every object variable is a reference, references are freely c
 - Borrows end at their last use (NLL). When an error appears, look at where the conflicting borrow is last used.
 - Own text with `String`, borrow it as `&str`; own lists with `Vec<T>`, borrow them as `&[T]`.
 - E0382, E0499, E0502, E0505 and E0597 cover most early errors. Fix them by reordering, borrowing instead of owning, copying out small values, splitting borrows, or cloning deliberately.
-
-Previous: [Part 1: Getting Started](/blog/rust-01-getting-started) · Next: [Part 3: Types, Enums, and Error Handling](/blog/rust-03-types-enums-errors)

@@ -973,5 +973,3 @@ A `Transaction` rolls back when it is dropped without `commit()`. Combined with 
 - Write outbox events in the same transaction as the change they describe.
 - Use keyset pagination with a unique tie-breaker and a matching index, batch related loads with `= ANY($1)`, and protect read-modify-write with a version column.
 - A repository can be a module of functions taking an executor; add traits only when you have a concrete reason.
-
-Previous: [Part 2: Errors, Configuration and Tracing](/blog/rust-backend-02-errors-config-tracing) · Next: [Part 4: Authentication, Authorization and Middleware](/blog/rust-backend-04-auth-middleware)

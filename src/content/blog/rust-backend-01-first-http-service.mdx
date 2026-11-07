@@ -890,5 +890,3 @@ Tokio's multi-threaded runtime has a small number of worker threads, typically o
 - Application state must be cheap to clone; share data through `Arc` and short, synchronous critical sections.
 - `with_graceful_shutdown` drains in-flight requests on `SIGTERM`, but you still need request timeouts and a plan for background tasks.
 - The service works, but its errors are inconsistent and its logs are thin. That is next.
-
-Next: [Part 2: Errors, Configuration and Tracing](/blog/rust-backend-02-errors-config-tracing)

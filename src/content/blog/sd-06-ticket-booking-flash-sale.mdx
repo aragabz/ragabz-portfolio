@@ -528,5 +528,3 @@ A distributed lock makes sense when the protected resource cannot enforce condit
 - Lock multi-seat holds in a fixed order, and use `NOWAIT` or `SKIP LOCKED` to fail fast instead of queueing on hot rows.
 - Make **payment pending** an explicit state with a bounded grace period. Authorise, confirm by `hold_id`, then capture.
 - Oversell prevention is **layered**: soft layers for experience, hard layers in one transactional database (conditional updates, ownership checks, `UNIQUE (event_id, seat_id)`), and reconciliation to catch what crosses system boundaries.
-
-Previous: [Design a Distributed Job Scheduler](/blog/sd-05-distributed-job-scheduler) · Next: [Design a Payment System](/blog/sd-07-payment-system-ledger)

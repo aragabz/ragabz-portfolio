@@ -855,5 +855,3 @@ The prime suspect is blocking work on runtime worker threads: synchronous I/O, a
 - Keep std mutex guards out of awaits by scoping them in blocks or sync methods.
 - `async fn` in traits works natively; add `+ Send` on the returned future for anything that will be spawned, and box futures for `dyn`.
 - Bound everything: channels, fan-out and queues. Backpressure and load shedding are design decisions, not afterthoughts.
-
-Previous: [Part 7: Concurrency](/blog/rust-07-concurrency) · Next: [Part 9: Unsafe, FFI and Macros](/blog/rust-09-unsafe-ffi-macros)
