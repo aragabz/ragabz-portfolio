@@ -1,0 +1,524 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-07T17:27:26.311792+00:00",
+  "title": "Design System: Ahmed Ragab Portfolio",
+  "extensions": {
+    "colorMeta": {
+      "signal-orange": {
+        "role": "primary",
+        "displayName": "Signal Orange",
+        "canonical": "oklch(68.5% 0.211 40.8)",
+        "tonalRamp": [
+          "#190501",
+          "#451100",
+          "#762000",
+          "#ab2f00",
+          "#e24300",
+          "#f97c4c",
+          "#ffad8a",
+          "#ffddc6"
+        ]
+      },
+      "signal-orange-deep": {
+        "role": "primary",
+        "displayName": "Signal Orange, Deep",
+        "canonical": "oklch(55.3% 0.174 38.4)",
+        "tonalRamp": [
+          "#170602",
+          "#401608",
+          "#6f2911",
+          "#a13d1a",
+          "#d45427",
+          "#ec8463",
+          "#ffb299",
+          "#ffe0cf"
+        ]
+      },
+      "signal-orange-night": {
+        "role": "primary",
+        "displayName": "Signal Orange, Night",
+        "canonical": "oklch(70.5% 0.193 39.2)",
+        "tonalRamp": [
+          "#180502",
+          "#431403",
+          "#722404",
+          "#a63602",
+          "#db4c09",
+          "#f38059",
+          "#ffb092",
+          "#ffdfcb"
+        ]
+      },
+      "signal-orange-night-deep": {
+        "role": "primary",
+        "displayName": "Signal Orange, Night Deep",
+        "canonical": "oklch(75.3% 0.155 41.6)",
+        "tonalRamp": [
+          "#160703",
+          "#3d190a",
+          "#6a2e15",
+          "#9a4420",
+          "#cb5d2f",
+          "#e58a67",
+          "#fcb69c",
+          "#ffe2d1"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "paper-subtle": {
+        "role": "neutral",
+        "displayName": "Paper, Subtle",
+        "canonical": "oklch(98.5% 0.002 247.8)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#414242",
+          "#606162",
+          "#818283",
+          "#a4a5a6",
+          "#c8c9ca",
+          "#eeeeef"
+        ]
+      },
+      "paper-sunken": {
+        "role": "neutral",
+        "displayName": "Paper, Sunken",
+        "canonical": "oklch(96.7% 0.003 264.5)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252526",
+          "#414243",
+          "#606162",
+          "#818284",
+          "#a4a5a6",
+          "#c8c9ca",
+          "#eeeeef"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(21.0% 0.032 264.7)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#22252b",
+          "#3d424d",
+          "#5a6170",
+          "#798296",
+          "#9da5b5",
+          "#c3c9d6",
+          "#eaeff7"
+        ]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Ink, Secondary",
+        "canonical": "oklch(44.6% 0.026 256.8)",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#22252a",
+          "#3d424b",
+          "#5a626e",
+          "#798392",
+          "#9da6b2",
+          "#c3cad3",
+          "#eaeff5"
+        ]
+      },
+      "ink-tertiary": {
+        "role": "neutral",
+        "displayName": "Ink, Tertiary",
+        "canonical": "oklch(55.1% 0.023 264.4)",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#23252a",
+          "#3e424a",
+          "#5c616c",
+          "#7b8291",
+          "#9fa5b1",
+          "#c5c9d2",
+          "#ebeef5"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "oklch(92.8% 0.006 264.5)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242526",
+          "#414244",
+          "#606164",
+          "#808286",
+          "#a3a5a8",
+          "#c8c9cb",
+          "#eeeef0"
+        ]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Rule, Strong",
+        "canonical": "oklch(87.2% 0.009 258.3)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242527",
+          "#404245",
+          "#5f6166",
+          "#7f8388",
+          "#a2a5aa",
+          "#c7c9cd",
+          "#edeef1"
+        ]
+      },
+      "night": {
+        "role": "neutral",
+        "displayName": "Night",
+        "canonical": "oklch(20.8% 0.040 265.8)",
+        "tonalRamp": [
+          "#0a0b0f",
+          "#21252d",
+          "#3c424f",
+          "#586174",
+          "#77829b",
+          "#9ca5b9",
+          "#c2c9d9",
+          "#eaeff9"
+        ]
+      },
+      "night-raised": {
+        "role": "neutral",
+        "displayName": "Night, Raised",
+        "canonical": "oklch(27.9% 0.037 260.0)",
+        "tonalRamp": [
+          "#090b0e",
+          "#21252c",
+          "#3b424e",
+          "#576273",
+          "#768399",
+          "#9ba6b8",
+          "#c1cad7",
+          "#e9eff8"
+        ]
+      },
+      "night-sunken": {
+        "role": "neutral",
+        "displayName": "Night, Sunken",
+        "canonical": "oklch(37.2% 0.039 257.3)",
+        "tonalRamp": [
+          "#090b0e",
+          "#20252d",
+          "#3a434f",
+          "#566274",
+          "#74849a",
+          "#99a6b9",
+          "#c0cad8",
+          "#e8eff9"
+        ]
+      },
+      "chalk": {
+        "role": "neutral",
+        "displayName": "Chalk",
+        "canonical": "oklch(96.8% 0.007 247.9)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242526",
+          "#404244",
+          "#5f6164",
+          "#7f8386",
+          "#a2a5a8",
+          "#c7c9cc",
+          "#edeff0"
+        ]
+      },
+      "chalk-secondary": {
+        "role": "neutral",
+        "displayName": "Chalk, Secondary",
+        "canonical": "oklch(86.9% 0.020 252.9)",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#222529",
+          "#3e4248",
+          "#5b626a",
+          "#7a838e",
+          "#9ea6af",
+          "#c4cad1",
+          "#ebeff3"
+        ]
+      },
+      "chalk-tertiary": {
+        "role": "neutral",
+        "displayName": "Chalk, Tertiary",
+        "canonical": "oklch(71.1% 0.035 256.8)",
+        "tonalRamp": [
+          "#090b0e",
+          "#21252c",
+          "#3b434d",
+          "#576272",
+          "#758497",
+          "#9aa6b7",
+          "#c1cad7",
+          "#e9eff8"
+        ]
+      },
+      "night-rule-strong": {
+        "role": "neutral",
+        "displayName": "Night Rule, Strong",
+        "canonical": "oklch(44.6% 0.037 257.3)",
+        "tonalRamp": [
+          "#090b0e",
+          "#20252c",
+          "#3a434e",
+          "#566273",
+          "#758499",
+          "#9aa6b8",
+          "#c0cad8",
+          "#e9eff8"
+        ]
+      },
+      "code-surface": {
+        "role": "neutral",
+        "displayName": "Code Surface",
+        "canonical": "oklch(27.8% 0.012 248.2)",
+        "tonalRamp": [
+          "#0a0b0c",
+          "#232527",
+          "#3f4246",
+          "#5d6266",
+          "#7d8389",
+          "#a1a6ab",
+          "#c6cacd",
+          "#eceff1"
+        ]
+      },
+      "code-toolbar": {
+        "role": "neutral",
+        "displayName": "Code Toolbar",
+        "canonical": "oklch(25.7% 0.010 242.1)",
+        "tonalRamp": [
+          "#0a0b0c",
+          "#232527",
+          "#3f4245",
+          "#5d6266",
+          "#7d8388",
+          "#a1a6aa",
+          "#c6cacd",
+          "#eceff1"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The name in the home hero only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Home section titles and page titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "List-row and card titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface copy and supporting text."
+      },
+      "article-body": {
+        "displayName": "Article Body",
+        "purpose": "Long-form prose in the 720px reading column."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Level badges, tags, filter counts."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Code blocks; inline code at 0.85em."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hover-lift",
+        "value": "0 10px 25px rgba(0, 0, 0, 0.1)",
+        "purpose": "Cards on hover, with translateY(-2px); 0.3 opacity in dark mode."
+      },
+      {
+        "name": "code-block",
+        "value": "0 1px 3px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06)",
+        "purpose": "Sets fenced code apart as a dark object."
+      },
+      {
+        "name": "portrait-ring",
+        "value": "0 0 0 6px var(--color-bg), 0 0 0 8px var(--color-accent), 0 24px 48px -12px rgb(0 0 0 / 0.35)",
+        "purpose": "About portrait only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "theme-transition",
+        "value": "0.3s ease",
+        "purpose": "Background, text and border color changes when the theme switches."
+      },
+      {
+        "name": "fade-in-up",
+        "value": "0.6s ease-out, 20px rise, 0.1s stagger",
+        "purpose": "Section entrance on the home page."
+      },
+      {
+        "name": "hover",
+        "value": "0.3s ease-out",
+        "purpose": "Card lift and link color changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one solid action per view, such as Get in Touch or Send Message.",
+      "html": "<button class=\"ds-btn-primary\">Get in Touch</button>",
+      "css": ".ds-btn-primary{background:var(--color-accent,#ff5d01);color:#fff;padding:16px 32px;border:none;border-radius:8px;font:500 1rem/1.5 'Inter Variable',Inter,system-ui,sans-serif;cursor:pointer;transition:background-color .3s ease}.ds-btn-primary:hover{background:var(--color-accent-strong,#c2410c)}.ds-btn-primary:focus-visible{outline:2px solid var(--color-accent,#ff5d01);outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet outlined companion to the primary, such as View Work.",
+      "html": "<button class=\"ds-btn-secondary\">View Work</button>",
+      "css": ".ds-btn-secondary{background:transparent;color:var(--color-text,#111827);padding:16px 32px;border:1px solid var(--color-border-secondary,#d1d5db);border-radius:8px;font:500 1rem/1.5 'Inter Variable',Inter,system-ui,sans-serif;cursor:pointer;transition:border-color .3s ease}.ds-btn-secondary:hover{border-color:var(--color-text,#111827)}.ds-btn-secondary:focus-visible{outline:2px solid var(--color-accent,#ff5d01);outline-offset:2px}"
+    },
+    {
+      "name": "Filter Pills",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "Blog index facet options with counts; the active one fills with Signal Orange.",
+      "html": "<div class=\"ds-pills\"><button class=\"ds-pill is-active\" aria-pressed=\"true\">All <span>70</span></button><button class=\"ds-pill\" aria-pressed=\"false\">Backend <span>36</span></button><button class=\"ds-pill\" aria-pressed=\"false\">Android <span>9</span></button></div>",
+      "css": ".ds-pills{display:flex;flex-wrap:wrap;gap:8px}.ds-pill{display:inline-flex;gap:6px;align-items:center;padding:6px 14px;border-radius:999px;border:1px solid var(--color-border,#e5e7eb);background:var(--color-bg-secondary,#f9fafb);color:var(--color-text-secondary,#4b5563);font:500 .875rem/1.4 'Inter Variable',Inter,system-ui,sans-serif;cursor:pointer;transition:border-color .2s,background-color .2s}.ds-pill span{color:var(--color-text-tertiary,#6b7280);font-size:.75rem}.ds-pill:hover{border-color:var(--color-border-secondary,#d1d5db)}.ds-pill.is-active{background:var(--color-accent,#ff5d01);border-color:var(--color-accent,#ff5d01);color:#fff}.ds-pill.is-active span{color:rgb(255 255 255/.8)}.ds-pill:focus-visible{outline:2px solid var(--color-accent,#ff5d01);outline-offset:2px}"
+    },
+    {
+      "name": "Tag and Level Badge",
+      "kind": "chip",
+      "refersTo": "level-badge",
+      "description": "Post metadata: the level badge with five dots, then topic tags.",
+      "html": "<div class=\"ds-meta\"><span class=\"ds-level\"><span class=\"ds-dots\"><i class=\"on\"></i><i class=\"on\"></i><i class=\"on\"></i><i></i><i></i></span>Senior</span><span class=\"ds-tag\">Rust</span><span class=\"ds-tag\">Backend</span></div>",
+      "css": ".ds-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ds-level{display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:999px;font:600 .75rem/1.4 'Inter Variable',Inter,system-ui,sans-serif;color:var(--color-accent-strong,#c2410c);background:color-mix(in srgb,var(--color-accent,#ff5d01) 8%,transparent);border:1px solid color-mix(in srgb,var(--color-accent,#ff5d01) 35%,transparent)}.ds-dots{display:inline-flex;gap:3px}.ds-dots i{width:6px;height:6px;border-radius:999px;background:currentColor;opacity:.25}.ds-dots i.on{opacity:1}.ds-tag{padding:4px 12px;border-radius:999px;border:1px solid var(--color-border,#e5e7eb);background:var(--color-bg-tertiary,#f3f4f6);color:var(--color-text-secondary,#4b5563);font:400 .75rem/1.4 'Inter Variable',Inter,system-ui,sans-serif}"
+    },
+    {
+      "name": "Article List Row",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "Signature blog list row: metadata column, title, two-line excerpt, badges; flat with hairline dividers.",
+      "html": "<ul class=\"ds-rows\"><li class=\"ds-row\"><div class=\"ds-row-meta\"><time>Nov 7, 2026</time><span>25 min read</span></div><div><h3><a href=\"#\">Rust Backend, Part 1: Your First HTTP Service with Axum</a></h3><p>Build the first endpoints of orders-api with Tokio and axum: routing, extractors, shared state and graceful shutdown.</p></div></li></ul>",
+      "css": ".ds-rows{list-style:none;margin:0;padding:0;border-top:1px solid var(--color-border,#e5e7eb)}.ds-row{position:relative;display:grid;grid-template-columns:9rem 1fr;gap:32px;padding:24px 0;border-bottom:1px solid var(--color-border,#e5e7eb);font-family:'Inter Variable',Inter,system-ui,sans-serif}.ds-row-meta{display:flex;flex-direction:column;gap:4px;font-size:.875rem;color:var(--color-text-tertiary,#6b7280);padding-top:4px}.ds-row h3{margin:0 0 8px;font-size:1.25rem;font-weight:600;letter-spacing:-.02em;color:var(--color-text,#111827);transition:color .3s}.ds-row a{color:inherit;text-decoration:none}.ds-row a::after{content:'';position:absolute;inset:0}.ds-row:hover h3{color:var(--color-accent-strong,#c2410c)}.ds-row a:focus-visible{outline:2px solid var(--color-accent,#ff5d01);outline-offset:2px}.ds-row p{margin:0;color:var(--color-text-secondary,#4b5563);line-height:1.7;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}"
+    },
+    {
+      "name": "Project Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Subtle-paper card, flat at rest, lifts 2px with a soft shadow on hover.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-card-media\"></div><div class=\"ds-card-body\"><h3>Android Clean Architecture Template</h3><p>A modular Android starter with Clean Architecture and MVVM.</p></div></article>",
+      "css": ".ds-card{max-width:360px;background:var(--color-bg-secondary,#f9fafb);border:1px solid var(--color-border,#e5e7eb);border-radius:12px;overflow:hidden;transition:transform .3s ease-out,box-shadow .3s ease-out;font-family:'Inter Variable',Inter,system-ui,sans-serif}.ds-card:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(0,0,0,.1)}.ds-card-media{aspect-ratio:16/9;background:var(--color-bg-tertiary,#f3f4f6)}.ds-card-body{padding:24px}.ds-card h3{margin:0 0 8px;font-size:1.25rem;font-weight:600;letter-spacing:-.02em;color:var(--color-text,#111827)}.ds-card p{margin:0;color:var(--color-text-secondary,#4b5563);line-height:1.7}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Contact form field: subtle fill, 2px border, orange focus outline.",
+      "html": "<label class=\"ds-field\"><span>Email <b>*</b></span><input class=\"ds-input\" type=\"email\" placeholder=\"you@example.com\"></label>",
+      "css": ".ds-field{display:block;max-width:420px;font-family:'Inter Variable',Inter,system-ui,sans-serif}.ds-field span{display:block;margin-bottom:8px;font-weight:500;color:var(--color-text,#111827)}.ds-field b{color:var(--color-accent,#ff5d01);font-weight:500}.ds-input{width:100%;box-sizing:border-box;padding:12px 16px;background:var(--color-bg-secondary,#f9fafb);border:2px solid var(--color-border,#e5e7eb);border-radius:8px;color:var(--color-text,#111827);font-size:1rem;outline:none;transition:border-color .3s}.ds-input:focus-visible{border-color:var(--color-text,#111827);outline:2px solid var(--color-accent,#ff5d01);outline-offset:2px}"
+    },
+    {
+      "name": "Top Navigation",
+      "kind": "nav",
+      "refersTo": "",
+      "description": "Fixed translucent bar with orange wordmark, medium-weight links and a hairline bottom border.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-logo\" href=\"#\">Ahmed Ragab</a><ul><li><a href=\"#\">About</a></li><li><a href=\"#\">Projects</a></li><li><a href=\"#\">Blog</a></li><li><a href=\"#\">Contact</a></li></ul></nav>",
+      "css": ".ds-nav{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:color-mix(in srgb,var(--color-bg,#fff) 80%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--color-border,#e5e7eb);font-family:'Inter Variable',Inter,system-ui,sans-serif}.ds-logo{font-size:1.25rem;font-weight:700;color:var(--color-accent,#ff5d01);text-decoration:none}.ds-nav ul{display:flex;gap:32px;list-style:none;margin:0;padding:0}.ds-nav ul a{font-weight:500;color:var(--color-text,#111827);text-decoration:none;transition:color .3s}.ds-nav ul a:hover{color:var(--color-accent-strong,#c2410c)}.ds-nav a:focus-visible{outline:2px solid var(--color-accent,#ff5d01);outline-offset:2px;border-radius:4px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Engineer's Notebook",
+    "overview": "The site reads like a well-kept engineering notebook: clean pages, careful handwriting, and one orange pen used only for what matters. Content and code lead. The interface stays out of the way through generous whitespace, neutral paper-and-ink surfaces, and a single typeface doing all the work through weight and size. The mood is quiet and precise, but not cold: the orange keeps it warm and human, bold headlines give it technical confidence, and the long-form articles are set with the care of an editorial publication.\n\nThere are two equal themes. Light mode is white paper and near-black ink; dark mode is deep slate night with chalk-colored text. Both carry the same single accent, tuned brighter for dark backgrounds. The one atmospheric flourish is the soft aurora glow behind the home hero, drawn entirely from the theme tokens so it changes with the theme and stays decorative.\n\nDensity follows the reader. Marketing sections on the home page breathe with large section padding and centered headlines. Articles sit in a 720px reading column with a sticky table of contents beside them. Lists such as the blog index are compact rows separated by hairlines, made for scanning.",
+    "keyCharacteristics": [
+      "One accent color, used sparingly, for action, state and wayfinding.",
+      "Neutral paper and ink surfaces with hairline borders; flat at rest.",
+      "A single typeface (Inter) with a clear weight and size ladder.",
+      "Long-form reading is a first-class surface, not an afterthought.",
+      "Light and dark themes are equally finished, switched with tokens and no JavaScript color logic."
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "Signal Orange is the only chromatic color in the interface. It marks the action, the active state or the thing to notice, and never fills large areas. If two orange things compete on one screen, one of them is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Deep-for-Text Rule",
+        "body": "Orange that is read as text (links, badges, inline code, small labels) uses Signal Orange, Deep, never the bright Signal Orange, which fails contrast on white at small sizes.",
+        "section": "colors"
+      },
+      {
+        "name": "The Token-Only Rule",
+        "body": "New UI uses the semantic variables (`--color-bg*`, `--color-text*`, `--color-border*`, `--color-accent*`). The legacy `--color-brand-*` aliases still exist for older components; don't extend their use.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Don't introduce a second typeface. Contrast comes from Inter's weight and size, and code gets the system monospace.",
+        "section": "typography"
+      },
+      {
+        "name": "The Reading Column Rule",
+        "body": "Long-form text never runs wider than 720px, and article body stays at 1.125rem with line-height 1.8.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces carry no shadow at rest. A shadow means \"this responds to you\" or \"this is a different kind of object\", never decoration.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** reference colors through the semantic CSS variables (`var(--color-text)`, `var(--color-accent)`), so both themes work with no extra code.",
+      "**Do** keep Signal Orange for the one action, active state or accent mark on a screen.",
+      "**Do** use Signal Orange, Deep for orange text, links and badges.",
+      "**Do** separate list items with 1px hairlines and keep rows flat.",
+      "**Do** keep article prose in the 720px column at 1.125rem with line-height 1.8.",
+      "**Do** give every interactive element a visible 2px Signal Orange focus outline.",
+      "**Do** check every new surface in both light and dark themes."
+    ],
+    "donts": [
+      "**Don't** add a second accent color or a second typeface.",
+      "**Don't** put shadows on surfaces at rest; use tone and hairlines.",
+      "**Don't** fill large areas with Signal Orange or use it for body text.",
+      "**Don't** hardcode hex values in components; the only exceptions are the dark code-block surfaces.",
+      "**Don't** extend the legacy `--color-brand-*` variables in new UI.",
+      "**Don't** let the hero aurora's animation depend on JavaScript to render; it must look right with CSS alone."
+    ]
+  }
+}
