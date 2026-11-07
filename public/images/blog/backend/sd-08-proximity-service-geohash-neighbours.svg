@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Geohash neighbours and the cell-edge problem</title>
+  <desc id="d">A three by three grid of 6-character geohash cells in Vienna centred on u2edk8. A rider near the bottom edge of u2edk8 and a driver about 45 metres away in u2edhx share only the prefix u2ed, so a proximity query must search the cell and its eight neighbours and then filter by true distance.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="400" y="42" font-size="18" font-weight="600" fill="#e6edf3" text-anchor="middle">A shared prefix is not the same as proximity</text>
+    <text x="400" y="66" font-size="13" fill="#8b949e" text-anchor="middle">6-character geohash cells around central Vienna (48.21 N, 16.37 E), each about 815 m by 611 m</text>
+    <rect x="48" y="104" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="104.0" y="151.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#8b949e" text-anchor="middle">u2edk3</text>
+    <rect x="160" y="104" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="216.0" y="151.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#8b949e" text-anchor="middle">u2edk9</text>
+    <rect x="272" y="104" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="328.0" y="151.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#8b949e" text-anchor="middle">u2edkc</text>
+    <rect x="48" y="188" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="104.0" y="235.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#8b949e" text-anchor="middle">u2edk2</text>
+    <rect x="160" y="188" width="112" height="84" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+    <text x="216.0" y="235.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#e6edf3" text-anchor="middle">u2edk8</text>
+    <rect x="272" y="188" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="328.0" y="235.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#8b949e" text-anchor="middle">u2edkb</text>
+    <rect x="48" y="272" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="104.0" y="340" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#f78166" text-anchor="middle">u2edhr</text>
+    <rect x="160" y="272" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="216.0" y="340" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#f78166" text-anchor="middle">u2edhx</text>
+    <rect x="272" y="272" width="112" height="84" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="328.0" y="340" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#f78166" text-anchor="middle">u2edhz</text>
+    <rect x="160" y="188" width="112" height="84" fill="none" stroke="#79c0ff" stroke-width="2"/>
+    <line x1="210" y1="264" x2="224" y2="282" stroke="#e6edf3" stroke-dasharray="3 3"/>
+    <circle cx="210" cy="264" r="6" fill="#79c0ff"/>
+    <circle cx="224" cy="282" r="6" fill="#7ee787"/>
+    <text x="200" y="260" font-size="13" fill="#79c0ff" text-anchor="end">rider</text>
+    <text x="234" y="287" font-size="13" fill="#7ee787">driver, about 45 m</text>
+    <text x="216.0" y="386" font-size="13" fill="#8b949e" text-anchor="middle">Query = centre cell + 8 neighbours, then filter by distance</text>
+    <text x="430" y="124" font-size="15" fill="#e6edf3" font-weight="600">Rider in u2edk8, driver in u2edhx.</text>
+    <text x="430" y="146" font-size="13" fill="#8b949e">They are about 45 m apart but share</text>
+    <text x="430" y="168" font-size="13" fill="#8b949e">only the 4-character prefix u2ed.</text>
+    <text x="430" y="212" font-size="15" fill="#e6edf3" font-weight="600">At the equator it is worse:</text>
+    <text x="430" y="234" font-size="13" fill="#8b949e">ebpbpb and s00000 are about 220 m</text>
+    <text x="430" y="256" font-size="13" fill="#8b949e">apart and share no prefix at all.</text>
+    <text x="430" y="294" font-size="15" font-weight="600" fill="#e6edf3">Cell size by length (at the equator)</text>
+    <rect x="430" y="306" width="330" height="26" rx="6" fill="#161b22" stroke="#30363d"/>
+    <text x="444" y="324" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#d2a8ff">5 chars</text>
+    <text x="540" y="324" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">4.89 km x 4.89 km</text>
+    <rect x="430" y="336" width="330" height="26" rx="6" fill="#161b22" stroke="#30363d"/>
+    <text x="444" y="354" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#d2a8ff">6 chars</text>
+    <text x="540" y="354" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">1.22 km x 0.61 km</text>
+    <rect x="430" y="366" width="330" height="26" rx="6" fill="#161b22" stroke="#30363d"/>
+    <text x="444" y="384" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#d2a8ff">7 chars</text>
+    <text x="540" y="384" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">153 m x 153 m</text>
+    <text x="430" y="414" font-size="13" fill="#8b949e">Cells get narrower east-west away from the equator.</text>
+  </g>
+</svg>

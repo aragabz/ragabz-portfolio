@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Incident timeline: checkout connection pool exhaustion</title>
+  <desc id="d">Two hours before the incident version 2.41 ships with a pricing re-quote call inside the order transaction. At T plus 0 a promotion doubles traffic. At T plus 3 minutes a burn-rate page fires. The database-overload hypothesis is ruled out at T plus 7, scaling out at T plus 11 makes things worse, a thread dump at T plus 16 shows connections held during HTTP calls, the re-quote feature flag is turned off at T plus 20 and the service recovers by T plus 24.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif" text-anchor="middle">
+    <text x="400" y="44" font-size="18" font-weight="600" fill="#e6edf3">From page to recovery in 24 minutes</text>
+    <text x="400" y="68" font-size="13" fill="#8b949e">Composite incident. Times relative to the start of the promotion (T+0).</text>
+
+    <line x1="64" y1="230" x2="736" y2="230" stroke="#30363d" stroke-width="2"/>
+
+    <!-- connectors -->
+    <g stroke="#30363d" stroke-width="1.5">
+      <line x1="104" y1="196" x2="104" y2="222"/>
+      <line x1="189" y1="238" x2="189" y2="256"/>
+      <line x1="273" y1="196" x2="273" y2="222"/>
+      <line x1="358" y1="238" x2="358" y2="256"/>
+      <line x1="442" y1="196" x2="442" y2="222"/>
+      <line x1="527" y1="238" x2="527" y2="256"/>
+      <line x1="611" y1="196" x2="611" y2="222"/>
+      <line x1="696" y1="238" x2="696" y2="256"/>
+    </g>
+
+    <!-- dots -->
+    <circle cx="104" cy="230" r="7" fill="#79c0ff"/>
+    <circle cx="189" cy="230" r="7" fill="#8b949e"/>
+    <circle cx="273" cy="230" r="7" fill="#f78166"/>
+    <circle cx="358" cy="230" r="7" fill="#d2a8ff"/>
+    <circle cx="442" cy="230" r="7" fill="#d2a8ff"/>
+    <circle cx="527" cy="230" r="7" fill="#d2a8ff"/>
+    <circle cx="611" cy="230" r="7" fill="#7ee787"/>
+    <circle cx="696" cy="230" r="7" fill="#7ee787"/>
+
+    <!-- above labels -->
+    <g font-size="13">
+      <text x="104" y="150" font-weight="600" fill="#79c0ff">T−2 h</text>
+      <text x="104" y="170" fill="#e6edf3">v2.41 deployed</text>
+      <text x="104" y="188" fill="#8b949e">re-quote inside tx</text>
+
+      <text x="273" y="150" font-weight="600" fill="#f78166">T+3 min</text>
+      <text x="273" y="170" fill="#e6edf3">burn-rate page</text>
+      <text x="273" y="188" fill="#8b949e">checkout 5xx at 9%</text>
+
+      <text x="442" y="150" font-weight="600" fill="#d2a8ff">T+11 min</text>
+      <text x="442" y="170" fill="#e6edf3">scaled 8 to 14 pods</text>
+      <text x="442" y="188" fill="#8b949e">worse: too many clients</text>
+
+      <text x="611" y="150" font-weight="600" fill="#7ee787">T+20 min</text>
+      <text x="611" y="170" fill="#e6edf3">re-quote flag off</text>
+      <text x="611" y="188" fill="#8b949e">pool starts draining</text>
+    </g>
+
+    <!-- below labels -->
+    <g font-size="13">
+      <text x="189" y="274" font-weight="600" fill="#8b949e">T+0</text>
+      <text x="189" y="294" fill="#e6edf3">promo goes live</text>
+      <text x="189" y="312" fill="#8b949e">orders 2.5x normal</text>
+
+      <text x="358" y="274" font-weight="600" fill="#d2a8ff">T+7 min</text>
+      <text x="358" y="294" fill="#e6edf3">"DB overloaded?"</text>
+      <text x="358" y="312" fill="#8b949e">no: CPU 61%, no locks</text>
+
+      <text x="527" y="274" font-weight="600" fill="#d2a8ff">T+16 min</text>
+      <text x="527" y="294" fill="#e6edf3">thread dump</text>
+      <text x="527" y="312" fill="#8b949e">conns held over HTTP</text>
+
+      <text x="696" y="274" font-weight="600" fill="#7ee787">T+24 min</text>
+      <text x="696" y="294" fill="#e6edf3">recovered</text>
+      <text x="696" y="312" fill="#8b949e">pending = 0</text>
+    </g>
+
+    <!-- phase bar -->
+    <rect x="104" y="346" width="169" height="10" rx="5" fill="#f78166"/>
+    <rect x="273" y="346" width="338" height="10" rx="5" fill="#d2a8ff"/>
+    <rect x="611" y="346" width="85" height="10" rx="5" fill="#7ee787"/>
+    <g font-size="13" fill="#8b949e">
+      <text x="188" y="376">latent → detect</text>
+      <text x="442" y="376">investigate (one wrong turn)</text>
+      <text x="653" y="376">mitigate</text>
+    </g>
+    <text x="400" y="412" font-size="13" fill="#8b949e">Follow-ups: index built CONCURRENTLY the next day, HTTP moved out of the transaction in v2.43.</text>
+  </g>
+</svg>

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">Connection hold time before and during the incident, with Little's law</title>
+  <desc id="d">Before the change, placing an order held a database connection for about 10 milliseconds. During the incident the same transaction held its connection for about 2.46 seconds: 250 milliseconds for a promotion count query, 2.2 seconds waiting on the pricing service over HTTP, and 10 milliseconds of writes and commit. By Little's law, 60 orders per second times 0.010 seconds is 0.6 busy connections, while 150 orders per second times 2.46 seconds is 369, against a pool of 20 which can then serve only about 8 orders per second.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">How long does one order hold a connection?</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">Scale: 0 to 2.5 s across the bar area. The pool only cares about this number.</text>
+
+    <!-- axis -->
+    <g font-size="13" fill="#8b949e" text-anchor="middle">
+      <line x1="200" y1="96" x2="740" y2="96" stroke="#30363d"/>
+      <text x="200" y="90">0 s</text>
+      <text x="308" y="90">0.5 s</text>
+      <text x="416" y="90">1.0 s</text>
+      <text x="524" y="90">1.5 s</text>
+      <text x="632" y="90">2.0 s</text>
+      <text x="740" y="90">2.5 s</text>
+    </g>
+
+    <!-- before row -->
+    <text x="32" y="128" font-size="14" font-weight="600" fill="#e6edf3">v2.40</text>
+    <text x="32" y="146" font-size="13" fill="#8b949e">normal day</text>
+    <rect x="200" y="114" width="4" height="30" rx="2" fill="#7ee787"/>
+    <text x="214" y="134" font-size="13" fill="#7ee787">writes + commit: ~10 ms held</text>
+
+    <!-- after row -->
+    <text x="32" y="196" font-size="14" font-weight="600" fill="#e6edf3">v2.41</text>
+    <text x="32" y="214" font-size="13" fill="#8b949e">during promo</text>
+    <rect x="200" y="182" width="54" height="30" rx="4" fill="#d2a8ff"/>
+    <rect x="254" y="182" width="475" height="30" rx="4" fill="#f78166"/>
+    <rect x="729" y="182" width="4" height="30" rx="2" fill="#7ee787"/>
+    <text x="491" y="202" font-size="13" fill="#0d1117" text-anchor="middle" font-weight="600">waiting on pricing over HTTP: ~2,200 ms</text>
+    <text x="200" y="236" font-size="13" fill="#d2a8ff">promo count query ~250 ms</text>
+    <text x="733" y="236" font-size="13" fill="#7ee787" text-anchor="end">writes ~10 ms</text>
+    <path d="M200 252 v8 h533 v-8" fill="none" stroke="#e6edf3" stroke-width="1.5"/>
+    <text x="466" y="280" font-size="13" fill="#e6edf3" text-anchor="middle">connection checked out for ~2.46 s, mostly doing nothing</text>
+
+    <!-- Little's law panel -->
+    <rect x="32" y="304" width="352" height="124" rx="10" fill="#161b22" stroke="#7ee787"/>
+    <text x="52" y="332" font-size="14" font-weight="600" fill="#e6edf3">Before (per pod)</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+      <text x="52" y="360" fill="#e6edf3">L = λ × W</text>
+      <text x="52" y="382" fill="#e6edf3">  = 60/s × 0.010 s</text>
+      <text x="52" y="404" fill="#7ee787">  = 0.6 busy of 20</text>
+    </g>
+
+    <rect x="416" y="304" width="352" height="124" rx="10" fill="#161b22" stroke="#f78166"/>
+    <text x="436" y="332" font-size="14" font-weight="600" fill="#e6edf3">During the promo (per pod)</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+      <text x="436" y="360" fill="#e6edf3">L = 150/s × 2.46 s = 369 needed</text>
+      <text x="436" y="382" fill="#e6edf3">max λ = 20 / 2.46 s</text>
+      <text x="436" y="404" fill="#f78166">      ≈ 8 orders/s per pod</text>
+    </g>
+  </g>
+</svg>

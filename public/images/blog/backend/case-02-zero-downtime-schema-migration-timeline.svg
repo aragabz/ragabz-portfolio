@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Incident timeline: a column type change blocks the orders table</title>
+  <desc id="d">At T plus 0 a deploy starts and Flyway runs at application startup. Thirty seconds later the ALTER TABLE waits for its lock behind a six-minute report query. At one minute every orders query queues behind it and connection pools exhaust. At three minutes the order API pages at 40 percent errors. At six minutes pg_locks shows the migration at the head of the lock queue. At eight minutes the rollout is paused and the migration is cancelled. At ten minutes a restarted pod re-runs the ALTER and the image is rolled back. At thirteen minutes the service has recovered with no schema change applied.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif" text-anchor="middle">
+    <text x="400" y="44" font-size="18" font-weight="600" fill="#e6edf3">One ALTER TABLE, thirteen minutes of failed orders</text>
+    <text x="400" y="68" font-size="13" fill="#8b949e">Composite incident. Times relative to the start of the deploy (T+0).</text>
+
+    <line x1="64" y1="230" x2="736" y2="230" stroke="#30363d" stroke-width="2"/>
+
+    <g stroke="#30363d" stroke-width="1.5">
+      <line x1="104" y1="196" x2="104" y2="222"/>
+      <line x1="189" y1="238" x2="189" y2="256"/>
+      <line x1="273" y1="196" x2="273" y2="222"/>
+      <line x1="358" y1="238" x2="358" y2="256"/>
+      <line x1="442" y1="196" x2="442" y2="222"/>
+      <line x1="527" y1="238" x2="527" y2="256"/>
+      <line x1="611" y1="196" x2="611" y2="222"/>
+      <line x1="696" y1="238" x2="696" y2="256"/>
+    </g>
+
+    <circle cx="104" cy="230" r="7" fill="#79c0ff"/>
+    <circle cx="189" cy="230" r="7" fill="#f78166"/>
+    <circle cx="273" cy="230" r="7" fill="#f78166"/>
+    <circle cx="358" cy="230" r="7" fill="#f78166"/>
+    <circle cx="442" cy="230" r="7" fill="#d2a8ff"/>
+    <circle cx="527" cy="230" r="7" fill="#7ee787"/>
+    <circle cx="611" cy="230" r="7" fill="#d2a8ff"/>
+    <circle cx="696" cy="230" r="7" fill="#7ee787"/>
+
+    <g font-size="13">
+      <text x="104" y="150" font-weight="600" fill="#79c0ff">T+0</text>
+      <text x="104" y="170" fill="#e6edf3">deploy v5.12</text>
+      <text x="104" y="188" fill="#8b949e">Flyway at startup</text>
+
+      <text x="273" y="150" font-weight="600" fill="#f78166">T+1 min</text>
+      <text x="273" y="170" fill="#e6edf3">all orders queries queue</text>
+      <text x="273" y="188" fill="#8b949e">pools exhaust</text>
+
+      <text x="442" y="150" font-weight="600" fill="#d2a8ff">T+6 min</text>
+      <text x="442" y="170" fill="#e6edf3">pg_locks: lock queue</text>
+      <text x="442" y="188" fill="#8b949e">migration at the head</text>
+
+      <text x="611" y="150" font-weight="600" fill="#d2a8ff">T+10 min</text>
+      <text x="611" y="170" fill="#e6edf3">restart re-runs ALTER</text>
+      <text x="611" y="188" fill="#8b949e">image rolled back</text>
+    </g>
+
+    <g font-size="13">
+      <text x="189" y="274" font-weight="600" fill="#f78166">T+30 s</text>
+      <text x="189" y="294" fill="#e6edf3">ALTER waits for lock</text>
+      <text x="189" y="312" fill="#8b949e">behind 6-min report</text>
+
+      <text x="358" y="274" font-weight="600" fill="#f78166">T+3 min</text>
+      <text x="358" y="294" fill="#e6edf3">page: order API</text>
+      <text x="358" y="312" fill="#8b949e">about 40% errors</text>
+
+      <text x="527" y="274" font-weight="600" fill="#7ee787">T+8 min</text>
+      <text x="527" y="294" fill="#e6edf3">rollout paused</text>
+      <text x="527" y="312" fill="#8b949e">pg_cancel_backend</text>
+
+      <text x="696" y="274" font-weight="600" fill="#7ee787">T+13 min</text>
+      <text x="696" y="294" fill="#e6edf3">recovered</text>
+      <text x="696" y="312" fill="#8b949e">schema unchanged</text>
+    </g>
+
+    <rect x="104" y="346" width="254" height="10" rx="5" fill="#f78166"/>
+    <rect x="358" y="346" width="253" height="10" rx="5" fill="#d2a8ff"/>
+    <rect x="611" y="346" width="85" height="10" rx="5" fill="#7ee787"/>
+    <g font-size="13" fill="#8b949e">
+      <text x="231" y="376">lock queue builds</text>
+      <text x="484" y="376">diagnose and cancel</text>
+      <text x="653" y="376">roll back</text>
+    </g>
+    <text x="400" y="412" font-size="13" fill="#8b949e">The redo: expand, backfill, switch and contract over three weeks, with no lock wait above 2 s.</text>
+  </g>
+</svg>

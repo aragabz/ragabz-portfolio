@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Seat hold expiry racing a slow payment, with and without a payment-pending state</title>
+  <desc id="d">Top lane: a seat is held for 10 minutes, the buyer starts payment at minute 7.5, the hold moves to payment pending with a grace period to minute 12.5, the payment succeeds at minute 11 and the seat is sold. Bottom lane: without a payment-pending state the hold expires at minute 10, another buyer holds the seat at minute 10.2, and the first buyer payment succeeds at minute 11 for a seat they no longer hold, so the authorization must be voided.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">The hold TTL races the payment</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Buyer A holds seat 14-C at minute 0. The payment provider takes 3.5 minutes to answer.</text>
+  <text x="32" y="126" fill="#7ee787" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">With PAYMENT_PENDING</text>
+  <text x="32" y="286" fill="#f78166" font-size="14" font-weight="600" font-family="Inter, system-ui, sans-serif">Without it</text>
+  <text x="32" y="165" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">seat 14-C</text>
+  <text x="32" y="325" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">seat 14-C</text>
+  <rect x="150.0" y="144" width="321.4" height="32" rx="6" fill="#79c0ff" fill-opacity="0.18" stroke="#79c0ff"/>
+  <text x="310.7" y="165" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">HELD by A</text>
+  <rect x="471.4" y="144" width="150.0" height="32" rx="6" fill="#d2a8ff" fill-opacity="0.18" stroke="#d2a8ff"/>
+  <text x="546.4" y="165" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">PAYMENT_PENDING</text>
+  <rect x="621.4" y="144" width="128.6" height="32" rx="6" fill="#7ee787" fill-opacity="0.18" stroke="#7ee787"/>
+  <text x="685.7" y="165" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">SOLD</text>
+  <rect x="621.4" y="182" width="64.3" height="8" rx="3" fill="#d2a8ff" fill-opacity="0.35"/>
+  <text x="685.7" y="208" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">grace ends 12.5</text>
+  <line x1="471.4" y1="136" x2="471.4" y2="220" stroke="#e6edf3" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="471.4" y="236" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">A clicks pay</text>
+  <line x1="578.6" y1="120" x2="578.6" y2="340" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="578.6" y="116" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">original expiry</text>
+  <rect x="150.0" y="304" width="428.6" height="32" rx="6" fill="#79c0ff" fill-opacity="0.18" stroke="#79c0ff"/>
+  <text x="364.3" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">HELD by A</text>
+  <rect x="587.1" y="304" width="162.9" height="32" rx="6" fill="#f78166" fill-opacity="0.18" stroke="#f78166"/>
+  <text x="668.6" y="325" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">HELD by B</text>
+  <line x1="471.4" y1="296" x2="471.4" y2="364" stroke="#e6edf3" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="471.4" y="380" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">A clicks pay</text>
+  <circle cx="621.4" cy="360" r="9" fill="#0d1117" stroke="#f78166" stroke-width="2"/>
+  <path d="M617.4 356 L625.4 364 M625.4 356 L617.4 364" stroke="#f78166" stroke-width="2"/>
+  <text x="637.4" y="358" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">A is charged,</text>
+  <text x="637.4" y="375" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">B holds the seat</text>
+  <line x1="150" y1="400" x2="750" y2="400" stroke="#30363d" stroke-width="2"/>
+  <text x="150.0" y="422" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0 min</text>
+  <text x="235.7" y="422" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">2 min</text>
+  <text x="321.4" y="422" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">4 min</text>
+  <text x="407.1" y="422" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">6 min</text>
+  <text x="492.9" y="422" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">8 min</text>
+  <text x="578.6" y="422" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">10 min</text>
+  <text x="664.3" y="422" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">12 min</text>
+  <text x="400" y="452" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Freeze the hold before charging, and give the payment a bounded grace period that the sweeper respects.</text>
+</svg>

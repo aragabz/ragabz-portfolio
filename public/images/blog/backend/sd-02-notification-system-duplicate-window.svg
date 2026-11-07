@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">Where duplicate sends come from</title>
+  <desc id="d">A channel worker's steps on a timeline: receive the message, claim a dedupe key, call the provider, the provider accepts, record SENT, then acknowledge the message. A crash before the provider call is safe because the retry finds no send. A crash after the provider accepted but before SENT is recorded is the duplicate window, because the retry cannot know the provider already accepted the message. A crash after recording SENT but before the acknowledgement is caught by the dedupe record.</desc>
+  <rect x="0" y="0" width="800" height="460" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">At-least-once delivery: what a crash at each step causes</text>
+    <text x="32" y="70" font-size="14" fill="#8b949e">One channel worker processing one send (notification, channel, device)</text>
+
+    <line x1="60" y1="170" x2="740" y2="170" stroke="#30363d" stroke-width="2"/>
+    <g fill="#e6edf3">
+      <circle cx="80" cy="170" r="7"/>
+      <circle cx="200" cy="170" r="7"/>
+      <circle cx="330" cy="170" r="7"/>
+      <circle cx="460" cy="170" r="7"/>
+      <circle cx="590" cy="170" r="7"/>
+      <circle cx="710" cy="170" r="7"/>
+    </g>
+    <g font-size="13" fill="#e6edf3" text-anchor="middle">
+      <text x="80" y="140">receive</text>
+      <text x="200" y="124">claim</text>
+      <text x="200" y="140">dedupe key</text>
+      <text x="330" y="124">call</text>
+      <text x="330" y="140">provider</text>
+      <text x="460" y="124">provider</text>
+      <text x="460" y="140">accepts</text>
+      <text x="590" y="124">record</text>
+      <text x="590" y="140">SENT</text>
+      <text x="710" y="140">ack</text>
+    </g>
+
+    <!-- zones -->
+    <rect x="80" y="196" width="250" height="34" rx="6" fill="none" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="205" y="218" font-size="13" fill="#7ee787" text-anchor="middle">crash here: safe retry</text>
+    <rect x="340" y="196" width="250" height="34" rx="6" fill="#f78166" fill-opacity="0.15" stroke="#f78166" stroke-width="1.5"/>
+    <text x="465" y="218" font-size="13" fill="#f78166" text-anchor="middle">crash here: duplicate window</text>
+    <rect x="600" y="196" width="140" height="34" rx="6" fill="none" stroke="#79c0ff" stroke-width="1.5"/>
+    <text x="670" y="218" font-size="13" fill="#79c0ff" text-anchor="middle">dedupe catches it</text>
+
+    <!-- notes -->
+    <rect x="32" y="262" width="736" height="168" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="52" y="292" font-size="14" fill="#e6edf3">You cannot close the red window with your own database alone:</text>
+    <text x="52" y="318" font-size="14" fill="#8b949e">the provider's accept and your SENT write are two systems with no shared transaction.</text>
+    <text x="52" y="350" font-size="14" fill="#e6edf3">Shrink it and soften it instead:</text>
+    <text x="52" y="376" font-size="14" fill="#8b949e">pass a provider idempotency key where the API supports one</text>
+    <text x="52" y="400" font-size="14" fill="#8b949e">set a collapse id on push so a duplicate replaces the first on the device</text>
+    <text x="52" y="424" font-size="14" fill="#8b949e">keep the window short: no slow work between the provider call and the SENT write</text>
+  </g>
+</svg>

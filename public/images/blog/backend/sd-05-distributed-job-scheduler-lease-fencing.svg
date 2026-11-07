@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Leases, heartbeats and fencing tokens when a worker stalls</title>
+  <desc id="d">Worker A claims a run with fencing token 41 and a 30 second lease, heartbeats twice, then stalls in a long pause. The lease expires at 50 seconds and worker B claims the same run with token 42. When A wakes at 70 seconds its write with token 41 is rejected. B completes with token 42. The target deduplicates both calls with the same idempotency key.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">A lease is a timeout, not a lock</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Run r-981 (job 7f3, fire time 10:00:00). Lease 30 s, heartbeat every 10 s.</text>
+  <text x="32" y="135" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">worker A</text>
+  <line x1="130" y1="130" x2="760" y2="130" stroke="#30363d" stroke-width="2"/>
+  <text x="32" y="235" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">worker B</text>
+  <line x1="130" y1="230" x2="760" y2="230" stroke="#30363d" stroke-width="2"/>
+  <text x="32" y="335" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">job store</text>
+  <line x1="130" y1="330" x2="760" y2="330" stroke="#30363d" stroke-width="2"/>
+  <rect x="130.0" y="116" width="175.0" height="28" rx="6" fill="#79c0ff" fill-opacity="0.18" stroke="#79c0ff"/>
+  <text x="217.5" y="135" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">token 41</text>
+  <rect x="305.0" y="116" width="315.0" height="28" rx="6" fill="#0d1117" stroke="#8b949e" stroke-dasharray="4 4"/>
+  <text x="462.5" y="135" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">stalled: GC pause or partition</text>
+  <line x1="620.0" y1="144" x2="620.0" y2="318" stroke="#f78166" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <circle cx="620.0" cy="330" r="9" fill="#0d1117" stroke="#f78166" stroke-width="2"/>
+  <path d="M616.0 326 L624.0 334 M624.0 326 L616.0 334" stroke="#f78166" stroke-width="2"/>
+  <text x="630.0" y="362" fill="#f78166" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">41 rejected</text>
+  <line x1="200.0" y1="144" x2="200.0" y2="320" stroke="#7ee787" stroke-width="1.5"/>
+  <circle cx="200.0" cy="330" r="5" fill="#7ee787"/>
+  <line x1="270.0" y1="144" x2="270.0" y2="320" stroke="#7ee787" stroke-width="1.5"/>
+  <circle cx="270.0" cy="330" r="5" fill="#7ee787"/>
+  <text x="235.0" y="362" fill="#7ee787" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">heartbeats</text>
+  <rect x="130.0" y="380" width="350.0" height="14" rx="4" fill="#79c0ff" fill-opacity="0.25"/>
+  <text x="130.0" y="412" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">lease held by A, extended to T+50</text>
+  <line x1="480.0" y1="96" x2="480.0" y2="398" stroke="#d2a8ff" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="480.0" y="92" fill="#d2a8ff" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">lease expires</text>
+  <rect x="494.0" y="216" width="196.0" height="28" rx="6" fill="#7ee787" fill-opacity="0.16" stroke="#7ee787"/>
+  <text x="592.0" y="235" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">token 42</text>
+  <line x1="690.0" y1="244" x2="690.0" y2="320" stroke="#7ee787" stroke-width="1.5"/>
+  <circle cx="690.0" cy="330" r="9" fill="#0d1117" stroke="#7ee787" stroke-width="2"/>
+  <path d="M686.0 330 L689.0 334 L695.0 325" stroke="#7ee787" stroke-width="2" fill="none"/>
+  <text x="680.0" y="362" fill="#7ee787" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">42 commits</text>
+  <rect x="494.0" y="380" width="196.0" height="14" rx="4" fill="#7ee787" fill-opacity="0.25"/>
+  <text x="130.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+0</text>
+  <text x="200.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+10</text>
+  <text x="270.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+20</text>
+  <text x="340.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+30</text>
+  <text x="410.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+40</text>
+  <text x="480.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+50</text>
+  <text x="550.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+60</text>
+  <text x="620.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+70</text>
+  <text x="690.0" y="436" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">T+80</text>
+  <text x="400" y="458" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Both workers may have called the target. Idempotency key 7f3:10:00:00 makes the second call a no-op.</text>
+</svg>

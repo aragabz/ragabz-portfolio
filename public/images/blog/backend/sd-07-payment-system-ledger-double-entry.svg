@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="t d">
+  <title id="t">Double-entry postings for a 100.00 EUR marketplace payment</title>
+  <desc id="d">Five journal entries (capture, PSP fee, settlement, payout, partial refund) across five accounts. Debits are positive, credits negative, and every entry sums to zero. After the first four entries the PSP receivable and seller payable are back to zero.</desc>
+  <rect width="800" height="500" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="400" y="42" font-size="18" font-weight="600" fill="#e6edf3" text-anchor="middle">Every journal entry sums to zero</text>
+    <text x="400" y="66" font-size="13" fill="#8b949e" text-anchor="middle">100.00 EUR sale, 10% platform fee, 1.50 EUR PSP fee. Debit +, credit −. Amounts in EUR (stored as integer cents).</text>
+
+    <!-- header -->
+    <g text-anchor="middle" font-size="13">
+      <text x="255" y="104" fill="#e6edf3" font-weight="600">PSP</text>
+      <text x="255" y="121" fill="#e6edf3" font-weight="600">receivable</text>
+      <text x="255" y="138" fill="#79c0ff">asset</text>
+      <text x="355" y="104" fill="#e6edf3" font-weight="600">Seller</text>
+      <text x="355" y="121" fill="#e6edf3" font-weight="600">payable</text>
+      <text x="355" y="138" fill="#d2a8ff">liability</text>
+      <text x="455" y="104" fill="#e6edf3" font-weight="600">Platform</text>
+      <text x="455" y="121" fill="#e6edf3" font-weight="600">revenue</text>
+      <text x="455" y="138" fill="#7ee787">revenue</text>
+      <text x="555" y="104" fill="#e6edf3" font-weight="600">PSP</text>
+      <text x="555" y="121" fill="#e6edf3" font-weight="600">fees</text>
+      <text x="555" y="138" fill="#f78166">expense</text>
+      <text x="655" y="104" fill="#e6edf3" font-weight="600">Bank</text>
+      <text x="655" y="121" fill="#e6edf3" font-weight="600">cash</text>
+      <text x="655" y="138" fill="#79c0ff">asset</text>
+      <text x="740" y="121" fill="#e6edf3" font-weight="600">Sum</text>
+    </g>
+    <line x1="40" y1="150" x2="770" y2="150" stroke="#30363d"/>
+
+    <!-- row labels -->
+    <g font-size="14" fill="#e6edf3">
+      <text x="48" y="180">1. Capture</text>
+      <text x="48" y="224">2. PSP fee</text>
+      <text x="48" y="268">3. Settlement</text>
+      <text x="48" y="312">4. Payout</text>
+    </g>
+    <g font-size="13" fill="#8b949e">
+      <text x="48" y="196">buyer pays 100.00</text>
+      <text x="48" y="240">PSP keeps 1.50</text>
+      <text x="48" y="284">PSP pays our bank</text>
+      <text x="48" y="328">we pay the seller</text>
+    </g>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" text-anchor="middle" fill="#e6edf3">
+      <!-- row 1 -->
+      <text x="255" y="186">+100.00</text>
+      <text x="355" y="186">−90.00</text>
+      <text x="455" y="186">−10.00</text>
+      <text x="740" y="186" fill="#7ee787">0</text>
+      <!-- row 2 -->
+      <text x="255" y="230">−1.50</text>
+      <text x="555" y="230">+1.50</text>
+      <text x="740" y="230" fill="#7ee787">0</text>
+      <!-- row 3 -->
+      <text x="255" y="274">−98.50</text>
+      <text x="655" y="274">+98.50</text>
+      <text x="740" y="274" fill="#7ee787">0</text>
+      <!-- row 4 -->
+      <text x="355" y="318">+90.00</text>
+      <text x="655" y="318">−90.00</text>
+      <text x="740" y="318" fill="#7ee787">0</text>
+    </g>
+
+    <!-- net row -->
+    <rect x="40" y="342" width="730" height="44" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="48" y="369" font-size="14" font-weight="600" fill="#e6edf3">Net after 1 to 4</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" text-anchor="middle" font-weight="600">
+      <text x="255" y="369" fill="#7ee787">0.00</text>
+      <text x="355" y="369" fill="#7ee787">0.00</text>
+      <text x="455" y="369" fill="#e6edf3">−10.00</text>
+      <text x="555" y="369" fill="#e6edf3">+1.50</text>
+      <text x="655" y="369" fill="#e6edf3">+8.50</text>
+      <text x="740" y="369" fill="#7ee787">0</text>
+    </g>
+
+    <!-- refund row -->
+    <text x="48" y="420" font-size="14" fill="#e6edf3">5. Refund 20.00</text>
+    <text x="48" y="436" font-size="13" fill="#8b949e">seller bears it, fee back</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" text-anchor="middle" fill="#e6edf3">
+      <text x="255" y="426">−20.00</text>
+      <text x="355" y="426">+18.00</text>
+      <text x="455" y="426">+2.00</text>
+      <text x="740" y="426" fill="#7ee787">0</text>
+    </g>
+
+    <text x="400" y="474" font-size="13" fill="#8b949e" text-anchor="middle">Receivable and payable draining to zero is a free reconciliation check. Corrections are new entries, never edits.</text>
+  </g>
+</svg>

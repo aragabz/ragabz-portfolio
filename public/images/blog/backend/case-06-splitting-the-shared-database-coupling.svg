@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="t d">
+<title id="t">Hidden coupling around the billing tables</title>
+<desc id="d">A shared PostgreSQL database holds billing tables (invoices, invoice lines, credit notes) and other tables (orders, refunds, audit log, customers). Five consumers depend on the billing tables. Only one, the monolith's billing code, was visible from the code being extracted. The others were a foreign key from refunds to invoices, a trigger from invoices to the audit log, a stored function used by the support tool, a nightly revenue job joining invoices with orders, and BI dashboards reading a read replica.</desc>
+<rect x="0" y="0" width="800" height="500" rx="16" fill="#0d1117"/>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker>
+</defs>
+<g font-family="Inter, system-ui, sans-serif">
+<text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">Who depends on the billing tables?</text>
+<text x="32" y="68" fill="#8b949e" font-size="13">The extraction plan saw one consumer. The database had five.</text>
+<g font-size="13">
+<rect x="32" y="112" width="200" height="52" rx="8" fill="#161b22" stroke="#79c0ff"/>
+<text x="132" y="134" fill="#e6edf3" text-anchor="middle" font-weight="600">Monolith billing code</text>
+<text x="132" y="153" fill="#79c0ff" text-anchor="middle">known, in the plan</text>
+<rect x="32" y="192" width="200" height="52" rx="8" fill="#161b22" stroke="#d2a8ff"/>
+<text x="132" y="214" fill="#e6edf3" text-anchor="middle" font-weight="600">Support admin tool</text>
+<text x="132" y="233" fill="#d2a8ff" text-anchor="middle">calls a stored function</text>
+<rect x="32" y="272" width="200" height="52" rx="8" fill="#161b22" stroke="#7ee787"/>
+<text x="132" y="294" fill="#e6edf3" text-anchor="middle" font-weight="600">Nightly revenue job</text>
+<text x="132" y="313" fill="#7ee787" text-anchor="middle">SQL join, other repo</text>
+<rect x="32" y="352" width="200" height="52" rx="8" fill="#161b22" stroke="#7ee787"/>
+<text x="132" y="374" fill="#e6edf3" text-anchor="middle" font-weight="600">BI dashboards</text>
+<text x="132" y="393" fill="#7ee787" text-anchor="middle">read replica, finance team</text>
+</g>
+<rect x="290" y="96" width="478" height="340" rx="12" fill="none" stroke="#30363d" stroke-width="1.5"/>
+<text x="306" y="120" fill="#8b949e" font-size="13">Shared PostgreSQL database: core</text>
+<rect x="306" y="136" width="210" height="214" rx="8" fill="#79c0ff" fill-opacity="0.08" stroke="#79c0ff" stroke-dasharray="5 4"/>
+<text x="411" y="340" fill="#79c0ff" font-size="13" text-anchor="middle">to be owned by billing</text>
+<g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+<rect x="326" y="150" width="170" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="411" y="175" fill="#e6edf3" text-anchor="middle">invoices</text>
+<rect x="326" y="210" width="170" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="411" y="235" fill="#e6edf3" text-anchor="middle">invoice_lines</text>
+<rect x="326" y="270" width="170" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="411" y="295" fill="#e6edf3" text-anchor="middle">credit_notes</text>
+<rect x="580" y="150" width="168" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="664" y="175" fill="#8b949e" text-anchor="middle">orders</text>
+<rect x="580" y="210" width="168" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="664" y="235" fill="#8b949e" text-anchor="middle">refunds</text>
+<rect x="580" y="270" width="168" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="664" y="295" fill="#8b949e" text-anchor="middle">audit_log</text>
+<rect x="580" y="370" width="168" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="664" y="395" fill="#8b949e" text-anchor="middle">customers</text>
+</g>
+<g stroke-width="2" fill="none">
+<line x1="232" y1="138" x2="324" y2="168" stroke="#79c0ff" marker-end="url(#a)"/>
+<line x1="232" y1="218" x2="324" y2="288" stroke="#d2a8ff" marker-end="url(#a)"/>
+<line x1="232" y1="298" x2="324" y2="176" stroke="#7ee787" marker-end="url(#a)"/>
+<line x1="232" y1="378" x2="324" y2="182" stroke="#7ee787" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="578" y1="226" x2="498" y2="176" stroke="#f78166" marker-end="url(#a)"/>
+<path d="M498,184 C540,210 540,270 578,288" stroke="#d2a8ff" stroke-dasharray="6 4" marker-end="url(#a)"/>
+</g>
+<g font-size="13">
+<text x="540" y="200" fill="#f78166" text-anchor="middle">FK</text>
+<text x="552" y="262" fill="#d2a8ff" text-anchor="start">trigger</text>
+</g>
+<g font-size="13" fill="#e6edf3">
+<text x="32" y="464"><tspan fill="#f78166" font-weight="600">Orange:</tspan> constraint across the boundary.  <tspan fill="#d2a8ff" font-weight="600">Purple:</tspan> logic inside the database.</text>
+<text x="32" y="486"><tspan fill="#7ee787" font-weight="600">Green:</tspan> readers outside the monolith's codebase. None of these show up in a grep of the billing package.</text>
+</g>
+</g></svg>

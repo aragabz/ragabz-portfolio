@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+<title id="t">Retry storm incident timeline</title>
+<desc id="d">A 52-minute incident timeline. A cold cache in the promotions service triggers the incident at T+0. The checkout error rate keeps rising after the cache recovers because retries sustain the overload. It only falls after a kill switch stops calls to promotions at T+22 and gateway retries are turned off at T+25. Promotions is re-enabled gradually from T+38 and the incident is resolved at T+52.</desc>
+<rect x="0" y="0" width="800" height="480" rx="16" fill="#0d1117"/>
+<g font-family="Inter, system-ui, sans-serif">
+<text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">Timeline: a 9-minute trigger, a 52-minute outage</text>
+<text x="32" y="68" fill="#8b949e" font-size="13">Composite scenario. Times are minutes after the cache nodes were replaced (19:02). Curve is illustrative.</text>
+<rect x="48" y="90" width="115" height="26" rx="4" fill="#f78166" fill-opacity="0.18" stroke="#f78166"/>
+<text x="105" y="108" fill="#f78166" font-size="13" text-anchor="middle">cold cache</text>
+<rect x="163" y="90" width="167" height="26" rx="4" fill="#d2a8ff" fill-opacity="0.18" stroke="#d2a8ff"/>
+<text x="246" y="108" fill="#d2a8ff" font-size="13" text-anchor="middle">retry-driven overload</text>
+<rect x="330" y="90" width="204" height="26" rx="4" fill="#79c0ff" fill-opacity="0.18" stroke="#79c0ff"/>
+<text x="432" y="108" fill="#79c0ff" font-size="13" text-anchor="middle">mitigation</text>
+<rect x="534" y="90" width="180" height="26" rx="4" fill="#7ee787" fill-opacity="0.18" stroke="#7ee787"/>
+<text x="624" y="108" fill="#7ee787" font-size="13" text-anchor="middle">gradual recovery</text>
+<line x1="48" y1="230" x2="752" y2="230" stroke="#30363d" stroke-width="1"/>
+<line x1="48" y1="150" x2="752" y2="150" stroke="#30363d" stroke-width="1" stroke-dasharray="4 4"/>
+<text x="752" y="144" fill="#8b949e" font-size="13" text-anchor="end">80% of checkout requests failing</text>
+<polyline fill="none" stroke="#f78166" stroke-width="2.5" stroke-linejoin="round" points="48,229 86,210 163,185 253,168 291,160 330,165 368,200 445,222 534,227 624,229 714,229.5"/>
+<text x="56" y="146" fill="#f78166" font-size="13">checkout 5xx rate</text>
+<line x1="48" y1="262" x2="752" y2="262" stroke="#8b949e" stroke-width="1.5"/>
+<text x="48" y="300" fill="#8b949e" font-size="13" text-anchor="middle">T+0</text>
+<text x="176" y="300" fill="#8b949e" font-size="13" text-anchor="middle">T+10</text>
+<text x="304" y="300" fill="#8b949e" font-size="13" text-anchor="middle">T+20</text>
+<text x="432" y="300" fill="#8b949e" font-size="13" text-anchor="middle">T+30</text>
+<text x="560" y="300" fill="#8b949e" font-size="13" text-anchor="middle">T+40</text>
+<text x="688" y="300" fill="#8b949e" font-size="13" text-anchor="middle">T+50</text>
+<g font-size="13" font-weight="600" text-anchor="middle">
+<circle cx="48" cy="262" r="10" fill="#f78166"/><text x="48" y="267" fill="#0d1117">1</text>
+<circle cx="86" cy="262" r="10" fill="#f78166"/><text x="86" y="267" fill="#0d1117">2</text>
+<circle cx="125" cy="262" r="10" fill="#d2a8ff"/><text x="125" y="267" fill="#0d1117">3</text>
+<circle cx="176" cy="262" r="10" fill="#d2a8ff"/><text x="176" y="267" fill="#0d1117">4</text>
+<circle cx="253" cy="262" r="10" fill="#d2a8ff"/><text x="253" y="267" fill="#0d1117">5</text>
+<circle cx="291" cy="262" r="10" fill="#d2a8ff"/><text x="291" y="267" fill="#0d1117">6</text>
+<circle cx="330" cy="262" r="10" fill="#79c0ff"/><text x="330" y="267" fill="#0d1117">7</text>
+<circle cx="368" cy="262" r="10" fill="#79c0ff"/><text x="368" y="267" fill="#0d1117">8</text>
+<circle cx="445" cy="262" r="10" fill="#79c0ff"/><text x="445" y="267" fill="#0d1117">9</text>
+<circle cx="534" cy="262" r="10" fill="#7ee787"/><text x="534" y="267" fill="#0d1117">10</text>
+<circle cx="714" cy="262" r="10" fill="#7ee787"/><text x="714" y="267" fill="#0d1117">11</text>
+</g>
+<g font-size="13" fill="#e6edf3">
+<text x="48" y="336"><tspan fill="#f78166" font-weight="600">1  T+0 </tspan> Promotions cache nodes replaced, start empty</text>
+<text x="48" y="360"><tspan fill="#f78166" font-weight="600">2  T+3 </tspan> Fast-burn page: checkout SLO</text>
+<text x="48" y="384"><tspan fill="#d2a8ff" font-weight="600">3  T+6 </tspan> Incident declared, commander assigned</text>
+<text x="48" y="408"><tspan fill="#d2a8ff" font-weight="600">4  T+10</tspan> Checkout deploy rolled back: no effect</text>
+<text x="48" y="432"><tspan fill="#d2a8ff" font-weight="600">5  T+16</tspan> Traces show 3 attempts at every hop</text>
+<text x="48" y="456"><tspan fill="#d2a8ff" font-weight="600">6  T+19</tspan> Promotions scaled out: database worse</text>
+<text x="430" y="336"><tspan fill="#79c0ff" font-weight="600">7  T+22</tspan> Kill switch: base prices, no promotions</text>
+<text x="430" y="360"><tspan fill="#79c0ff" font-weight="600">8  T+25</tspan> Gateway retries off, edge shedding on</text>
+<text x="430" y="384"><tspan fill="#79c0ff" font-weight="600">9  T+31</tspan> Promotions healthy, cache pre-warmed</text>
+<text x="430" y="408"><tspan fill="#7ee787" font-weight="600">10 T+38</tspan> Promotions back on: 10%, 50%, 100%</text>
+<text x="430" y="432"><tspan fill="#7ee787" font-weight="600">11 T+52</tspan> Burn rate normal, incident resolved</text>
+</g>
+</g></svg>

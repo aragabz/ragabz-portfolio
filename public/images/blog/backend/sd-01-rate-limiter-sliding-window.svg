@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Sliding window counter estimate</title>
+  <desc id="d">Two fixed one-minute windows. The previous window counted 84 requests and the current window has 36 so far. At 15 seconds into the current window, the sliding 60-second window overlaps 75 percent of the previous window, so the estimate is 36 plus 84 times 0.75, which is 99. With a limit of 100 the next request is allowed.</desc>
+  <rect x="0" y="0" width="800" height="440" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Sliding window counter: two integers approximate a rolling window</text>
+    <text x="32" y="70" font-size="14" fill="#8b949e">Limit: 100 requests per 60 s. Now = 15 s into the current fixed window.</text>
+
+    <!-- fixed windows -->
+    <rect x="80" y="130" width="320" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <text x="96" y="158" font-size="14" fill="#e6edf3">previous window</text>
+    <text x="96" y="182" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#79c0ff">count = 84</text>
+    <rect x="400" y="130" width="320" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <text x="416" y="158" font-size="14" fill="#e6edf3">current window</text>
+    <text x="416" y="182" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#7ee787">count = 36</text>
+
+    <!-- axis -->
+    <line x1="80" y1="230" x2="720" y2="230" stroke="#30363d" stroke-width="2"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b949e">
+      <text x="72" y="252">0s</text>
+      <text x="388" y="252">60s</text>
+      <text x="704" y="252">120s</text>
+    </g>
+
+    <!-- now marker at 75s: x = 80 + 75/120*640 = 480 -->
+    <line x1="480" y1="110" x2="480" y2="300" stroke="#f78166" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="490" y="122" font-size="13" fill="#f78166">now (75 s)</text>
+
+    <!-- sliding window 15s..75s: x 160..480 -->
+    <rect x="160" y="276" width="320" height="34" rx="6" fill="none" stroke="#d2a8ff" stroke-width="2"/>
+    <text x="196" y="298" font-size="14" fill="#d2a8ff">sliding window: last 60 s (15 s to 75 s)</text>
+    <line x1="160" y1="230" x2="160" y2="276" stroke="#d2a8ff" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <text x="166" y="268" font-size="13" fill="#8b949e">75% of previous window</text>
+    <text x="404" y="268" font-size="13" fill="#8b949e">25%</text>
+
+    <!-- formula -->
+    <rect x="32" y="334" width="736" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="52" y="364" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">estimate = current + previous * (1 - elapsed / window)</text>
+    <text x="52" y="394" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">         = 36 + 84 * 0.75 = 99</text>
+    <text x="420" y="394" font-size="14" fill="#7ee787">99 is under 100: allow, then current = 37</text>
+  </g>
+</svg>

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Four spatial indexes compared: geohash, quadtree, H3 and S2</title>
+  <desc id="d">Geohash uses a fixed rectangular grid ordered by a Z-order curve. A quadtree splits cells adaptively where points are dense. H3 tiles the sphere with hexagons whose six neighbours are equidistant. S2 projects a cube onto the sphere and orders square cells along a Hilbert curve.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="400" y="42" font-size="18" font-weight="600" fill="#e6edf3" text-anchor="middle">Four ways to turn a location into a key</text>
+    <text x="400" y="66" font-size="13" fill="#8b949e" text-anchor="middle">All of them map 2D space to cells with IDs you can store in an ordinary key-value or sorted index.</text>
+    <rect x="32" y="88" width="166" height="356" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="115.0" y="116" font-size="15" font-weight="600" fill="#79c0ff" text-anchor="middle">Geohash</text>
+    <text x="46" y="304" font-size="13" fill="#e6edf3">Rectangular cells</text>
+    <text x="46" y="326" font-size="13" fill="#e6edf3">base32 string IDs</text>
+    <text x="46" y="348" font-size="13" fill="#e6edf3">Prefix = contained</text>
+    <text x="46" y="370" font-size="13" fill="#8b949e">Near points can</text>
+    <text x="46" y="392" font-size="13" fill="#8b949e">differ in prefix</text>
+    <text x="46" y="414" font-size="13" fill="#8b949e">at cell edges</text>
+    <rect x="222" y="88" width="166" height="356" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="305.0" y="116" font-size="15" font-weight="600" fill="#7ee787" text-anchor="middle">Quadtree</text>
+    <text x="236" y="304" font-size="13" fill="#e6edf3">Splits where dense</text>
+    <text x="236" y="326" font-size="13" fill="#e6edf3">Even load per leaf</text>
+    <text x="236" y="348" font-size="13" fill="#e6edf3">Built in memory</text>
+    <text x="236" y="370" font-size="13" fill="#8b949e">Rebuilds are costly</text>
+    <text x="236" y="392" font-size="13" fill="#8b949e">for moving points</text>
+    <rect x="412" y="88" width="166" height="356" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="495.0" y="116" font-size="15" font-weight="600" fill="#f78166" text-anchor="middle">H3</text>
+    <text x="426" y="304" font-size="13" fill="#e6edf3">Hexagons, 16 levels</text>
+    <text x="426" y="326" font-size="13" fill="#e6edf3">6 equal neighbours</text>
+    <text x="426" y="348" font-size="13" fill="#e6edf3">Rings: gridDisk</text>
+    <text x="426" y="370" font-size="13" fill="#8b949e">Children are only</text>
+    <text x="426" y="392" font-size="13" fill="#8b949e">roughly nested</text>
+    <rect x="602" y="88" width="166" height="356" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="685.0" y="116" font-size="15" font-weight="600" fill="#d2a8ff" text-anchor="middle">S2</text>
+    <text x="616" y="304" font-size="13" fill="#e6edf3">Cube on a sphere</text>
+    <text x="616" y="326" font-size="13" fill="#e6edf3">Hilbert-ordered</text>
+    <text x="616" y="348" font-size="13" fill="#e6edf3">64-bit cell IDs</text>
+    <text x="616" y="370" font-size="13" fill="#8b949e">31 levels, nested</text>
+    <text x="616" y="392" font-size="13" fill="#8b949e">Good for polygons</text>
+    <line x1="55" y1="140" x2="175" y2="140" stroke="#30363d"/>
+    <line x1="55" y1="140" x2="55" y2="260" stroke="#30363d"/>
+    <line x1="55" y1="170" x2="175" y2="170" stroke="#30363d"/>
+    <line x1="85" y1="140" x2="85" y2="260" stroke="#30363d"/>
+    <line x1="55" y1="200" x2="175" y2="200" stroke="#30363d"/>
+    <line x1="115" y1="140" x2="115" y2="260" stroke="#30363d"/>
+    <line x1="55" y1="230" x2="175" y2="230" stroke="#30363d"/>
+    <line x1="145" y1="140" x2="145" y2="260" stroke="#30363d"/>
+    <line x1="55" y1="260" x2="175" y2="260" stroke="#30363d"/>
+    <line x1="175" y1="140" x2="175" y2="260" stroke="#30363d"/>
+    <polyline points="70.0,245.0 100.0,245.0 70.0,215.0 100.0,215.0 130.0,245.0 160.0,245.0 130.0,215.0 160.0,215.0 70.0,185.0 100.0,185.0 70.0,155.0 100.0,155.0 130.0,185.0 160.0,185.0 130.0,155.0 160.0,155.0" fill="none" stroke="#79c0ff" stroke-width="2"/>
+    <text x="115.0" y="280" font-size="13" fill="#8b949e" text-anchor="middle">Z-order curve</text>
+    <rect x="245" y="140" width="120" height="120" fill="none" stroke="#7ee787"/>
+    <line x1="305" y1="140" x2="305" y2="260" stroke="#7ee787" stroke-opacity="0.7"/>
+    <line x1="245" y1="200" x2="365" y2="200" stroke="#7ee787" stroke-opacity="0.7"/>
+    <line x1="275" y1="140" x2="275" y2="200" stroke="#7ee787" stroke-opacity="0.7"/>
+    <line x1="245" y1="170" x2="305" y2="170" stroke="#7ee787" stroke-opacity="0.7"/>
+    <line x1="290" y1="140" x2="290" y2="170" stroke="#7ee787" stroke-opacity="0.7"/>
+    <line x1="275" y1="155" x2="305" y2="155" stroke="#7ee787" stroke-opacity="0.7"/>
+    <line x1="335" y1="200" x2="335" y2="260" stroke="#7ee787" stroke-opacity="0.7"/>
+    <line x1="305" y1="230" x2="365" y2="230" stroke="#7ee787" stroke-opacity="0.7"/>
+    <circle cx="253" cy="148" r="2.5" fill="#e6edf3"/>
+    <circle cx="265" cy="162" r="2.5" fill="#e6edf3"/>
+    <circle cx="281" cy="146" r="2.5" fill="#e6edf3"/>
+    <circle cx="297" cy="150" r="2.5" fill="#e6edf3"/>
+    <circle cx="285" cy="162" r="2.5" fill="#e6edf3"/>
+    <circle cx="300" cy="164" r="2.5" fill="#e6edf3"/>
+    <circle cx="257" cy="184" r="2.5" fill="#e6edf3"/>
+    <circle cx="289" cy="184" r="2.5" fill="#e6edf3"/>
+    <circle cx="271" cy="192" r="2.5" fill="#e6edf3"/>
+    <circle cx="325" cy="170" r="2.5" fill="#e6edf3"/>
+    <circle cx="317" cy="240" r="2.5" fill="#e6edf3"/>
+    <circle cx="349" cy="214" r="2.5" fill="#e6edf3"/>
+    <circle cx="345" cy="248" r="2.5" fill="#e6edf3"/>
+    <text x="305.0" y="280" font-size="13" fill="#8b949e" text-anchor="middle">split when full</text>
+    <polygon points="514.1,189.0 514.1,211.0 495.0,222.0 475.9,211.0 475.9,189.0 495.0,178.0" fill="#f78166" fill-opacity="0.35" stroke="#f78166"/>
+    <polygon points="552.2,189.0 552.2,211.0 533.1,222.0 514.1,211.0 514.1,189.0 533.1,178.0" fill="none" stroke="#f78166"/>
+    <polygon points="533.1,222.0 533.1,244.0 514.1,255.0 495.0,244.0 495.0,222.0 514.1,211.0" fill="none" stroke="#f78166"/>
+    <polygon points="495.0,222.0 495.0,244.0 475.9,255.0 456.9,244.0 456.9,222.0 475.9,211.0" fill="none" stroke="#f78166"/>
+    <polygon points="475.9,189.0 475.9,211.0 456.9,222.0 437.8,211.0 437.8,189.0 456.9,178.0" fill="none" stroke="#f78166"/>
+    <polygon points="495.0,156.0 495.0,178.0 475.9,189.0 456.9,178.0 456.9,156.0 475.9,145.0" fill="none" stroke="#f78166"/>
+    <polygon points="533.1,156.0 533.1,178.0 514.1,189.0 495.0,178.0 495.0,156.0 514.1,145.0" fill="none" stroke="#f78166"/>
+    <text x="495.0" y="280" font-size="13" fill="#8b949e" text-anchor="middle">k = 1 ring: 7 cells</text>
+    <line x1="625" y1="140" x2="745" y2="140" stroke="#30363d"/>
+    <line x1="625" y1="140" x2="625" y2="260" stroke="#30363d"/>
+    <line x1="625" y1="170" x2="745" y2="170" stroke="#30363d"/>
+    <line x1="655" y1="140" x2="655" y2="260" stroke="#30363d"/>
+    <line x1="625" y1="200" x2="745" y2="200" stroke="#30363d"/>
+    <line x1="685" y1="140" x2="685" y2="260" stroke="#30363d"/>
+    <line x1="625" y1="230" x2="745" y2="230" stroke="#30363d"/>
+    <line x1="715" y1="140" x2="715" y2="260" stroke="#30363d"/>
+    <line x1="625" y1="260" x2="745" y2="260" stroke="#30363d"/>
+    <line x1="745" y1="140" x2="745" y2="260" stroke="#30363d"/>
+    <polyline points="640.0,245.0 640.0,215.0 670.0,215.0 670.0,245.0 700.0,245.0 730.0,245.0 730.0,215.0 700.0,215.0 700.0,185.0 730.0,185.0 730.0,155.0 700.0,155.0 670.0,155.0 670.0,185.0 640.0,185.0 640.0,155.0" fill="none" stroke="#d2a8ff" stroke-width="2"/>
+    <text x="685.0" y="280" font-size="13" fill="#8b949e" text-anchor="middle">Hilbert curve</text>
+  </g>
+</svg>

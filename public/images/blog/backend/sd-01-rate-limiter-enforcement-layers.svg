@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">Where rate limits are enforced</title>
+  <desc id="d">Four layers from outside in. The edge or WAF limits per IP and stops floods and scrapers cheaply. The API gateway limits per API key or tenant with a shared token bucket and enforces plan quotas. The service limits per user and action, such as login attempts or messages sent. The resource layer uses concurrency limits and load shedding to protect databases and pools from the sum of all callers.</desc>
+  <rect x="0" y="0" width="800" height="480" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Defence in depth: each layer limits a different key</text>
+    <text x="32" y="70" font-size="14" fill="#8b949e">Cheap and coarse at the outside, precise and business-aware on the inside</text>
+
+    <g font-size="13" fill="#8b949e">
+      <text x="236" y="104">key</text>
+      <text x="436" y="104">what it stops</text>
+    </g>
+
+    <rect x="32" y="116" width="736" height="72" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+    <text x="52" y="146" font-size="16" font-weight="600" fill="#f78166">Edge / WAF</text>
+    <text x="52" y="170" font-size="13" fill="#8b949e">no app code runs</text>
+    <text x="236" y="158" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">client IP, path</text>
+    <text x="436" y="158" font-size="14" fill="#e6edf3">floods, scrapers, credential stuffing</text>
+
+    <rect x="32" y="200" width="736" height="72" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+    <text x="52" y="230" font-size="16" font-weight="600" fill="#79c0ff">API gateway</text>
+    <text x="52" y="254" font-size="13" fill="#8b949e">shared Redis bucket</text>
+    <text x="236" y="242" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">API key, tenant</text>
+    <text x="436" y="242" font-size="14" fill="#e6edf3">noisy tenants, plan quota overuse</text>
+
+    <rect x="32" y="284" width="736" height="72" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+    <text x="52" y="314" font-size="16" font-weight="600" fill="#d2a8ff">Service</text>
+    <text x="52" y="338" font-size="13" fill="#8b949e">business rules</text>
+    <text x="236" y="326" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">user + action</text>
+    <text x="436" y="326" font-size="14" fill="#e6edf3">5 logins per minute, OTP resend spam</text>
+
+    <rect x="32" y="368" width="736" height="72" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="52" y="398" font-size="16" font-weight="600" fill="#7ee787">Resource</text>
+    <text x="52" y="422" font-size="13" fill="#8b949e">concurrency, shedding</text>
+    <text x="236" y="410" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">in-flight requests</text>
+    <text x="436" y="410" font-size="14" fill="#e6edf3">the sum of well-behaved clients</text>
+  </g>
+</svg>

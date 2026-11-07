@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">Due jobs partitioned by shard and one-minute time bucket</title>
+  <desc id="d">A grid with shards as rows and minute buckets as columns. Buckets before now are drained, the current bucket is being scanned by its shard owner, future buckets wait. Each shard is owned by one scheduler instance holding a lease with an epoch number. The 10:03 column is much larger because many cron schedules fire at the same minute.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Partitioned time buckets</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Key = (shard_id, minute_bucket). A shard owner only ever reads its own rows, oldest bucket first.</text>
+  <text x="200" y="112" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">10:00</text>
+  <text x="300" y="112" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">10:01</text>
+  <text x="400" y="112" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">10:02</text>
+  <text x="500" y="112" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">10:03</text>
+  <text x="600" y="112" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">10:04</text>
+  <text x="40" y="160" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">shard 0</text>
+  <rect x="154" y="132" width="92" height="46" rx="6" fill="#7ee787" fill-opacity="0.10" stroke="#7ee787"/>
+  <text x="200" y="160" fill="#7ee787" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">drained</text>
+  <rect x="254" y="132" width="92" height="46" rx="6" fill="#f78166" fill-opacity="0.16" stroke="#f78166"/>
+  <text x="300" y="160" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">412 due</text>
+  <rect x="354" y="132" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="400" y="160" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">380</text>
+  <rect x="454" y="132" width="92" height="46" rx="6" fill="#d2a8ff" fill-opacity="0.14" stroke="#d2a8ff"/>
+  <text x="500" y="160" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">9,104</text>
+  <rect x="554" y="132" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="600" y="160" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">empty</text>
+  <text x="40" y="214" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">shard 1</text>
+  <rect x="154" y="186" width="92" height="46" rx="6" fill="#7ee787" fill-opacity="0.10" stroke="#7ee787"/>
+  <text x="200" y="214" fill="#7ee787" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">drained</text>
+  <rect x="254" y="186" width="92" height="46" rx="6" fill="#f78166" fill-opacity="0.16" stroke="#f78166"/>
+  <text x="300" y="214" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">398 due</text>
+  <rect x="354" y="186" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="400" y="214" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">355</text>
+  <rect x="454" y="186" width="92" height="46" rx="6" fill="#d2a8ff" fill-opacity="0.14" stroke="#d2a8ff"/>
+  <text x="500" y="214" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">8,870</text>
+  <rect x="554" y="186" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="600" y="214" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">empty</text>
+  <text x="40" y="268" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">shard 2</text>
+  <rect x="154" y="240" width="92" height="46" rx="6" fill="#7ee787" fill-opacity="0.10" stroke="#7ee787"/>
+  <text x="200" y="268" fill="#7ee787" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">drained</text>
+  <rect x="254" y="240" width="92" height="46" rx="6" fill="#f78166" fill-opacity="0.16" stroke="#f78166"/>
+  <text x="300" y="268" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">405 due</text>
+  <rect x="354" y="240" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="400" y="268" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">371</text>
+  <rect x="454" y="240" width="92" height="46" rx="6" fill="#d2a8ff" fill-opacity="0.14" stroke="#d2a8ff"/>
+  <text x="500" y="268" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">9,022</text>
+  <rect x="554" y="240" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="600" y="268" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">empty</text>
+  <text x="40" y="322" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">shard 3</text>
+  <rect x="154" y="294" width="92" height="46" rx="6" fill="#7ee787" fill-opacity="0.10" stroke="#7ee787"/>
+  <text x="200" y="322" fill="#7ee787" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">drained</text>
+  <rect x="254" y="294" width="92" height="46" rx="6" fill="#f78166" fill-opacity="0.16" stroke="#f78166"/>
+  <text x="300" y="322" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">420 due</text>
+  <rect x="354" y="294" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="400" y="322" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">366</text>
+  <rect x="454" y="294" width="92" height="46" rx="6" fill="#d2a8ff" fill-opacity="0.14" stroke="#d2a8ff"/>
+  <text x="500" y="322" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">8,951</text>
+  <rect x="554" y="294" width="92" height="46" rx="6" fill="#79c0ff" fill-opacity="0.06" stroke="#30363d"/>
+  <text x="600" y="322" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">empty</text>
+  <line x1="342" y1="102" x2="342" y2="350" stroke="#f78166" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="336" y="96" fill="#f78166" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">now 10:01:50</text>
+  <rect x="666" y="132" width="110" height="100" rx="8" fill="#161b22" stroke="#79c0ff"/>
+  <text x="721" y="178" fill="#e6edf3" font-size="14" text-anchor="middle" font-family="Inter, system-ui, sans-serif">scheduler A</text>
+  <text x="721" y="198" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">epoch 7</text>
+  <rect x="666" y="240" width="110" height="100" rx="8" fill="#161b22" stroke="#79c0ff"/>
+  <text x="721" y="286" fill="#e6edf3" font-size="14" text-anchor="middle" font-family="Inter, system-ui, sans-serif">scheduler B</text>
+  <text x="721" y="306" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">epoch 12</text>
+  <text x="500" y="370" fill="#d2a8ff" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">cron herd: many schedules</text>
+  <text x="500" y="388" fill="#d2a8ff" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">share one minute</text>
+  <text x="40" y="370" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">256 logical shards in production,</text>
+  <text x="40" y="388" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">far more than scheduler nodes.</text>
+  <text x="32" y="434" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Owners poll the current and overdue buckets every ~200 ms and hand due runs to the dispatch queue.</text>
+</svg>

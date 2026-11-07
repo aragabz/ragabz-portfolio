@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 430" role="img" aria-labelledby="t d">
+  <title id="t">Latency budget for one autocomplete keystroke</title>
+  <desc id="d">Illustrative ranges against a 100 millisecond target. Client to edge round trip 20 to 40 milliseconds. Edge processing 1 to 5. On an edge miss, edge to origin round trip 10 to 30 and server lookup 1 to 5. Client rendering 10 to 16. A browser cache hit costs only rendering, an edge hit skips the origin, and a miss uses most of the budget.</desc>
+  <rect width="800" height="430" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="400" y="44" font-size="18" font-weight="600" fill="#e6edf3" text-anchor="middle">Where 100 ms goes (illustrative upper ends of typical ranges)</text>
+    <text x="400" y="68" font-size="13" fill="#8b949e" text-anchor="middle">The server lookup is the smallest slice. The network and the cache hit level decide the outcome.</text>
+
+    <!-- scale: 0ms at x=200, 1ms = 5.4px, 100ms at x=740 -->
+    <line x1="200" y1="96" x2="200" y2="350" stroke="#30363d"/>
+    <line x1="740" y1="96" x2="740" y2="350" stroke="#f78166" stroke-dasharray="5 4"/>
+    <text x="740" y="368" font-size="13" fill="#f78166" text-anchor="middle">100 ms target</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8b949e" text-anchor="middle">
+      <text x="200" y="368">0</text>
+      <text x="335" y="368">25</text>
+      <text x="470" y="368">50</text>
+      <text x="605" y="368">75</text>
+    </g>
+
+    <!-- row 1: browser cache hit -->
+    <text x="32" y="130" font-size="14" fill="#e6edf3">Browser cache hit</text>
+    <rect x="200" y="114" width="86" height="24" rx="4" fill="#d2a8ff"/>
+    <text x="296" y="131" font-size="13" fill="#8b949e">render 16</text>
+
+    <!-- row 2: edge hit -->
+    <text x="32" y="200" font-size="14" fill="#e6edf3">Edge cache hit</text>
+    <rect x="200" y="184" width="216" height="24" rx="4" fill="#79c0ff"/>
+    <rect x="416" y="184" width="27" height="24" rx="4" fill="#7ee787"/>
+    <rect x="443" y="184" width="86" height="24" rx="4" fill="#d2a8ff"/>
+    <text x="539" y="201" font-size="13" fill="#8b949e">about 61</text>
+
+    <!-- row 3: origin -->
+    <text x="32" y="270" font-size="14" fill="#e6edf3">Edge miss, origin</text>
+    <rect x="200" y="254" width="216" height="24" rx="4" fill="#79c0ff"/>
+    <rect x="416" y="254" width="27" height="24" rx="4" fill="#7ee787"/>
+    <rect x="443" y="254" width="162" height="24" rx="4" fill="#f78166"/>
+    <rect x="605" y="254" width="27" height="24" rx="4" fill="#7ee787"/>
+    <rect x="632" y="254" width="86" height="24" rx="4" fill="#d2a8ff"/>
+    <text x="726" y="248" font-size="13" fill="#8b949e" text-anchor="end">about 96</text>
+
+    <!-- legend -->
+    <g font-size="13" fill="#8b949e">
+      <rect x="32" y="392" width="14" height="14" rx="3" fill="#79c0ff"/><text x="52" y="404">client to edge RTT 20-40</text>
+      <rect x="228" y="392" width="14" height="14" rx="3" fill="#7ee787"/><text x="248" y="404">edge or server work 1-5</text>
+      <rect x="420" y="392" width="14" height="14" rx="3" fill="#f78166"/><text x="440" y="404">edge to origin RTT 10-30</text>
+      <rect x="620" y="392" width="14" height="14" rx="3" fill="#d2a8ff"/><text x="640" y="404">render 10-16</text>
+    </g>
+    <text x="400" y="318" font-size="13" fill="#8b949e" text-anchor="middle">Debounce time is not counted: the user is still typing while it runs.</text>
+  </g>
+</svg>

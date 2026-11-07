@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Retry amplification across three layers</title>
+  <desc id="d">One tap on Pay becomes up to 2 client attempts, each becomes up to 3 gateway attempts, and each of those up to 3 service attempts to the PSP: 2 times 3 times 3 equals 18 PSP calls in the worst case. Every attempt carried a fresh idempotency key, so every call that the PSP completed was a separate charge.</desc>
+  <rect x="0" y="0" width="800" height="440" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Retries multiply: attempts per layer, not added</text>
+
+    <!-- columns -->
+    <g font-size="14">
+      <rect x="32" y="84" width="150" height="56" rx="8" fill="#161b22" stroke="#d2a8ff"/>
+      <text x="56" y="108" fill="#e6edf3">User taps Pay</text>
+      <text x="56" y="128" font-size="13" fill="#8b949e">1 intent</text>
+
+      <rect x="222" y="84" width="150" height="56" rx="8" fill="#161b22" stroke="#79c0ff"/>
+      <text x="246" y="108" fill="#e6edf3">Mobile client</text>
+      <text x="246" y="128" font-size="13" fill="#8b949e">1 + 1 retry = 2</text>
+
+      <rect x="412" y="84" width="150" height="56" rx="8" fill="#161b22" stroke="#79c0ff"/>
+      <text x="436" y="108" fill="#e6edf3">API gateway</text>
+      <text x="436" y="128" font-size="13" fill="#8b949e">1 + 2 retries = 3</text>
+
+      <rect x="602" y="84" width="166" height="56" rx="8" fill="#161b22" stroke="#f78166"/>
+      <text x="622" y="108" fill="#e6edf3">Payment service</text>
+      <text x="622" y="128" font-size="13" fill="#8b949e">max-attempts = 3</text>
+    </g>
+
+    <!-- dots representing attempts -->
+    <g>
+      <circle cx="107" cy="200" r="9" fill="#d2a8ff"/>
+      <circle cx="270" cy="185" r="8" fill="#79c0ff"/>
+      <circle cx="324" cy="185" r="8" fill="#79c0ff"/>
+      <g fill="#79c0ff">
+        <circle cx="440" cy="178" r="6"/><circle cx="466" cy="178" r="6"/><circle cx="492" cy="178" r="6"/>
+        <circle cx="440" cy="204" r="6"/><circle cx="466" cy="204" r="6"/><circle cx="492" cy="204" r="6"/>
+      </g>
+      <g fill="#f78166">
+        <circle cx="624" cy="172" r="5"/><circle cx="644" cy="172" r="5"/><circle cx="664" cy="172" r="5"/><circle cx="684" cy="172" r="5"/><circle cx="704" cy="172" r="5"/><circle cx="724" cy="172" r="5"/>
+        <circle cx="624" cy="194" r="5"/><circle cx="644" cy="194" r="5"/><circle cx="664" cy="194" r="5"/><circle cx="684" cy="194" r="5"/><circle cx="704" cy="194" r="5"/><circle cx="724" cy="194" r="5"/>
+        <circle cx="624" cy="216" r="5"/><circle cx="644" cy="216" r="5"/><circle cx="664" cy="216" r="5"/><circle cx="684" cy="216" r="5"/><circle cx="704" cy="216" r="5"/><circle cx="724" cy="216" r="5"/>
+      </g>
+      <g stroke="#30363d" stroke-width="2" fill="none">
+        <path d="M 122 200 L 254 190"/>
+        <path d="M 338 190 L 424 190"/>
+        <path d="M 506 190 L 608 194"/>
+      </g>
+    </g>
+
+    <g font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+      <text x="100" y="258" fill="#d2a8ff">1</text>
+      <text x="290" y="258" fill="#79c0ff">2</text>
+      <text x="458" y="258" fill="#79c0ff">6</text>
+      <text x="664" y="258" fill="#f78166">18</text>
+    </g>
+    <text x="32" y="290" font-size="14" fill="#e6edf3">Worst case PSP calls per tap = 2 x 3 x 3 = 18</text>
+
+    <rect x="32" y="312" width="736" height="104" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+    <text x="52" y="340" font-size="14" fill="#f78166">Why each attempt became a separate charge</text>
+    <text x="52" y="364" font-size="13" fill="#8b949e">client and gateway retries carried no key, so the service created a new payment row each time</text>
+    <text x="52" y="386" font-size="13" fill="#8b949e">the service generated a new PSP Idempotency-Key inside the retried method, one per attempt</text>
+    <text x="52" y="406" font-size="13" fill="#8b949e">a timeout meant "unknown", but every layer treated it as "failed, try again"</text>
+  </g>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d">
+  <title id="t">Trie with precomputed top-k completions at each node</title>
+  <desc id="d">A path in a trie spelling b, be, bes, best. Each node stores its top three completions with scores computed offline. Node be stores best buy, best pizza and bed frame. Node bes stores best buy, best pizza and best laptop. A lookup for the prefix bes walks three edges and returns the cached list without searching the subtree.</desc>
+  <rect width="800" height="470" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="400" y="44" font-size="18" font-weight="600" fill="#e6edf3" text-anchor="middle">Top-k cached at every node: lookup cost is the prefix length</text>
+    <text x="400" y="68" font-size="13" fill="#8b949e" text-anchor="middle">Lists are built offline by the batch job. Scores are illustrative.</text>
+
+    <!-- edges -->
+    <g stroke="#30363d" stroke-width="2">
+      <line x1="90" y1="120" x2="90" y2="176"/>
+      <line x1="90" y1="216" x2="90" y2="266"/>
+      <line x1="90" y1="306" x2="90" y2="356"/>
+      <line x1="110" y1="196" x2="176" y2="246"/>
+    </g>
+    <!-- lookup path highlight -->
+    <g stroke="#f78166" stroke-width="3" fill="none">
+      <path d="M58 100 L58 300"/>
+    </g>
+    <text x="40" y="200" font-size="13" fill="#f78166" transform="rotate(-90 40 200)" text-anchor="middle">lookup "bes"</text>
+
+    <!-- nodes -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" text-anchor="middle">
+      <circle cx="90" cy="100" r="20" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/><text x="90" y="105" fill="#e6edf3">b</text>
+      <circle cx="90" cy="196" r="20" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/><text x="90" y="201" fill="#e6edf3">be</text>
+      <circle cx="90" cy="286" r="20" fill="#161b22" stroke="#f78166" stroke-width="2"/><text x="90" y="291" fill="#e6edf3">bes</text>
+      <circle cx="90" cy="376" r="20" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/><text x="90" y="381" font-size="13" fill="#e6edf3">best</text>
+      <circle cx="190" cy="262" r="20" fill="#161b22" stroke="#30363d" stroke-width="1.5"/><text x="190" y="267" fill="#8b949e">bed</text>
+    </g>
+
+    <!-- connectors from nodes to lists -->
+    <g stroke="#30363d" stroke-dasharray="4 4">
+      <line x1="110" y1="100" x2="300" y2="100"/>
+      <line x1="110" y1="196" x2="300" y2="190"/>
+      <line x1="110" y1="286" x2="300" y2="286"/>
+      <line x1="110" y1="376" x2="300" y2="386"/>
+    </g>
+
+    <!-- lists -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+      <rect x="300" y="82" width="440" height="40" rx="8" fill="#161b22" stroke="#30363d"/>
+      <text x="316" y="107" fill="#8b949e">top-3(b): best buy 910, bbc news 870, best pizza 640</text>
+
+      <rect x="300" y="152" width="440" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+      <text x="316" y="176" fill="#8b949e">top-3(be):</text>
+      <text x="410" y="176" fill="#e6edf3">best buy 910</text>
+      <text x="410" y="196" fill="#e6edf3">best pizza 640</text>
+      <text x="410" y="216" fill="#e6edf3">bed frame 410</text>
+
+      <rect x="300" y="250" width="440" height="72" rx="8" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+      <text x="316" y="274" fill="#f78166">top-3(bes):</text>
+      <text x="410" y="274" fill="#e6edf3">best buy 910</text>
+      <text x="410" y="294" fill="#e6edf3">best pizza 640</text>
+      <text x="410" y="314" fill="#e6edf3">best laptop 380</text>
+
+      <rect x="300" y="350" width="440" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+      <text x="316" y="374" fill="#8b949e">top-3(best):</text>
+      <text x="420" y="374" fill="#e6edf3">best buy 910</text>
+      <text x="420" y="394" fill="#e6edf3">best pizza 640</text>
+      <text x="420" y="414" fill="#e6edf3">best laptop 380</text>
+    </g>
+
+    <text x="400" y="452" font-size="13" fill="#8b949e" text-anchor="middle">Without cached lists, "b" would need a search of every query starting with b. With them, it is one read.</text>
+  </g>
+</svg>

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">The poll-loop time budget before and after the deploy</title>
+  <desc id="d">Two bars against a 300 second max.poll.interval.ms line. Before the deploy, 500 records at 4 milliseconds each take 2 seconds, far below the limit. After the deploy, 500 records at about 650 milliseconds each take 325 seconds, crossing the limit, so the consumer leaves the group, its partitions are reassigned, and because offsets are only committed after the whole batch, the batch is reprocessed by the next owner and the cycle repeats.</desc>
+  <rect x="0" y="0" width="800" height="460" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">One poll() must be processed within max.poll.interval.ms</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">time between poll() calls = max.poll.records x per-record time (when every poll returns a full batch)</text>
+
+    <!-- scale: 0..360s mapped to x 200..740 => 1.5 px per second -->
+    <line x1="200" y1="96" x2="200" y2="270" stroke="#30363d" stroke-width="2"/>
+    <line x1="650" y1="90" x2="650" y2="276" stroke="#f78166" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="586" y="290" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#f78166">300 s limit (default)</text>
+
+    <!-- before -->
+    <text x="32" y="130" font-size="14" fill="#e6edf3">Before (v2.13)</text>
+    <text x="32" y="150" font-size="13" fill="#8b949e">500 x 4 ms</text>
+    <rect x="200" y="116" width="4" height="36" rx="2" fill="#7ee787"/>
+    <text x="214" y="140" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#7ee787">2 s</text>
+
+    <!-- after -->
+    <text x="32" y="212" font-size="14" fill="#e6edf3">After (v2.14)</text>
+    <text x="32" y="232" font-size="13" fill="#8b949e">500 x 650 ms</text>
+    <rect x="200" y="198" width="450" height="36" rx="4" fill="#79c0ff" opacity="0.85"/>
+    <rect x="650" y="198" width="38" height="36" rx="4" fill="#f78166"/>
+    <text x="698" y="222" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#f78166">325 s</text>
+
+    <!-- consequence chain -->
+    <g font-size="13">
+      <rect x="32" y="316" width="160" height="56" rx="8" fill="#161b22" stroke="#f78166"/>
+      <text x="44" y="340" fill="#e6edf3">poll timeout:</text>
+      <text x="44" y="360" fill="#8b949e">member leaves group</text>
+
+      <rect x="216" y="316" width="160" height="56" rx="8" fill="#161b22" stroke="#d2a8ff"/>
+      <text x="228" y="340" fill="#e6edf3">rebalance:</text>
+      <text x="228" y="360" fill="#8b949e">partitions move</text>
+
+      <rect x="400" y="316" width="160" height="56" rx="8" fill="#161b22" stroke="#d2a8ff"/>
+      <text x="412" y="340" fill="#e6edf3">commit fails:</text>
+      <text x="412" y="360" fill="#8b949e">batch not recorded</text>
+
+      <rect x="584" y="316" width="184" height="56" rx="8" fill="#161b22" stroke="#79c0ff"/>
+      <text x="596" y="340" fill="#e6edf3">new owner re-reads</text>
+      <text x="596" y="360" fill="#8b949e">same 500 records</text>
+
+      <g stroke="#8b949e" stroke-width="2">
+        <line x1="192" y1="344" x2="214" y2="344"/>
+        <line x1="376" y1="344" x2="398" y2="344"/>
+        <line x1="560" y1="344" x2="582" y2="344"/>
+      </g>
+      <path d="M 676 372 L 676 400 L 112 400 L 112 374" fill="none" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 3"/>
+      <text x="290" y="424" fill="#f78166">repeat: lots of work, almost no committed progress</text>
+    </g>
+  </g>
+</svg>

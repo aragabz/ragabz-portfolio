@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+<title id="t">Retry amplification across four layers</title>
+<desc id="d">One user tap passes through four layers that each retry. The app makes 3 attempts, the gateway 2 per attempt, checkout 3 per call and pricing 3 per call, so in the worst case one tap becomes 54 calls to the promotions service. After the fix, only one server-side layer retries, capped by a 10 percent retry budget, so server-side amplification is at most about 1.1 times.</desc>
+<rect x="0" y="0" width="800" height="440" rx="16" fill="#0d1117"/>
+<g font-family="Inter, system-ui, sans-serif">
+<text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">Every layer retries: attempts multiply, they do not add</text>
+<text x="32" y="68" fill="#8b949e" font-size="13">Worst case when every attempt fails. Bar height is proportional to calls reaching that layer.</text>
+<g font-size="13" text-anchor="middle">
+<text x="104" y="104" fill="#e6edf3" font-weight="600">User tap</text>
+<text x="252" y="104" fill="#e6edf3" font-weight="600">Gateway</text>
+<text x="400" y="104" fill="#e6edf3" font-weight="600">Checkout</text>
+<text x="548" y="104" fill="#e6edf3" font-weight="600">Pricing</text>
+<text x="696" y="104" fill="#e6edf3" font-weight="600">Promotions</text>
+<line x1="48" y1="250" x2="752" y2="250" stroke="#30363d" stroke-width="1.5"/>
+<rect x="74" y="246" width="60" height="4" rx="2" fill="#79c0ff"/>
+<rect x="222" y="243" width="60" height="7" rx="2" fill="#79c0ff"/>
+<rect x="370" y="237" width="60" height="13" rx="2" fill="#d2a8ff"/>
+<rect x="518" y="210" width="60" height="40" rx="2" fill="#d2a8ff"/>
+<rect x="666" y="130" width="60" height="120" rx="2" fill="#f78166"/>
+<text x="104" y="236" fill="#e6edf3" font-size="16" font-weight="600">1</text>
+<text x="252" y="233" fill="#e6edf3" font-size="16" font-weight="600">3</text>
+<text x="400" y="227" fill="#e6edf3" font-size="16" font-weight="600">6</text>
+<text x="548" y="200" fill="#e6edf3" font-size="16" font-weight="600">18</text>
+<text x="696" y="122" fill="#f78166" font-size="16" font-weight="600">54</text>
+<text x="178" y="276" fill="#8b949e">app: 3 attempts</text>
+<text x="326" y="276" fill="#8b949e">gateway: x2</text>
+<text x="474" y="276" fill="#8b949e">checkout: x3</text>
+<text x="622" y="276" fill="#8b949e">pricing: x3</text>
+<text x="178" y="296" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">1 x 3</text>
+<text x="326" y="296" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">3 x 2</text>
+<text x="474" y="296" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">6 x 3</text>
+<text x="622" y="296" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">18 x 3</text>
+</g>
+<line x1="32" y1="322" x2="768" y2="322" stroke="#30363d" stroke-width="1"/>
+<text x="32" y="352" fill="#7ee787" font-size="15" font-weight="600">After the fix: one server-side retry layer, with a budget</text>
+<text x="32" y="378" fill="#e6edf3" font-size="13">Gateway and checkout stop retrying. Pricing retries promotions once, within a 10% budget.</text>
+<text x="32" y="402" fill="#e6edf3" font-size="13">Server-side amplification drops from 18x to about 1.1x. The app retries with jitter and Retry-After.</text>
+<text x="32" y="420" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">gateway x1, checkout x1, pricing x1.1 (budgeted)</text>
+</g></svg>
