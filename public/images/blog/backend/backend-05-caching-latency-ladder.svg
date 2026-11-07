@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">Latency ladder: where a copy of data can live</title>
+  <desc id="d">Approximate latencies on a logarithmic scale, from a CPU L1 cache reference at about 1 nanosecond to a transatlantic round trip at about 90 milliseconds.</desc>
+  <rect width="800" height="480" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Latency ladder (log scale, approximate)</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Each tier up is roughly 10x to 1000x faster. Caching means keeping a copy one tier higher.</text>
+  <line x1="300" y1="92" x2="300" y2="430" stroke="#30363d" stroke-width="1"/>
+  <text x="300" y="452" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">1 ns</text>
+  <line x1="350" y1="92" x2="350" y2="430" stroke="#30363d" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="400" y1="92" x2="400" y2="430" stroke="#30363d" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="450" y1="92" x2="450" y2="430" stroke="#30363d" stroke-width="1"/>
+  <text x="450" y="452" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">1 µs</text>
+  <line x1="500" y1="92" x2="500" y2="430" stroke="#30363d" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="550" y1="92" x2="550" y2="430" stroke="#30363d" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="600" y1="92" x2="600" y2="430" stroke="#30363d" stroke-width="1"/>
+  <text x="600" y="452" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">1 ms</text>
+  <line x1="650" y1="92" x2="650" y2="430" stroke="#30363d" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="700" y1="92" x2="700" y2="430" stroke="#30363d" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="750" y1="92" x2="750" y2="430" stroke="#30363d" stroke-width="1"/>
+  <text x="750" y="452" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">1 s</text>
+  <text x="32" y="133" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">CPU L1 cache reference</text>
+  <rect x="300" y="118" width="6" height="22" rx="4" fill="#7ee787" fill-opacity="0.85"/>
+  <text x="314" y="134" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~1 ns</text>
+  <text x="32" y="173" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">Main memory (RAM) access</text>
+  <rect x="300" y="158" width="100" height="22" rx="4" fill="#7ee787" fill-opacity="0.85"/>
+  <text x="408" y="174" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~100 ns</text>
+  <text x="32" y="213" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">In-process cache lookup</text>
+  <rect x="300" y="198" width="150" height="22" rx="4" fill="#7ee787" fill-opacity="0.85"/>
+  <text x="458" y="214" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~1 µs</text>
+  <text x="32" y="253" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">SSD random read</text>
+  <rect x="300" y="238" width="250" height="22" rx="4" fill="#79c0ff" fill-opacity="0.85"/>
+  <text x="558" y="254" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~100 µs</text>
+  <text x="32" y="293" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">Redis GET, same datacenter</text>
+  <rect x="300" y="278" width="285" height="22" rx="4" fill="#79c0ff" fill-opacity="0.85"/>
+  <text x="593" y="294" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~0.5 ms</text>
+  <text x="32" y="333" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">Indexed DB query over network</text>
+  <rect x="300" y="318" width="315" height="22" rx="4" fill="#d2a8ff" fill-opacity="0.85"/>
+  <text x="623" y="334" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~2 ms</text>
+  <text x="32" y="373" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">Heavy DB query (joins, sorts)</text>
+  <rect x="300" y="358" width="385" height="22" rx="4" fill="#d2a8ff" fill-opacity="0.85"/>
+  <text x="693" y="374" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~50 ms</text>
+  <text x="32" y="413" fill="#e6edf3" font-size="14" font-family="Inter, system-ui, sans-serif">Round trip US to Europe</text>
+  <rect x="300" y="398" width="398" height="22" rx="4" fill="#f78166" fill-opacity="0.85"/>
+  <text x="706" y="414" fill="#8b949e" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">~90 ms</text>
+</svg>

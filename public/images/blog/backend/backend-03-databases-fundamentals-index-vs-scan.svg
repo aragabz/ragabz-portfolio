@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">B-tree index lookup versus sequential scan</title>
+  <desc id="d">On the left, a three-level B-tree: the root page points to branch pages, which point to leaf pages holding sorted emails and row pointers, so finding one email reads three index pages and one table page. On the right, a sequential scan reads every page of the table.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Finding email = 'ada@example.com' in 50 million rows</text>
+
+    <!-- B-tree -->
+    <text x="32" y="80" font-size="14" font-weight="600" fill="#7ee787">With a B-tree index: about 4 page reads</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+      <rect x="164" y="96" width="140" height="36" rx="6" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+      <text x="234" y="119" fill="#e6edf3" text-anchor="middle">root: a..m | n..z</text>
+
+      <rect x="48" y="172" width="150" height="36" rx="6" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+      <text x="123" y="195" fill="#e6edf3" text-anchor="middle">a..f | g..m</text>
+      <rect x="270" y="172" width="150" height="36" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="345" y="195" fill="#8b949e" text-anchor="middle">n..s | t..z</text>
+
+      <rect x="32" y="248" width="120" height="58" rx="6" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+      <text x="44" y="270" fill="#7ee787">ada@ row 812</text>
+      <text x="44" y="292" fill="#8b949e">alan@...</text>
+      <rect x="164" y="248" width="120" height="58" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="176" y="270" fill="#8b949e">grace@...</text>
+      <text x="176" y="292" fill="#8b949e">ken@...</text>
+      <rect x="296" y="248" width="120" height="58" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="308" y="270" fill="#8b949e">linus@...</text>
+      <text x="308" y="292" fill="#8b949e">tim@...</text>
+    </g>
+    <g stroke="#7ee787" stroke-width="2" fill="none">
+      <line x1="200" y1="132" x2="130" y2="172"/>
+      <line x1="100" y1="208" x2="92" y2="248"/>
+    </g>
+    <g stroke="#30363d" stroke-width="1.5" fill="none">
+      <line x1="270" y1="132" x2="340" y2="172"/>
+      <line x1="160" y1="208" x2="224" y2="248"/>
+      <line x1="345" y1="208" x2="356" y2="248"/>
+    </g>
+    <path d="M92 306 V344" stroke="#79c0ff" stroke-width="2"/>
+    <rect x="32" y="344" width="200" height="34" rx="6" fill="#161b22" stroke="#79c0ff" stroke-width="2"/>
+    <text x="132" y="366" font-size="13" fill="#e6edf3" text-anchor="middle">table page with row 812</text>
+    <text x="32" y="408" font-size="13" fill="#8b949e">Each page holds hundreds of keys, so even huge</text>
+    <text x="32" y="428" font-size="13" fill="#8b949e">tables are only 3 to 5 levels deep.</text>
+
+    <line x1="448" y1="72" x2="448" y2="432" stroke="#30363d"/>
+
+    <!-- Seq scan -->
+    <text x="472" y="80" font-size="14" font-weight="600" fill="#f78166">Without an index: read every page</text>
+    <g fill="#f78166" opacity="0.85">
+      <rect x="472" y="100" width="22" height="22" rx="3"/><rect x="498" y="100" width="22" height="22" rx="3"/><rect x="524" y="100" width="22" height="22" rx="3"/><rect x="550" y="100" width="22" height="22" rx="3"/><rect x="576" y="100" width="22" height="22" rx="3"/><rect x="602" y="100" width="22" height="22" rx="3"/><rect x="628" y="100" width="22" height="22" rx="3"/><rect x="654" y="100" width="22" height="22" rx="3"/><rect x="680" y="100" width="22" height="22" rx="3"/><rect x="706" y="100" width="22" height="22" rx="3"/><rect x="732" y="100" width="22" height="22" rx="3"/>
+      <rect x="472" y="126" width="22" height="22" rx="3"/><rect x="498" y="126" width="22" height="22" rx="3"/><rect x="524" y="126" width="22" height="22" rx="3"/><rect x="550" y="126" width="22" height="22" rx="3"/><rect x="576" y="126" width="22" height="22" rx="3"/><rect x="602" y="126" width="22" height="22" rx="3"/><rect x="628" y="126" width="22" height="22" rx="3"/><rect x="654" y="126" width="22" height="22" rx="3"/><rect x="680" y="126" width="22" height="22" rx="3"/><rect x="706" y="126" width="22" height="22" rx="3"/><rect x="732" y="126" width="22" height="22" rx="3"/>
+      <rect x="472" y="152" width="22" height="22" rx="3"/><rect x="498" y="152" width="22" height="22" rx="3"/><rect x="524" y="152" width="22" height="22" rx="3"/><rect x="550" y="152" width="22" height="22" rx="3"/><rect x="576" y="152" width="22" height="22" rx="3"/><rect x="602" y="152" width="22" height="22" rx="3"/><rect x="628" y="152" width="22" height="22" rx="3"/><rect x="654" y="152" width="22" height="22" rx="3"/><rect x="680" y="152" width="22" height="22" rx="3"/><rect x="706" y="152" width="22" height="22" rx="3"/><rect x="732" y="152" width="22" height="22" rx="3"/>
+      <rect x="472" y="178" width="22" height="22" rx="3"/><rect x="498" y="178" width="22" height="22" rx="3"/><rect x="524" y="178" width="22" height="22" rx="3"/><rect x="550" y="178" width="22" height="22" rx="3"/><rect x="576" y="178" width="22" height="22" rx="3"/><rect x="602" y="178" width="22" height="22" rx="3"/><rect x="628" y="178" width="22" height="22" rx="3"/><rect x="654" y="178" width="22" height="22" rx="3"/><rect x="680" y="178" width="22" height="22" rx="3"/><rect x="706" y="178" width="22" height="22" rx="3"/><rect x="732" y="178" width="22" height="22" rx="3"/>
+    </g>
+    <text x="612" y="232" font-size="16" fill="#8b949e" text-anchor="middle">... hundreds of thousands more pages</text>
+    <text x="472" y="280" font-size="13" fill="#e6edf3">Several GB read to return one row.</text>
+    <text x="472" y="304" font-size="13" fill="#8b949e">Fine for 10 rows, terrible for 50 million,</text>
+    <text x="472" y="324" font-size="13" fill="#8b949e">and repeated on every request.</text>
+    <text x="472" y="366" font-size="13" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">EXPLAIN shows: Seq Scan</text>
+    <text x="472" y="390" font-size="13" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">vs Index Scan using ...</text>
+  </g>
+</svg>

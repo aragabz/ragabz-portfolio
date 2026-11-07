@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-labelledby="t d">
+  <title id="t">Retries with exponential backoff and jitter, then a dead-letter queue</title>
+  <desc id="d">Five failed attempts with growing, randomised gaps between them. After the last attempt the message moves to the dead-letter queue and an alert fires.</desc>
+  <rect width="800" height="400" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">Backoff with jitter, then dead-letter</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Each wait is random within a window that doubles per attempt. Dots mark the chosen delay.</text>
+  <line x1="40" y1="200" x2="640" y2="200" stroke="#30363d" stroke-width="2"/>
+  <rect x="58" y="162" width="32" height="16" rx="4" fill="#79c0ff" fill-opacity="0.15" stroke="#79c0ff" stroke-opacity="0.5"/>
+  <circle cx="79" cy="170" r="4" fill="#79c0ff"/>
+  <text x="74" y="152" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0-2s</text>
+  <rect x="87" y="120" width="64" height="16" rx="4" fill="#79c0ff" fill-opacity="0.15" stroke="#79c0ff" stroke-opacity="0.5"/>
+  <circle cx="128" cy="128" r="4" fill="#79c0ff"/>
+  <text x="119" y="110" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0-4s</text>
+  <rect x="136" y="162" width="128" height="16" rx="4" fill="#79c0ff" fill-opacity="0.15" stroke="#79c0ff" stroke-opacity="0.5"/>
+  <circle cx="234" cy="170" r="4" fill="#79c0ff"/>
+  <text x="200" y="152" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0-8s</text>
+  <rect x="242" y="120" width="256" height="16" rx="4" fill="#79c0ff" fill-opacity="0.15" stroke="#79c0ff" stroke-opacity="0.5"/>
+  <circle cx="392" cy="128" r="4" fill="#79c0ff"/>
+  <text x="370" y="110" fill="#8b949e" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0-16s</text>
+  <circle cx="50" cy="200" r="9" fill="#0d1117" stroke="#f78166" stroke-width="2"/>
+  <path d="M46 196 L54 204 M54 196 L46 204" stroke="#f78166" stroke-width="2"/>
+  <text x="50" y="232" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">#1</text>
+  <circle cx="79" cy="200" r="9" fill="#0d1117" stroke="#f78166" stroke-width="2"/>
+  <path d="M75 196 L83 204 M83 196 L75 204" stroke="#f78166" stroke-width="2"/>
+  <text x="79" y="232" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">#2</text>
+  <circle cx="128" cy="200" r="9" fill="#0d1117" stroke="#f78166" stroke-width="2"/>
+  <path d="M124 196 L132 204 M132 196 L124 204" stroke="#f78166" stroke-width="2"/>
+  <text x="128" y="232" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">#3</text>
+  <circle cx="234" cy="200" r="9" fill="#0d1117" stroke="#f78166" stroke-width="2"/>
+  <path d="M230 196 L238 204 M238 196 L230 204" stroke="#f78166" stroke-width="2"/>
+  <text x="234" y="232" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">#4</text>
+  <circle cx="392" cy="200" r="9" fill="#0d1117" stroke="#f78166" stroke-width="2"/>
+  <path d="M388 196 L396 204 M396 196 L388 204" stroke="#f78166" stroke-width="2"/>
+  <text x="392" y="232" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">#5</text>
+  <text x="40" y="260" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">failed attempts (transient errors: timeout, 503, deadlock)</text>
+  <line x1="404" y1="200" x2="654" y2="200" stroke="#8b949e" stroke-width="1.5"/>
+  <path d="M654 195 L662 200 L654 205 Z" fill="#8b949e"/>
+  <rect x="666" y="174" width="104" height="52" rx="8" fill="#d2a8ff" fill-opacity="0.16" stroke="#d2a8ff"/>
+  <text x="718" y="196" fill="#e6edf3" font-size="14" font-weight="600" text-anchor="middle" font-family="Inter, system-ui, sans-serif">DLQ</text>
+  <text x="718" y="215" fill="#8b949e" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">max attempts</text>
+  <text x="718" y="260" fill="#f78166" font-size="13" text-anchor="middle" font-family="Inter, system-ui, sans-serif">alert: depth over 0</text>
+  <text x="32" y="330" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">delay = random(0, min(cap, base * 2^attempt))</text>
+  <text x="32" y="356" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Permanent errors (bad payload, missing record) skip the retries and go straight to the DLQ.</text>
+</svg>

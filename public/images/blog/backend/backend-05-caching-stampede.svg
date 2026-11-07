@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">Cache stampede versus request coalescing</title>
+  <desc id="d">Top: when a hot key expires, every concurrent request misses and queries the database. Bottom: with coalescing, one request recomputes while the rest get the stale value or wait, so the database sees one query.</desc>
+  <rect width="800" height="480" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600" font-family="Inter, system-ui, sans-serif">A hot key expires at 12:00:00.000</text>
+  <text x="32" y="68" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Same traffic, two outcomes. Each tick is one request arriving in the next 50 ms.</text>
+  <text x="32" y="110" fill="#f78166" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">Without protection: every miss goes to the database</text>
+  <text x="32" y="148" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Requests</text>
+  <text x="32" y="208" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Database</text>
+  <line x1="130" y1="144" x2="770" y2="144" stroke="#30363d" stroke-width="2"/>
+  <line x1="130" y1="204" x2="770" y2="204" stroke="#30363d" stroke-width="2"/>
+  <line x1="150" y1="124" x2="150" y2="220" stroke="#f78166" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="156" y="126" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">expiry</text>
+  <line x1="170" y1="134" x2="170" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="170" y1="156" x2="170" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="164" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="194" y1="134" x2="194" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="194" y1="156" x2="194" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="188" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="218" y1="134" x2="218" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="218" y1="156" x2="218" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="212" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="242" y1="134" x2="242" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="242" y1="156" x2="242" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="236" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="266" y1="134" x2="266" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="266" y1="156" x2="266" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="260" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="290" y1="134" x2="290" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="290" y1="156" x2="290" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="284" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="314" y1="134" x2="314" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="314" y1="156" x2="314" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="308" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="338" y1="134" x2="338" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="338" y1="156" x2="338" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="332" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="362" y1="134" x2="362" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="362" y1="156" x2="362" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="356" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="386" y1="134" x2="386" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="386" y1="156" x2="386" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="380" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="410" y1="134" x2="410" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="410" y1="156" x2="410" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="404" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="434" y1="134" x2="434" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="434" y1="156" x2="434" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="428" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="458" y1="134" x2="458" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="458" y1="156" x2="458" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="452" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="482" y1="134" x2="482" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="482" y1="156" x2="482" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="476" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="506" y1="134" x2="506" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="506" y1="156" x2="506" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="500" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <line x1="530" y1="134" x2="530" y2="154" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="530" y1="156" x2="530" y2="194" stroke="#f78166" stroke-width="1.2" stroke-opacity="0.8"/>
+  <rect x="524" y="196" width="12" height="16" rx="2" fill="#f78166" fill-opacity="0.85"/>
+  <text x="560" y="166" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">16 identical queries</text>
+  <text x="560" y="184" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">DB saturates, latency spikes</text>
+  <text x="32" y="270" fill="#7ee787" font-size="15" font-weight="600" font-family="Inter, system-ui, sans-serif">With coalescing (single flight) or serve-stale</text>
+  <text x="32" y="308" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Requests</text>
+  <text x="32" y="368" fill="#e6edf3" font-size="13" font-family="Inter, system-ui, sans-serif">Database</text>
+  <line x1="130" y1="304" x2="770" y2="304" stroke="#30363d" stroke-width="2"/>
+  <line x1="130" y1="364" x2="770" y2="364" stroke="#30363d" stroke-width="2"/>
+  <line x1="150" y1="284" x2="150" y2="380" stroke="#f78166" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="156" y="286" fill="#f78166" font-size="13" font-family="Inter, system-ui, sans-serif">expiry</text>
+  <line x1="170" y1="294" x2="170" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="194" y1="294" x2="194" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="218" y1="294" x2="218" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="242" y1="294" x2="242" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="266" y1="294" x2="266" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="290" y1="294" x2="290" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="314" y1="294" x2="314" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="338" y1="294" x2="338" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="362" y1="294" x2="362" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="386" y1="294" x2="386" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="410" y1="294" x2="410" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="434" y1="294" x2="434" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="458" y1="294" x2="458" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="482" y1="294" x2="482" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="506" y1="294" x2="506" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="530" y1="294" x2="530" y2="314" stroke="#79c0ff" stroke-width="2"/>
+  <line x1="170" y1="316" x2="170" y2="354" stroke="#7ee787" stroke-width="1.5"/>
+  <rect x="164" y="356" width="60" height="16" rx="2" fill="#7ee787" fill-opacity="0.85"/>
+  <text x="232" y="369" fill="#7ee787" font-size="13" font-family="Inter, system-ui, sans-serif">1 query (lock winner recomputes)</text>
+  <text x="560" y="326" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">others: stale value</text>
+  <text x="560" y="344" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">or brief wait, then hit</text>
+  <text x="32" y="430" fill="#e6edf3" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">SET lock:product:42 token NX PX 5000</text>
+  <text x="32" y="452" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">Only the caller whose SET succeeds recomputes. Add TTL jitter so many keys never expire together.</text>
+</svg>

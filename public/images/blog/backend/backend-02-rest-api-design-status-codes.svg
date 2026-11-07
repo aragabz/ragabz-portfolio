@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">The HTTP status codes an API actually needs</title>
+  <desc id="d">Three columns: 2xx success codes 200, 201, 202 and 204; 4xx client error codes 400, 401, 403, 404, 409, 412, 422 and 429; 5xx server error codes 500, 502, 503 and 504, each with a short description of when to use it.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Status codes an API actually needs</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">4xx: the client must change something. 5xx: the server failed, a retry may help.</text>
+
+    <!-- columns -->
+    <rect x="32" y="88" width="232" height="344" rx="10" fill="#161b22" stroke="#7ee787"/>
+    <rect x="284" y="88" width="232" height="344" rx="10" fill="#161b22" stroke="#f78166"/>
+    <rect x="536" y="88" width="232" height="344" rx="10" fill="#161b22" stroke="#d2a8ff"/>
+    <g font-size="15" font-weight="600">
+      <text x="48" y="116" fill="#7ee787">2xx success</text>
+      <text x="300" y="116" fill="#f78166">4xx client error</text>
+      <text x="552" y="116" fill="#d2a8ff">5xx server error</text>
+    </g>
+
+    <g font-size="14">
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#e6edf3">
+        <text x="48" y="150">200</text><text x="48" y="182">201</text><text x="48" y="214">202</text><text x="48" y="246">204</text>
+        <text x="300" y="150">400</text><text x="300" y="182">401</text><text x="300" y="214">403</text><text x="300" y="246">404</text>
+        <text x="300" y="278">409</text><text x="300" y="310">412</text><text x="300" y="342">422</text><text x="300" y="374">429</text>
+        <text x="552" y="150">500</text><text x="552" y="182">502</text><text x="552" y="214">503</text><text x="552" y="246">504</text>
+      </g>
+      <g fill="#8b949e" font-size="13">
+        <text x="88" y="150">OK, here is the body</text>
+        <text x="88" y="182">Created, see Location</text>
+        <text x="88" y="214">Accepted, poll for status</text>
+        <text x="88" y="246">Done, no body</text>
+        <text x="340" y="150">Malformed request</text>
+        <text x="340" y="182">Who are you?</text>
+        <text x="340" y="214">Known, not allowed</text>
+        <text x="340" y="246">No such resource</text>
+        <text x="340" y="278">Conflicts with state</text>
+        <text x="340" y="310">If-Match failed</text>
+        <text x="340" y="342">Valid JSON, invalid values</text>
+        <text x="340" y="374">Slow down, Retry-After</text>
+        <text x="592" y="150">Bug in our code</text>
+        <text x="592" y="182">Upstream sent garbage</text>
+        <text x="592" y="214">Overloaded, Retry-After</text>
+        <text x="592" y="246">Upstream timed out</text>
+      </g>
+    </g>
+    <g font-size="13" fill="#8b949e">
+      <text x="48" y="404">Do not retry: nothing to fix</text>
+      <text x="300" y="404">Retry only 429 (after waiting)</text>
+      <text x="552" y="404">Retry with backoff if idempotent</text>
+    </g>
+  </g>
+</svg>

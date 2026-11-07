@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-labelledby="t d">
+  <title id="t">At-most-once versus at-least-once delivery</title>
+  <desc id="d">Two consumer timelines with a crash at the same point. Committing the offset before processing means the crash loses the message, which is at-most-once. Processing before committing means the message is processed again after restart, which is at-least-once and requires idempotent handling.</desc>
+  <rect x="0" y="0" width="800" height="400" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Where you commit the offset decides what a crash does</text>
+
+    <!-- row 1: at most once -->
+    <text x="32" y="96" font-size="15" font-weight="600" fill="#f78166">At-most-once: commit, then process</text>
+    <line x1="32" y1="134" x2="768" y2="134" stroke="#30363d" stroke-width="2"/>
+    <rect x="40" y="116" width="120" height="36" rx="6" fill="#161b22" stroke="#8b949e"/>
+    <text x="70" y="139" font-size="14" fill="#e6edf3">poll msg 7</text>
+    <rect x="190" y="116" width="140" height="36" rx="6" fill="#161b22" stroke="#79c0ff"/>
+    <text x="206" y="139" font-size="14" fill="#79c0ff">commit offset 8</text>
+    <rect x="360" y="116" width="120" height="36" rx="6" fill="#161b22" stroke="#8b949e"/>
+    <text x="380" y="139" font-size="14" fill="#e6edf3">processing</text>
+    <text x="500" y="141" font-size="18" font-weight="700" fill="#f78166">CRASH</text>
+    <rect x="584" y="116" width="176" height="36" rx="6" fill="#161b22" stroke="#f78166"/>
+    <text x="594" y="139" font-size="13" fill="#f78166">restart at 8: msg 7 lost</text>
+
+    <!-- row 2: at least once -->
+    <text x="32" y="210" font-size="15" font-weight="600" fill="#7ee787">At-least-once: process, then commit</text>
+    <line x1="32" y1="248" x2="768" y2="248" stroke="#30363d" stroke-width="2"/>
+    <rect x="40" y="230" width="120" height="36" rx="6" fill="#161b22" stroke="#8b949e"/>
+    <text x="70" y="253" font-size="14" fill="#e6edf3">poll msg 7</text>
+    <rect x="190" y="230" width="140" height="36" rx="6" fill="#161b22" stroke="#8b949e"/>
+    <text x="210" y="253" font-size="14" fill="#e6edf3">process (done)</text>
+    <text x="350" y="255" font-size="18" font-weight="700" fill="#f78166">CRASH</text>
+    <rect x="430" y="230" width="140" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-dasharray="4 3"/>
+    <text x="442" y="253" font-size="14" fill="#8b949e">commit never ran</text>
+    <rect x="584" y="230" width="176" height="36" rx="6" fill="#161b22" stroke="#7ee787"/>
+    <text x="594" y="253" font-size="13" fill="#7ee787">restart at 7: runs twice</text>
+
+    <!-- footer -->
+    <rect x="32" y="300" width="736" height="72" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+    <text x="52" y="328" font-size="14" fill="#d2a8ff">Effectively-once = at-least-once delivery + idempotent processing</text>
+    <text x="52" y="352" font-size="13" fill="#8b949e">dedupe by message id, or make the side effect naturally idempotent (upsert, conditional update)</text>
+  </g>
+</svg>

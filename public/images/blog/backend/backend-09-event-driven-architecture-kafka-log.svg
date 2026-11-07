@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">Kafka topic, partitions, offsets and consumer groups</title>
+  <desc id="d">A topic named orders with three partitions. Each partition is an append-only log of numbered offsets. Producers choose a partition by hashing the record key. Consumer group billing has two consumers splitting the partitions, consumer group analytics has one consumer reading all three. Each group tracks its own committed offset per partition.</desc>
+  <rect x="0" y="0" width="800" height="480" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Topic "orders": 3 partitions, each an append-only log</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">partition = hash(key) mod 3, so every event for one order lands in one partition, in order</text>
+
+    <!-- partitions -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+      <text x="32" y="122" fill="#e6edf3">P0</text>
+      <text x="32" y="192" fill="#e6edf3">P1</text>
+      <text x="32" y="262" fill="#e6edf3">P2</text>
+    </g>
+
+    <!-- P0 cells -->
+    <g fill="#161b22" stroke="#30363d" stroke-width="1.5">
+      <rect x="70" y="100" width="48" height="36" rx="4"/>
+      <rect x="122" y="100" width="48" height="36" rx="4"/>
+      <rect x="174" y="100" width="48" height="36" rx="4"/>
+      <rect x="226" y="100" width="48" height="36" rx="4"/>
+      <rect x="278" y="100" width="48" height="36" rx="4"/>
+      <rect x="330" y="100" width="48" height="36" rx="4"/>
+
+      <rect x="70" y="170" width="48" height="36" rx="4"/>
+      <rect x="122" y="170" width="48" height="36" rx="4"/>
+      <rect x="174" y="170" width="48" height="36" rx="4"/>
+      <rect x="226" y="170" width="48" height="36" rx="4"/>
+
+      <rect x="70" y="240" width="48" height="36" rx="4"/>
+      <rect x="122" y="240" width="48" height="36" rx="4"/>
+      <rect x="174" y="240" width="48" height="36" rx="4"/>
+      <rect x="226" y="240" width="48" height="36" rx="4"/>
+      <rect x="278" y="240" width="48" height="36" rx="4"/>
+    </g>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">
+      <text x="90" y="123">0</text><text x="142" y="123">1</text><text x="194" y="123">2</text><text x="246" y="123">3</text><text x="298" y="123">4</text><text x="350" y="123">5</text>
+      <text x="90" y="193">0</text><text x="142" y="193">1</text><text x="194" y="193">2</text><text x="246" y="193">3</text>
+      <text x="90" y="263">0</text><text x="142" y="263">1</text><text x="194" y="263">2</text><text x="246" y="263">3</text><text x="298" y="263">4</text>
+    </g>
+    <text x="388" y="123" font-size="13" fill="#7ee787">new writes append here</text>
+
+    <!-- billing committed offsets (orange) -->
+    <g stroke="#f78166" stroke-width="2.5">
+      <line x1="226" y1="94" x2="226" y2="142"/>
+      <line x1="226" y1="164" x2="226" y2="212"/>
+      <line x1="174" y1="234" x2="174" y2="282"/>
+    </g>
+    <!-- analytics committed offsets (blue) -->
+    <g stroke="#79c0ff" stroke-width="2.5" stroke-dasharray="4 3">
+      <line x1="122" y1="94" x2="122" y2="142"/>
+      <line x1="278" y1="164" x2="278" y2="212"/>
+      <line x1="278" y1="234" x2="278" y2="282"/>
+    </g>
+    <text x="32" y="316" font-size="13" fill="#f78166">solid: billing group committed offset</text>
+    <text x="330" y="316" font-size="13" fill="#79c0ff">dashed: analytics group committed offset</text>
+
+    <!-- consumer groups -->
+    <rect x="32" y="340" width="360" height="112" rx="10" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+    <text x="52" y="366" font-size="15" font-weight="600" fill="#e6edf3">Group "billing"</text>
+    <text x="52" y="392" font-size="14" fill="#e6edf3">consumer 1 reads P0, P1</text>
+    <text x="52" y="414" font-size="14" fill="#e6edf3">consumer 2 reads P2</text>
+    <text x="52" y="436" font-size="13" fill="#8b949e">a third idle consumer would get no partition</text>
+
+    <rect x="408" y="340" width="360" height="112" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+    <text x="428" y="366" font-size="15" font-weight="600" fill="#e6edf3">Group "analytics"</text>
+    <text x="428" y="392" font-size="14" fill="#e6edf3">consumer 1 reads P0, P1, P2</text>
+    <text x="428" y="414" font-size="13" fill="#8b949e">independent position, same data</text>
+    <text x="428" y="436" font-size="13" fill="#8b949e">reading does not delete records</text>
+  </g>
+</svg>

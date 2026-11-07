@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" font-family="Inter, system-ui, sans-serif">
+  <title>Three short-code generation strategies compared</title>
+  <rect x="0" y="0" width="800" height="440" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">Minting a 7-character short code</text>
+  <text x="32" y="66" fill="#8b949e" font-size="13">Same output alphabet (base62), very different failure modes.</text>
+
+  <!-- Column A -->
+  <rect x="32" y="88" width="232" height="320" rx="10" fill="none" stroke="#30363d"/>
+  <text x="48" y="116" fill="#f78166" font-size="16" font-weight="600">A. Hash and truncate</text>
+  <rect x="48" y="132" width="200" height="32" rx="6" fill="none" stroke="#30363d"/>
+  <text x="148" y="153" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">sha256(longUrl)</text>
+  <path d="M148 164 L148 184" stroke="#8b949e" stroke-width="2"/>
+  <rect x="48" y="186" width="200" height="32" rx="6" fill="none" stroke="#30363d"/>
+  <text x="148" y="207" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">base62, keep 7</text>
+  <g font-size="13">
+    <text x="48" y="248" fill="#7ee787">+ deterministic, dedupes</text>
+    <text x="48" y="272" fill="#f78166">- truncation collides</text>
+    <text x="48" y="296" fill="#f78166">- leaks "was this shortened?"</text>
+    <text x="48" y="320" fill="#f78166">- one code, many owners</text>
+    <text x="48" y="384" fill="#8b949e">Still needs check-and-retry</text>
+  </g>
+
+  <!-- Column B -->
+  <rect x="284" y="88" width="232" height="320" rx="10" fill="none" stroke="#79c0ff"/>
+  <text x="300" y="116" fill="#79c0ff" font-size="16" font-weight="600">B. Random + retry</text>
+  <rect x="300" y="132" width="200" height="32" rx="6" fill="none" stroke="#30363d"/>
+  <text x="400" y="153" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">SecureRandom x 7</text>
+  <path d="M400 164 L400 184" stroke="#8b949e" stroke-width="2"/>
+  <rect x="300" y="186" width="200" height="32" rx="6" fill="none" stroke="#30363d"/>
+  <text x="400" y="207" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">INSERT if absent</text>
+  <g font-size="13">
+    <text x="300" y="248" fill="#7ee787">+ stateless, not enumerable</text>
+    <text x="300" y="272" fill="#7ee787">+ trivial to implement</text>
+    <text x="300" y="296" fill="#f78166">- retries grow with fill</text>
+    <text x="300" y="320" fill="#f78166">- needs atomic conditional put</text>
+  </g>
+  <text x="300" y="352" fill="#e6edf3" font-size="13">At 182.5 B of 3.52 T used:</text>
+  <text x="300" y="372" fill="#e6edf3" font-size="13">about 5.2% of attempts retry</text>
+  <text x="300" y="396" fill="#79c0ff" font-size="13" font-weight="600">Chosen in this design</text>
+
+  <!-- Column C -->
+  <rect x="536" y="88" width="232" height="320" rx="10" fill="none" stroke="#30363d"/>
+  <text x="552" y="116" fill="#7ee787" font-size="16" font-weight="600">C. Counter + base62</text>
+  <rect x="552" y="132" width="200" height="32" rx="6" fill="none" stroke="#30363d"/>
+  <text x="652" y="153" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">lease range 10k IDs</text>
+  <path d="M652 164 L652 184" stroke="#8b949e" stroke-width="2"/>
+  <rect x="552" y="186" width="200" height="32" rx="6" fill="none" stroke="#30363d"/>
+  <text x="652" y="207" fill="#e6edf3" font-size="13" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">permute, then base62</text>
+  <g font-size="13">
+    <text x="552" y="248" fill="#7ee787">+ zero collisions</text>
+    <text x="552" y="272" fill="#7ee787">+ no conditional write needed</text>
+    <text x="552" y="296" fill="#f78166">- raw counter is enumerable</text>
+    <text x="552" y="320" fill="#f78166">- coordinator to operate</text>
+    <text x="552" y="352" fill="#8b949e">Snowflake 64-bit IDs need</text>
+    <text x="552" y="372" fill="#8b949e">11 base62 chars, not 7</text>
+  </g>
+</svg>

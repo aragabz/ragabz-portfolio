@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="t d">
+  <title id="t">Token bucket rate limiter</title>
+  <desc id="d">A bucket with capacity 10 tokens is refilled at 5 tokens per second. Each request removes one token. If a token is available the request is allowed, otherwise it is rejected with HTTP 429. Capacity sets the burst size and refill rate sets the sustained rate.</desc>
+  <rect x="0" y="0" width="800" height="420" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Token bucket: capacity = burst, refill rate = sustained rate</text>
+
+    <!-- refill -->
+    <text x="250" y="88" font-size="14" fill="#7ee787">refill: 5 tokens / second</text>
+    <line x1="310" y1="98" x2="310" y2="130" stroke="#7ee787" stroke-width="2"/>
+    <polygon points="310,138 304,128 316,128" fill="#7ee787"/>
+
+    <!-- bucket -->
+    <path d="M200 140 L220 330 L400 330 L420 140" fill="none" stroke="#8b949e" stroke-width="2.5"/>
+    <text x="436" y="160" font-size="13" fill="#8b949e">capacity: 10 tokens</text>
+    <g fill="#79c0ff">
+      <circle cx="250" cy="310" r="11"/>
+      <circle cx="280" cy="310" r="11"/>
+      <circle cx="310" cy="310" r="11"/>
+      <circle cx="340" cy="310" r="11"/>
+      <circle cx="370" cy="310" r="11"/>
+      <circle cx="265" cy="284" r="11"/>
+      <circle cx="295" cy="284" r="11"/>
+      <circle cx="325" cy="284" r="11"/>
+    </g>
+    <text x="236" y="250" font-size="13" fill="#e6edf3">8 tokens available</text>
+
+    <!-- requests -->
+    <rect x="32" y="200" width="130" height="44" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="50" y="227" font-size="14" fill="#e6edf3">request</text>
+    <line x1="162" y1="222" x2="196" y2="222" stroke="#e6edf3" stroke-width="1.5"/>
+    <polygon points="200,222 190,216 190,228" fill="#e6edf3"/>
+
+    <!-- outcomes -->
+    <line x1="420" y1="290" x2="530" y2="250" stroke="#7ee787" stroke-width="1.5"/>
+    <line x1="420" y1="300" x2="530" y2="340" stroke="#f78166" stroke-width="1.5"/>
+    <rect x="534" y="222" width="234" height="56" rx="8" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="550" y="246" font-size="14" fill="#7ee787">token taken: allow</text>
+    <text x="550" y="266" font-size="13" fill="#8b949e">forward to the service</text>
+    <rect x="534" y="312" width="234" height="56" rx="8" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+    <text x="550" y="336" font-size="14" fill="#f78166">bucket empty: reject</text>
+    <text x="550" y="356" font-size="13" fill="#8b949e">429 + Retry-After</text>
+
+    <text x="32" y="388" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b949e">tokens = min(capacity, tokens + elapsed_seconds * rate)</text>
+  </g>
+</svg>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">Anatomy of a JWT</title>
+  <desc id="d">A JWT is three base64url segments separated by dots: header, payload and signature. The signature covers the header and payload.</desc>
+  <rect width="800" height="460" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">Anatomy of a JWT</text>
+    <text x="32" y="68" fill="#8b949e" font-size="13">Three base64url parts joined by dots. Encoded, not encrypted: anyone can read the payload.</text>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">
+    <text x="32" y="112"><tspan fill="#f78166">eyJhbGciOiJSUzI1NiIs</tspan><tspan fill="#8b949e">.</tspan><tspan fill="#d2a8ff">eyJzdWIiOiI0MiIsImF1ZCI6Im9yZGVy</tspan><tspan fill="#8b949e">.</tspan><tspan fill="#79c0ff">SflKxwRJSMeKKF2QT4fwpM</tspan></text>
+  </g>
+  <!-- header card -->
+  <rect x="32" y="140" width="220" height="190" rx="10" fill="none" stroke="#f78166" stroke-width="1.5"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="48" y="166" fill="#f78166" font-size="15" font-weight="600">Header</text>
+    <text x="48" y="186" fill="#8b949e" font-size="13">How it was signed</text>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">
+    <text x="48" y="218">"alg": "RS256",</text>
+    <text x="48" y="240">"typ": "JWT",</text>
+    <text x="48" y="262">"kid": "2026-10"</text>
+  </g>
+  <text x="48" y="306" fill="#8b949e" font-size="13" font-family="Inter, system-ui, sans-serif">kid picks the key in JWKS</text>
+  <!-- payload card -->
+  <rect x="270" y="140" width="260" height="190" rx="10" fill="none" stroke="#d2a8ff" stroke-width="1.5"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="286" y="166" fill="#d2a8ff" font-size="15" font-weight="600">Payload (claims)</text>
+    <text x="286" y="186" fill="#8b949e" font-size="13">Who, for whom, until when</text>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">
+    <text x="286" y="218">"iss": "https://auth...",</text>
+    <text x="286" y="240">"sub": "42",</text>
+    <text x="286" y="262">"aud": "orders-api",</text>
+    <text x="286" y="284">"exp": 1793000400,</text>
+    <text x="286" y="306">"scope": "orders:read"</text>
+  </g>
+  <!-- signature card -->
+  <rect x="548" y="140" width="220" height="190" rx="10" fill="none" stroke="#79c0ff" stroke-width="1.5"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="564" y="166" fill="#79c0ff" font-size="15" font-weight="600">Signature</text>
+    <text x="564" y="186" fill="#8b949e" font-size="13">Proves integrity and origin</text>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">
+    <text x="564" y="218">RSASSA-PKCS1-v1_5(</text>
+    <text x="576" y="240">SHA-256,</text>
+    <text x="576" y="262">header + "." +</text>
+    <text x="576" y="284">payload,</text>
+    <text x="576" y="306">private key)</text>
+  </g>
+  <!-- covers bracket -->
+  <path d="M42 352 V368 H520 V352" fill="none" stroke="#30363d" stroke-width="2"/>
+  <path d="M281 368 V384" stroke="#30363d" stroke-width="2"/>
+  <path d="M281 384 H600 V340" fill="none" stroke="#79c0ff" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <g font-family="Inter, system-ui, sans-serif" font-size="13">
+    <text x="32" y="412" fill="#e6edf3">The signature is computed over the encoded header and payload.</text>
+    <text x="32" y="434" fill="#8b949e">Change one character in either and verification with the issuer's public key fails.</text>
+  </g>
+</svg>

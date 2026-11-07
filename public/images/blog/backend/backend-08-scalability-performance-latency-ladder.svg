@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">Latency ladder for backend engineers</title>
+  <desc id="d">Approximate latencies on a logarithmic scale: CPU cache about 1 nanosecond, RAM about 100 nanoseconds, NVMe random read tens of microseconds, same-zone network round trip a few hundred microseconds, Redis GET or indexed database query around one millisecond, cross-zone round trip one to two milliseconds, cross-continent round trip about 70 to 150 milliseconds.</desc>
+  <rect x="0" y="0" width="800" height="480" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Latency ladder (orders of magnitude, log scale)</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">Each step to the right is roughly 10x slower. Exact values depend on hardware and cloud.</text>
+
+    <!-- axis -->
+    <line x1="280" y1="440" x2="768" y2="440" stroke="#30363d" stroke-width="1.5"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8b949e">
+      <text x="270" y="460">1ns</text>
+      <text x="370" y="460">100ns</text>
+      <text x="470" y="460">10us</text>
+      <text x="575" y="460">1ms</text>
+      <text x="670" y="460">100ms</text>
+    </g>
+
+    <g font-size="14" fill="#e6edf3">
+      <text x="32" y="106">CPU L1 cache hit</text>
+      <text x="32" y="148">Main memory (RAM)</text>
+      <text x="32" y="190">NVMe SSD random 4 KB read</text>
+      <text x="32" y="232">Same-zone network round trip</text>
+      <text x="32" y="274">Redis GET (incl. network)</text>
+      <text x="32" y="316">Indexed DB point query</text>
+      <text x="32" y="358">Cross-zone round trip</text>
+      <text x="32" y="400">Cross-continent round trip</text>
+    </g>
+
+    <!-- bars: x scale: 1ns at 280, each decade = 49px -->
+    <rect x="280" y="92" width="6" height="20" rx="3" fill="#7ee787"/>
+    <rect x="280" y="134" width="98" height="20" rx="3" fill="#7ee787"/>
+    <rect x="280" y="176" width="225" height="20" rx="3" fill="#79c0ff"/>
+    <rect x="280" y="218" width="270" height="20" rx="3" fill="#79c0ff"/>
+    <rect x="280" y="260" width="300" height="20" rx="3" fill="#d2a8ff"/>
+    <rect x="280" y="302" width="300" height="20" rx="3" fill="#d2a8ff"/>
+    <rect x="280" y="344" width="310" height="20" rx="3" fill="#f78166"/>
+    <rect x="280" y="386" width="392" height="20" rx="3" fill="#f78166"/>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b949e">
+      <text x="296" y="107">~1 ns</text>
+      <text x="388" y="149">~100 ns</text>
+      <text x="515" y="191">~20-100 us</text>
+      <text x="560" y="233">~0.1-0.5 ms</text>
+      <text x="590" y="275">~0.3-1 ms</text>
+      <text x="590" y="317">~0.5-2 ms</text>
+      <text x="600" y="359">~1-2 ms</text>
+      <text x="684" y="401">70-150 ms</text>
+    </g>
+  </g>
+</svg>

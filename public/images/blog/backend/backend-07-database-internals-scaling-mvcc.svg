@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="t d">
+  <title id="t">PostgreSQL MVCC tuple versions</title>
+  <desc id="d">An UPDATE in PostgreSQL writes a new row version. Each version carries xmin and xmax transaction ids. A snapshot taken before transaction 105 committed sees the old version, a later snapshot sees the new one, and VACUUM later reclaims the dead version.</desc>
+  <rect x="0" y="0" width="800" height="420" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">MVCC: an UPDATE writes a new version, it does not overwrite</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">UPDATE accounts SET balance = 70 WHERE id = 1, run by transaction 105</text>
+
+    <!-- version 1 -->
+    <rect x="32" y="96" width="340" height="120" rx="10" fill="#161b22" stroke="#8b949e" stroke-width="1.5"/>
+    <text x="52" y="124" font-size="15" font-weight="600" fill="#e6edf3">Version 1 (now dead)</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">
+      <text x="52" y="152" fill="#7ee787">xmin = 100</text>
+      <text x="52" y="174" fill="#f78166">xmax = 105</text>
+      <text x="52" y="196" fill="#e6edf3">id=1  balance=100</text>
+    </g>
+
+    <!-- version 2 -->
+    <rect x="428" y="96" width="340" height="120" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+    <text x="448" y="124" font-size="15" font-weight="600" fill="#e6edf3">Version 2 (live)</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">
+      <text x="448" y="152" fill="#7ee787">xmin = 105</text>
+      <text x="448" y="174" fill="#8b949e">xmax = 0</text>
+      <text x="448" y="196" fill="#e6edf3">id=1  balance=70</text>
+    </g>
+    <line x1="372" y1="156" x2="428" y2="156" stroke="#79c0ff" stroke-width="2"/>
+    <polygon points="428,156 418,150 418,162" fill="#79c0ff"/>
+    <text x="378" y="146" font-size="12" fill="#79c0ff">t_ctid</text>
+
+    <!-- snapshots -->
+    <rect x="32" y="244" width="340" height="72" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+    <text x="52" y="272" font-size="14" fill="#e6edf3">Snapshot taken before 105 commits</text>
+    <text x="52" y="296" font-size="14" fill="#79c0ff">sees balance = 100</text>
+
+    <rect x="428" y="244" width="340" height="72" rx="10" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+    <text x="448" y="272" font-size="14" fill="#e6edf3">Snapshot taken after 105 commits</text>
+    <text x="448" y="296" font-size="14" fill="#79c0ff">sees balance = 70</text>
+
+    <!-- vacuum -->
+    <rect x="32" y="340" width="736" height="52" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+    <text x="52" y="371" font-size="14" fill="#d2a8ff">VACUUM</text>
+    <text x="128" y="371" font-size="14" fill="#e6edf3">reclaims version 1 once no running snapshot can still see it</text>
+  </g>
+</svg>

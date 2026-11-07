@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="t d">
+  <title id="t">Offset pagination versus cursor pagination</title>
+  <desc id="d">With offset pagination the database reads and discards every skipped row before returning the page. With cursor pagination it uses the index to seek straight to the row after the last seen key and reads only the page.</desc>
+  <rect width="800" height="420" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">Getting page 4 of orders (20 per page)</text>
+
+    <!-- offset -->
+    <text x="32" y="88" font-size="15" font-weight="600" fill="#f78166">Offset</text>
+    <text x="110" y="88" font-size="13" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">LIMIT 20 OFFSET 60</text>
+    <g fill="#30363d">
+      <rect x="32" y="104" width="16" height="40" rx="3"/><rect x="52" y="104" width="16" height="40" rx="3"/><rect x="72" y="104" width="16" height="40" rx="3"/><rect x="92" y="104" width="16" height="40" rx="3"/><rect x="112" y="104" width="16" height="40" rx="3"/><rect x="132" y="104" width="16" height="40" rx="3"/><rect x="152" y="104" width="16" height="40" rx="3"/><rect x="172" y="104" width="16" height="40" rx="3"/><rect x="192" y="104" width="16" height="40" rx="3"/><rect x="212" y="104" width="16" height="40" rx="3"/><rect x="232" y="104" width="16" height="40" rx="3"/><rect x="252" y="104" width="16" height="40" rx="3"/><rect x="272" y="104" width="16" height="40" rx="3"/><rect x="292" y="104" width="16" height="40" rx="3"/><rect x="312" y="104" width="16" height="40" rx="3"/><rect x="332" y="104" width="16" height="40" rx="3"/><rect x="352" y="104" width="16" height="40" rx="3"/><rect x="372" y="104" width="16" height="40" rx="3"/><rect x="392" y="104" width="16" height="40" rx="3"/><rect x="412" y="104" width="16" height="40" rx="3"/><rect x="432" y="104" width="16" height="40" rx="3"/><rect x="452" y="104" width="16" height="40" rx="3"/><rect x="472" y="104" width="16" height="40" rx="3"/><rect x="492" y="104" width="16" height="40" rx="3"/>
+    </g>
+    <g fill="#f78166">
+      <rect x="532" y="104" width="16" height="40" rx="3"/><rect x="552" y="104" width="16" height="40" rx="3"/><rect x="572" y="104" width="16" height="40" rx="3"/><rect x="592" y="104" width="16" height="40" rx="3"/><rect x="612" y="104" width="16" height="40" rx="3"/><rect x="632" y="104" width="16" height="40" rx="3"/><rect x="652" y="104" width="16" height="40" rx="3"/><rect x="672" y="104" width="16" height="40" rx="3"/>
+    </g>
+    <text x="512" y="130" font-size="14" fill="#8b949e">...</text>
+    <path d="M32 156 H508" stroke="#8b949e" stroke-width="1.5" fill="none"/>
+    <text x="32" y="178" font-size="13" fill="#8b949e">60 rows read and thrown away</text>
+    <text x="532" y="178" font-size="13" fill="#e6edf3">20 rows returned</text>
+    <text x="32" y="204" font-size="13" fill="#8b949e">Cost grows with page depth. A row inserted meanwhile shifts every page by one.</text>
+
+    <line x1="32" y1="226" x2="768" y2="226" stroke="#30363d"/>
+
+    <!-- cursor -->
+    <text x="32" y="262" font-size="15" font-weight="600" fill="#7ee787">Cursor</text>
+    <text x="110" y="262" font-size="13" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">WHERE (created_at, id) &lt; (last seen) LIMIT 20</text>
+    <g fill="#161b22" stroke="#30363d">
+      <rect x="32" y="278" width="16" height="40" rx="3"/><rect x="52" y="278" width="16" height="40" rx="3"/><rect x="72" y="278" width="16" height="40" rx="3"/><rect x="92" y="278" width="16" height="40" rx="3"/><rect x="112" y="278" width="16" height="40" rx="3"/><rect x="132" y="278" width="16" height="40" rx="3"/><rect x="152" y="278" width="16" height="40" rx="3"/><rect x="172" y="278" width="16" height="40" rx="3"/><rect x="192" y="278" width="16" height="40" rx="3"/><rect x="212" y="278" width="16" height="40" rx="3"/><rect x="232" y="278" width="16" height="40" rx="3"/><rect x="252" y="278" width="16" height="40" rx="3"/><rect x="272" y="278" width="16" height="40" rx="3"/><rect x="292" y="278" width="16" height="40" rx="3"/><rect x="312" y="278" width="16" height="40" rx="3"/><rect x="332" y="278" width="16" height="40" rx="3"/><rect x="352" y="278" width="16" height="40" rx="3"/><rect x="372" y="278" width="16" height="40" rx="3"/><rect x="392" y="278" width="16" height="40" rx="3"/><rect x="412" y="278" width="16" height="40" rx="3"/><rect x="432" y="278" width="16" height="40" rx="3"/><rect x="452" y="278" width="16" height="40" rx="3"/><rect x="472" y="278" width="16" height="40" rx="3"/><rect x="492" y="278" width="16" height="40" rx="3"/>
+    </g>
+    <g fill="#7ee787">
+      <rect x="532" y="278" width="16" height="40" rx="3"/><rect x="552" y="278" width="16" height="40" rx="3"/><rect x="572" y="278" width="16" height="40" rx="3"/><rect x="592" y="278" width="16" height="40" rx="3"/><rect x="612" y="278" width="16" height="40" rx="3"/><rect x="632" y="278" width="16" height="40" rx="3"/><rect x="652" y="278" width="16" height="40" rx="3"/><rect x="672" y="278" width="16" height="40" rx="3"/>
+    </g>
+    <text x="512" y="304" font-size="14" fill="#8b949e">...</text>
+    <path d="M60 340 C 200 372, 400 372, 528 326" stroke="#79c0ff" stroke-width="2" fill="none"/>
+    <path d="M528 326 l-11 2 l6 8 z" fill="#79c0ff"/>
+    <text x="200" y="384" font-size="13" fill="#79c0ff">index seek straight to the cursor position</text>
+    <text x="32" y="404" font-size="13" fill="#8b949e">Same cost on page 4 or page 40,000, and stable when new rows arrive. No jumping to page N.</text>
+  </g>
+</svg>

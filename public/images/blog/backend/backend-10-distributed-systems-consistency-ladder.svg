@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="t d">
+  <title id="t">The consistency model ladder</title>
+  <desc id="d">Consistency models ordered from strongest to weakest: strict serializable and linearizable, sequential, causal, session guarantees, eventual. Stronger models need more coordination and latency; weaker models stay available under partition.</desc>
+  <rect x="0" y="0" width="800" height="500" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">Consistency models: stronger means more coordination</text>
+    <text x="32" y="68" fill="#8b949e" font-size="13">Each rung allows every anomaly of the rungs above it, plus its own</text>
+
+    <!-- arrow on the left -->
+    <line x1="48" y1="100" x2="48" y2="456" stroke="#30363d" stroke-width="2"/>
+    <polygon points="42,106 48,92 54,106" fill="#f78166"/>
+    <polygon points="42,450 48,464 54,450" fill="#7ee787"/>
+    <text x="62" y="104" fill="#f78166" font-size="13">more latency, unavailable in partition</text>
+    <text x="62" y="466" fill="#7ee787" font-size="13">lower latency, available in partition</text>
+
+    <!-- rungs -->
+    <g>
+      <rect x="80" y="120" width="688" height="52" rx="10" fill="#161b22" stroke="#f78166"/>
+      <text x="100" y="143" fill="#e6edf3" font-size="15" font-weight="600">Linearizable / strict serializable</text>
+      <text x="100" y="162" fill="#8b949e" font-size="13">Acts like one copy, respects real time</text>
+      <text x="748" y="143" fill="#79c0ff" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">etcd, ZooKeeper, Spanner</text>
+      <text x="748" y="162" fill="#8b949e" font-size="13" text-anchor="end">locks, leader election, uniqueness</text>
+    </g>
+    <g>
+      <rect x="80" y="182" width="688" height="52" rx="10" fill="#161b22" stroke="#d2a8ff"/>
+      <text x="100" y="205" fill="#e6edf3" font-size="15" font-weight="600">Sequential</text>
+      <text x="100" y="224" fill="#8b949e" font-size="13">One total order, per-client order kept, real time ignored</text>
+      <text x="748" y="205" fill="#8b949e" font-size="13" text-anchor="end">allows: stale reads vs real time</text>
+    </g>
+    <g>
+      <rect x="80" y="244" width="688" height="52" rx="10" fill="#161b22" stroke="#79c0ff"/>
+      <text x="100" y="267" fill="#e6edf3" font-size="15" font-weight="600">Causal</text>
+      <text x="100" y="286" fill="#8b949e" font-size="13">Cause is always seen before effect, concurrent ops in any order</text>
+      <text x="748" y="267" fill="#8b949e" font-size="13" text-anchor="end">comment threads, chat</text>
+      <text x="748" y="286" fill="#8b949e" font-size="13" text-anchor="end">allows: reordered concurrent writes</text>
+    </g>
+    <g>
+      <rect x="80" y="306" width="688" height="52" rx="10" fill="#161b22" stroke="#79c0ff" stroke-dasharray="5 4"/>
+      <text x="100" y="329" fill="#e6edf3" font-size="15" font-weight="600">Session guarantees</text>
+      <text x="100" y="348" fill="#8b949e" font-size="13">Read-your-writes, monotonic reads, monotonic writes</text>
+      <text x="748" y="329" fill="#8b949e" font-size="13" text-anchor="end">profile edits, settings pages</text>
+      <text x="748" y="348" fill="#8b949e" font-size="13" text-anchor="end">allows: other users see stale data</text>
+    </g>
+    <g>
+      <rect x="80" y="368" width="688" height="52" rx="10" fill="#161b22" stroke="#7ee787"/>
+      <text x="100" y="391" fill="#e6edf3" font-size="15" font-weight="600">Eventual</text>
+      <text x="100" y="410" fill="#8b949e" font-size="13">Replicas converge if writes stop, no bound on when</text>
+      <text x="748" y="391" fill="#79c0ff" font-size="13" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">DNS, caches, CL=ONE</text>
+      <text x="748" y="410" fill="#8b949e" font-size="13" text-anchor="end">counters, feeds, catalogues</text>
+    </g>
+  </g>
+</svg>

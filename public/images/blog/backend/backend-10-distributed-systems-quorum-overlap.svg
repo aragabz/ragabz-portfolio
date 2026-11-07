@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-labelledby="t d">
+  <title id="t">Quorum overlap with N=3, W=2, R=2</title>
+  <desc id="d">A write of version 2 is acknowledged by replicas A and B. Replica C still holds version 1. A later read queries replicas B and C. Because W plus R is greater than N, the sets overlap at replica B, so the reader sees version 2 and can repair C.</desc>
+  <rect x="0" y="0" width="800" height="400" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">Quorum overlap: N = 3, W = 2, R = 2</text>
+    <text x="32" y="68" fill="#8b949e" font-size="13">W + R = 4, which is greater than N = 3, so every read set shares a replica with every write set</text>
+
+    <!-- write set -->
+    <rect x="96" y="104" width="380" height="200" rx="18" fill="#f78166" fill-opacity="0.08" stroke="#f78166" stroke-dasharray="6 4"/>
+    <text x="112" y="128" fill="#f78166" font-size="14" font-weight="600">Write set (W = 2): x = v2</text>
+
+    <!-- read set -->
+    <rect x="324" y="152" width="380" height="200" rx="18" fill="#79c0ff" fill-opacity="0.08" stroke="#79c0ff" stroke-dasharray="6 4"/>
+    <text x="688" y="340" fill="#79c0ff" font-size="14" font-weight="600" text-anchor="end">Read set (R = 2)</text>
+
+    <!-- replicas -->
+    <g>
+      <rect x="128" y="176" width="140" height="80" rx="12" fill="#161b22" stroke="#30363d"/>
+      <text x="198" y="206" fill="#e6edf3" font-size="15" font-weight="600" text-anchor="middle">Replica A</text>
+      <text x="198" y="232" fill="#7ee787" font-size="14" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">x = v2</text>
+    </g>
+    <g>
+      <rect x="330" y="176" width="140" height="80" rx="12" fill="#161b22" stroke="#d2a8ff" stroke-width="2"/>
+      <text x="400" y="206" fill="#e6edf3" font-size="15" font-weight="600" text-anchor="middle">Replica B</text>
+      <text x="400" y="232" fill="#7ee787" font-size="14" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">x = v2</text>
+    </g>
+    <g>
+      <rect x="532" y="176" width="140" height="80" rx="12" fill="#161b22" stroke="#30363d"/>
+      <text x="602" y="206" fill="#e6edf3" font-size="15" font-weight="600" text-anchor="middle">Replica C</text>
+      <text x="602" y="232" fill="#8b949e" font-size="14" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">x = v1 (stale)</text>
+    </g>
+    <text x="400" y="282" fill="#d2a8ff" font-size="13" text-anchor="middle">overlap: the reader sees v2</text>
+
+    <text x="32" y="378" fill="#8b949e" font-size="13">Reader returns the newest version (v2) and can write it back to C (read repair).</text>
+  </g>
+</svg>

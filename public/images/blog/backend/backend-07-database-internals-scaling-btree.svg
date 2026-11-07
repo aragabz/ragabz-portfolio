@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d">
+  <title id="t">B+tree index lookup</title>
+  <desc id="d">A three-level B+tree. The root page holds separator keys, internal pages narrow the range, and leaf pages hold sorted keys with pointers to heap rows and links to sibling leaves. Looking up key 42 reads three pages.</desc>
+  <rect x="0" y="0" width="800" height="460" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">B+tree: WHERE id = 42 reads one page per level</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">8 KB pages, hundreds of keys per page: 3 to 4 levels index billions of rows</text>
+
+    <!-- root -->
+    <text x="32" y="112" font-size="13" fill="#8b949e">root</text>
+    <rect x="300" y="92" width="200" height="40" rx="6" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">
+      <text x="340" y="117">30</text>
+      <text x="390" y="117">60</text>
+      <text x="440" y="117">90</text>
+    </g>
+
+    <!-- internal -->
+    <text x="32" y="182" font-size="13" fill="#8b949e">internal</text>
+    <rect x="70" y="192" width="170" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <rect x="315" y="192" width="170" height="40" rx="6" fill="#161b22" stroke="#f78166" stroke-width="2"/>
+    <rect x="560" y="192" width="170" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">
+      <text x="100" y="217">10</text><text x="170" y="217">20</text>
+      <text x="345" y="217">40</text><text x="415" y="217">50</text>
+      <text x="590" y="217">70</text><text x="660" y="217">80</text>
+    </g>
+
+    <line x1="320" y1="132" x2="155" y2="192" stroke="#30363d" stroke-width="1.5"/>
+    <line x1="400" y1="132" x2="400" y2="192" stroke="#f78166" stroke-width="2.5"/>
+    <line x1="480" y1="132" x2="645" y2="192" stroke="#30363d" stroke-width="1.5"/>
+
+    <!-- leaves -->
+    <text x="32" y="312" font-size="13" fill="#8b949e">leaves</text>
+    <rect x="200" y="292" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <rect x="345" y="292" width="130" height="40" rx="6" fill="#161b22" stroke="#7ee787" stroke-width="2"/>
+    <rect x="490" y="292" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e6edf3">
+      <text x="220" y="317">30 33 37</text>
+      <text x="365" y="317">40 42 47</text>
+      <text x="510" y="317">50 55 58</text>
+    </g>
+    <line x1="350" y1="232" x2="265" y2="292" stroke="#30363d" stroke-width="1.5"/>
+    <line x1="400" y1="232" x2="410" y2="292" stroke="#f78166" stroke-width="2.5"/>
+    <line x1="450" y1="232" x2="555" y2="292" stroke="#30363d" stroke-width="1.5"/>
+
+    <!-- sibling links -->
+    <line x1="330" y1="312" x2="345" y2="312" stroke="#79c0ff" stroke-width="2"/>
+    <line x1="475" y1="312" x2="490" y2="312" stroke="#79c0ff" stroke-width="2"/>
+    <text x="632" y="317" font-size="13" fill="#79c0ff">sibling links</text>
+    <text x="632" y="335" font-size="13" fill="#8b949e">make range scans cheap</text>
+
+    <!-- heap -->
+    <line x1="400" y1="332" x2="400" y2="380" stroke="#7ee787" stroke-width="2" stroke-dasharray="5 4"/>
+    <rect x="300" y="380" width="200" height="40" rx="6" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+    <text x="318" y="405" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6edf3">heap row (ctid 7,3)</text>
+    <text x="520" y="405" font-size="13" fill="#8b949e">skipped by an index-only scan</text>
+    <text x="32" y="405" font-size="13" fill="#d2a8ff">table heap</text>
+  </g>
+</svg>

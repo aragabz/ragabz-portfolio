@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="t d">
+  <title id="t">Waterfall of a first HTTPS request at 80 ms round-trip time</title>
+  <desc id="d">DNS, TCP handshake, TLS 1.3 handshake and the HTTP request each take about one round trip, so the first response arrives after roughly 320 ms plus server time. A reused connection needs only the last round trip.</desc>
+  <rect width="800" height="420" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">A first HTTPS request, 80 ms round-trip time</text>
+    <text x="32" y="68" font-size="13" fill="#8b949e">Each bar is one round trip. Server processing assumed 20 ms.</text>
+
+    <!-- grid -->
+    <g stroke="#30363d" stroke-width="1">
+      <line x1="200" y1="92" x2="200" y2="330"/>
+      <line x1="320" y1="92" x2="320" y2="330" stroke-dasharray="3 4"/>
+      <line x1="440" y1="92" x2="440" y2="330" stroke-dasharray="3 4"/>
+      <line x1="560" y1="92" x2="560" y2="330" stroke-dasharray="3 4"/>
+      <line x1="680" y1="92" x2="680" y2="330" stroke-dasharray="3 4"/>
+      <line x1="200" y1="330" x2="770" y2="330"/>
+    </g>
+    <g font-size="13" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" text-anchor="middle">
+      <text x="200" y="350">0</text>
+      <text x="320" y="350">80</text>
+      <text x="440" y="350">160</text>
+      <text x="560" y="350">240</text>
+      <text x="680" y="350">320 ms</text>
+    </g>
+
+    <!-- rows -->
+    <g font-size="14" fill="#e6edf3">
+      <text x="32" y="122">DNS lookup</text>
+      <text x="32" y="172">TCP handshake</text>
+      <text x="32" y="222">TLS 1.3 handshake</text>
+      <text x="32" y="272">HTTP request</text>
+      <text x="32" y="318">Reused connection</text>
+    </g>
+    <rect x="200" y="104" width="120" height="26" rx="5" fill="#d2a8ff"/>
+    <rect x="320" y="154" width="120" height="26" rx="5" fill="#79c0ff"/>
+    <rect x="440" y="204" width="120" height="26" rx="5" fill="#7ee787"/>
+    <rect x="560" y="254" width="120" height="26" rx="5" fill="#f78166"/>
+    <rect x="680" y="254" width="30" height="26" rx="5" fill="#f78166" opacity="0.55"/>
+    <rect x="200" y="300" width="120" height="26" rx="5" fill="#f78166"/>
+    <rect x="320" y="300" width="30" height="26" rx="5" fill="#f78166" opacity="0.55"/>
+
+    <g font-size="13" fill="#0d1117" font-weight="600">
+      <text x="212" y="122">resolver walk</text>
+      <text x="332" y="172">SYN, SYN-ACK</text>
+      <text x="452" y="222">keys + cert</text>
+      <text x="572" y="272">GET, 200 OK</text>
+      <text x="212" y="318">GET, 200 OK</text>
+    </g>
+    <text x="716" y="272" font-size="13" fill="#8b949e">server</text>
+    <text x="358" y="318" font-size="13" fill="#8b949e">about 100 ms total</text>
+
+    <text x="32" y="386" font-size="14" fill="#e6edf3">First request: about 4 round trips, roughly 340 ms. Reused connection: 1 round trip.</text>
+    <text x="32" y="406" font-size="13" fill="#8b949e">Connection reuse, CDNs (shorter RTT) and HTTP/3 (combined handshake) attack the first three bars.</text>
+  </g>
+</svg>

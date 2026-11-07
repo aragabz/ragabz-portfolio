@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" font-family="Inter, system-ui, sans-serif">
+  <title>Architecture spectrum: coupling versus operational cost</title>
+  <rect x="0" y="0" width="800" height="460" rx="16" fill="#0d1117"/>
+  <text x="32" y="44" fill="#e6edf3" font-size="18" font-weight="600">The architecture spectrum</text>
+  <text x="32" y="66" fill="#8b949e" font-size="13">Where a system sits depends on two independent choices: boundaries and deployment.</text>
+
+  <!-- axes -->
+  <line x1="110" y1="400" x2="740" y2="400" stroke="#30363d" stroke-width="2"/>
+  <line x1="110" y1="400" x2="110" y2="96" stroke="#30363d" stroke-width="2"/>
+  <path d="M740 400 L730 394 L730 406 Z" fill="#30363d"/>
+  <path d="M110 96 L104 106 L116 106 Z" fill="#30363d"/>
+  <text x="740" y="426" fill="#8b949e" font-size="13" text-anchor="end">Operational cost of distribution (more deployables, more network)</text>
+  <text x="40" y="250" fill="#8b949e" font-size="13" text-anchor="middle" transform="rotate(-90 40 250)">Coupling of changes (lower is better)</text>
+  <text x="122" y="118" fill="#8b949e" font-size="13">high</text>
+  <text x="122" y="390" fill="#8b949e" font-size="13">low</text>
+
+  <!-- quadrant divider -->
+  <line x1="425" y1="96" x2="425" y2="400" stroke="#30363d" stroke-dasharray="6 6"/>
+  <line x1="110" y1="248" x2="740" y2="248" stroke="#30363d" stroke-dasharray="6 6"/>
+
+  <!-- Big ball of mud -->
+  <rect x="150" y="120" width="230" height="96" rx="10" fill="none" stroke="#8b949e"/>
+  <text x="166" y="146" fill="#e6edf3" font-size="15" font-weight="600">Big ball of mud</text>
+  <text x="166" y="170" fill="#8b949e" font-size="13">one deployable, no boundaries</text>
+  <text x="166" y="192" fill="#8b949e" font-size="13">cheap to run, painful to change</text>
+
+  <!-- Distributed monolith -->
+  <rect x="470" y="120" width="240" height="96" rx="10" fill="none" stroke="#f78166" stroke-width="2"/>
+  <text x="486" y="146" fill="#f78166" font-size="15" font-weight="600">Distributed monolith</text>
+  <text x="486" y="170" fill="#8b949e" font-size="13">many deployables, coupled changes</text>
+  <text x="486" y="192" fill="#8b949e" font-size="13">worst of both worlds</text>
+
+  <!-- Modular monolith -->
+  <rect x="150" y="276" width="230" height="96" rx="10" fill="none" stroke="#7ee787" stroke-width="2"/>
+  <text x="166" y="302" fill="#7ee787" font-size="15" font-weight="600">Modular monolith</text>
+  <text x="166" y="326" fill="#8b949e" font-size="13">one deployable, enforced modules</text>
+  <text x="166" y="348" fill="#8b949e" font-size="13">the usual right default</text>
+
+  <!-- Microservices -->
+  <rect x="470" y="276" width="240" height="96" rx="10" fill="none" stroke="#79c0ff" stroke-width="2"/>
+  <text x="486" y="302" fill="#79c0ff" font-size="15" font-weight="600">Microservices</text>
+  <text x="486" y="326" fill="#8b949e" font-size="13">independent deploys and data</text>
+  <text x="486" y="348" fill="#8b949e" font-size="13">pays off with many teams</text>
+
+  <!-- arrows -->
+  <path d="M265 216 L265 270" stroke="#d2a8ff" stroke-width="2" fill="none"/>
+  <path d="M265 274 L259 262 L271 262 Z" fill="#d2a8ff"/>
+  <text x="275" y="250" fill="#d2a8ff" font-size="13">add boundaries first</text>
+  <path d="M384 324 L462 324" stroke="#d2a8ff" stroke-width="2" fill="none"/>
+  <path d="M466 324 L454 318 L454 330 Z" fill="#d2a8ff"/>
+  <text x="392" y="314" fill="#d2a8ff" font-size="13">extract</text>
+  <path d="M384 168 L462 168" stroke="#f78166" stroke-width="2" stroke-dasharray="5 4" fill="none"/>
+  <path d="M466 168 L454 162 L454 174 Z" fill="#f78166"/>
+  <text x="392" y="158" fill="#f78166" font-size="13">split</text>
+</svg>

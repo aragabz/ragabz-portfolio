@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d">
+  <title id="t">Protocol stacks for HTTP/1.1, HTTP/2 and HTTP/3</title>
+  <desc id="d">HTTP/1.1 and HTTP/2 run over TLS and TCP. HTTP/3 runs over QUIC, which includes TLS 1.3 and runs over UDP. All three run over IP.</desc>
+  <rect width="800" height="440" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif" text-anchor="middle">
+    <text x="400" y="44" font-size="18" font-weight="600" fill="#e6edf3">Same HTTP semantics, three different stacks</text>
+    <text x="400" y="68" font-size="13" fill="#8b949e">Methods, status codes and headers (RFC 9110) are identical. Framing and transport differ.</text>
+
+    <g font-size="15" font-weight="600" fill="#e6edf3">
+      <text x="160" y="108">HTTP/1.1</text>
+      <text x="400" y="108">HTTP/2</text>
+      <text x="640" y="108">HTTP/3</text>
+    </g>
+
+    <!-- application -->
+    <rect x="48" y="122" width="224" height="56" rx="8" fill="#161b22" stroke="#f78166"/>
+    <text x="160" y="146" font-size="14" fill="#e6edf3">Text messages</text>
+    <text x="160" y="166" font-size="13" fill="#8b949e">one request at a time</text>
+    <rect x="288" y="122" width="224" height="56" rx="8" fill="#161b22" stroke="#f78166"/>
+    <text x="400" y="146" font-size="14" fill="#e6edf3">Binary frames</text>
+    <text x="400" y="166" font-size="13" fill="#8b949e">many streams, HPACK headers</text>
+    <rect x="528" y="122" width="224" height="56" rx="8" fill="#161b22" stroke="#f78166"/>
+    <text x="640" y="146" font-size="14" fill="#e6edf3">Binary frames</text>
+    <text x="640" y="166" font-size="13" fill="#8b949e">many streams, QPACK headers</text>
+
+    <!-- security -->
+    <rect x="48" y="190" width="224" height="48" rx="8" fill="#161b22" stroke="#7ee787"/>
+    <text x="160" y="219" font-size="14" fill="#e6edf3">TLS (optional)</text>
+    <rect x="288" y="190" width="224" height="48" rx="8" fill="#161b22" stroke="#7ee787"/>
+    <text x="400" y="219" font-size="14" fill="#e6edf3">TLS (required by browsers)</text>
+    <rect x="528" y="190" width="224" height="108" rx="8" fill="#161b22" stroke="#d2a8ff"/>
+    <text x="640" y="232" font-size="14" fill="#e6edf3">QUIC</text>
+    <text x="640" y="254" font-size="13" fill="#8b949e">TLS 1.3 built in,</text>
+    <text x="640" y="274" font-size="13" fill="#8b949e">independent streams</text>
+
+    <!-- transport -->
+    <rect x="48" y="250" width="224" height="48" rx="8" fill="#161b22" stroke="#79c0ff"/>
+    <text x="160" y="279" font-size="14" fill="#e6edf3">TCP</text>
+    <rect x="288" y="250" width="224" height="48" rx="8" fill="#161b22" stroke="#79c0ff"/>
+    <text x="400" y="279" font-size="14" fill="#e6edf3">TCP</text>
+    <rect x="528" y="310" width="224" height="40" rx="8" fill="#161b22" stroke="#79c0ff"/>
+    <text x="640" y="335" font-size="14" fill="#e6edf3">UDP</text>
+    <rect x="48" y="310" width="464" height="40" rx="8" fill="#0d1117" stroke="#30363d" stroke-dasharray="4 4"/>
+    <text x="280" y="335" font-size="13" fill="#8b949e">one lost packet stalls every stream on the connection</text>
+
+    <!-- network -->
+    <rect x="48" y="362" width="704" height="40" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="400" y="387" font-size="14" fill="#e6edf3">IP (best-effort packet delivery, IPv4 or IPv6)</text>
+  </g>
+</svg>

@@ -1,0 +1,576 @@
+---
+title: "Backend Engineering, Part 4: Authentication & Authorization"
+date: 2026-10-25
+excerpt: "Password hashing, sessions vs tokens, JWTs, OAuth 2.0 and OpenID Connect, and RBAC/ABAC: how a backend decides who you are and what you're allowed to do, without the usual security holes."
+tags: ["Backend", "Security", "OAuth", "JWT", "Interview Prep"]
+readingTime: 19
+level: mid
+series: "Backend Engineering: Zero to Principal"
+seriesOrder: 4
+draft: false
+---
+
+import Callout from '../../components/mdx/Callout.astro';
+
+Every non-trivial backend eventually has to answer two questions on every request: **who is this?** and **are they allowed to do this?** The first is *authentication* (authn). The second is *authorization* (authz). They sound similar, they are often configured in the same file, and confusing them causes a large share of real-world security bugs.
+
+This part is the first of the mid-level posts. It moves from "my API works" to "my API is safe to put on the internet."
+
+<Callout variant="tip" title="What you'll learn">
+- How to store passwords so a database leak doesn't become a credential leak
+- Server-side sessions vs self-contained tokens, and when each one is the right call
+- What a JWT actually contains, how it's verified, and the classic JWT mistakes
+- OAuth 2.0 and OpenID Connect: the Authorization Code flow with PKCE, step by step
+- RBAC, ABAC and relationship-based authorization, and where to enforce them
+- A Spring Boot 4 / Spring Security 7 resource-server setup in Kotlin
+</Callout>
+
+**You should already know:** HTTP requests, headers and cookies ([Part 1](/blog/backend-01-how-the-web-works)), REST status codes like 401 and 403 ([Part 2](/blog/backend-02-rest-api-design)), and basic SQL tables ([Part 3](/blog/backend-03-databases-fundamentals)).
+
+## Authentication vs authorization
+
+A quick mental model: authentication is checking someone's passport at the airport entrance. Authorization is checking whether their boarding pass lets them onto *this* plane. You can pass the first and fail the second.
+
+HTTP encodes the difference in two status codes, and mixing them up is a common interview red flag:
+
+| Status | Meaning | Example |
+|---|---|---|
+| `401 Unauthorized` | "I don't know who you are." Missing, expired or invalid credentials. Must include a `WWW-Authenticate` header. | No `Authorization` header, or an expired token |
+| `403 Forbidden` | "I know who you are, and the answer is no." | A regular user calling `DELETE /admin/users/42` |
+
+(Yes, `401` is named "Unauthorized" but means "unauthenticated". That is a historical naming accident you just have to remember.)
+
+A third option is worth knowing: when a user asks for a resource they aren't allowed to *see*, many APIs return `404 Not Found` instead of `403` so they don't confirm the resource exists. GitHub does this for private repositories.
+
+```mermaid
+flowchart LR
+    R["Incoming request"] --> A{"Credentials valid?"}
+    A -->|"no"| U["401 Unauthorized"]
+    A -->|"yes"| P["Principal: user 42, roles, scopes"]
+    P --> Z{"Policy allows<br/>this action on<br/>this resource?"}
+    Z -->|"no"| F["403 Forbidden (or 404)"]
+    Z -->|"yes"| H["Run the handler"]
+```
+
+The output of authentication is a **principal**: an identity plus some attributes (user ID, tenant, roles, scopes). Authorization is a function of `(principal, action, resource)` that returns allow or deny. Keep those two steps separate in your head and in your code.
+
+## Storing passwords correctly
+
+If you run your own login, you store passwords. You never store them in plain text, and you never store them with a fast hash like SHA-256 either.
+
+### Why fast hashes are wrong
+
+Hash functions like SHA-256 are designed to be *fast*. A modern GPU computes billions of SHA-256 hashes per second. If your `users` table leaks, an attacker runs a dictionary of common passwords through SHA-256 and matches them in minutes. Adding a salt stops precomputed rainbow tables but does nothing against brute force, because each guess is still cheap.
+
+A password hashing function is deliberately **slow** and ideally **memory-hard**, so each guess costs real time and RAM. Your login endpoint pays that cost once per login; the attacker pays it billions of times.
+
+### What to use in 2026
+
+The OWASP Password Storage Cheat Sheet gives these recommendations, in order of preference:
+
+| Algorithm | Recommended minimum settings | Notes |
+|---|---|---|
+| **Argon2id** | 19 MiB memory, 2 iterations, parallelism 1 | Winner of the Password Hashing Competition; memory-hard. First choice. |
+| **scrypt** | N=2^17, r=8, p=1 | Memory-hard; fine if Argon2id isn't available. |
+| **bcrypt** | Work factor 10 or higher | Battle-tested. Only uses the first **72 bytes** of input. |
+| **PBKDF2-HMAC-SHA256** | 600,000 iterations | Use only when FIPS-140 compliance requires it. |
+
+Tune the parameters so one hash takes somewhere around a few hundred milliseconds on your production hardware, and revisit them as hardware gets faster.
+
+Every one of these produces an encoded string that includes the algorithm, parameters and a random per-user salt, so you store a single column:
+
+```text
+$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG
+```
+
+Because the parameters travel with the hash, you can **upgrade on login**: when a user logs in successfully and their stored hash uses old parameters, rehash the password they just typed with the new settings and save it.
+
+### In Spring Security
+
+Spring Security's `DelegatingPasswordEncoder` prefixes each hash with an algorithm ID, which makes algorithm migration painless:
+
+```kotlin
+@Configuration
+class PasswordConfig {
+    // Encodes new passwords with bcrypt by default; can still verify
+    // {pbkdf2}, {scrypt}, {argon2}... hashes created earlier.
+    @Bean
+    fun passwordEncoder(): PasswordEncoder =
+        PasswordEncoderFactories.createDelegatingPasswordEncoder()
+}
+```
+
+```text
+{bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG
+```
+
+If you want Argon2id instead, `Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()` gives you a configured encoder (it needs the BouncyCastle library on the classpath).
+
+<Callout variant="warning" title="Login endpoints leak information">
+Return the same error ("invalid email or password") for an unknown email and a wrong password, and try to take similar time for both. Otherwise attackers can enumerate which emails have accounts. Also rate-limit login attempts per account and per IP; slow hashing doesn't help if someone can try ten thousand passwords a minute against one account.
+</Callout>
+
+### Beyond passwords
+
+Passwords are the weakest factor you'll support. Two upgrades are worth knowing about:
+
+- **Multi-factor authentication (MFA):** TOTP codes from an authenticator app (RFC 6238), or a hardware key. SMS codes are better than nothing but vulnerable to SIM-swapping.
+- **Passkeys (WebAuthn / FIDO2):** the browser or OS holds a private key per site, and login is a signed challenge. There's no shared secret on the server to leak, and they're phishing-resistant because the browser binds the credential to the site's origin. Spring Security has had passkey support since 6.4.
+
+## Sessions vs tokens
+
+Once a user has proven who they are, you don't want them sending their password on every request. You give them something that stands in for "already logged in." There are two broad designs.
+
+### Server-side sessions
+
+The server creates a random, unguessable session ID, stores session data (user ID, roles, CSRF token, expiry) in a store, and sends only the ID to the browser in a cookie:
+
+```http
+HTTP/1.1 200 OK
+Set-Cookie: __Host-session=8f3c9a1e7b...; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400
+```
+
+On every later request the browser sends the cookie back automatically, and the server looks up the ID.
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant API as Backend
+    participant S as Session store (Redis)
+    participant DB as Users DB
+    B->>API: POST /login (email, password)
+    API->>DB: Load user and password hash
+    API->>API: Verify Argon2id hash
+    API->>S: SET session:8f3c... (user 42, roles) EX 86400
+    API-->>B: 200 + Set-Cookie session=8f3c...
+    B->>API: GET /orders (Cookie: session=8f3c...)
+    API->>S: GET session:8f3c...
+    S-->>API: user 42, roles
+    API-->>B: 200 orders for user 42
+```
+
+The cookie attributes do a lot of security work:
+
+- `HttpOnly`: JavaScript can't read the cookie, so an XSS bug can't simply steal it.
+- `Secure`: only sent over HTTPS.
+- `SameSite=Lax` (the default in modern browsers) or `Strict`: the browser won't attach the cookie to most cross-site requests, which is your main defence against CSRF.
+- The `__Host-` prefix: the browser only accepts the cookie if it's `Secure`, has `Path=/` and has no `Domain`, so a subdomain can't overwrite it.
+
+**Strengths:** instant revocation (delete the session row and the user is logged out everywhere), tiny cookie, and the server can change session data at any time.
+**Costs:** a lookup on every request, and the session store becomes shared state your stateless app servers depend on. In practice a Redis lookup costs well under a millisecond inside a datacenter, so the cost is rarely the problem people think it is.
+
+**CSRF.** Because browsers attach cookies automatically, a malicious site could make your user's browser send `POST /transfer` to your API with their cookie. `SameSite` cookies block most of this; for state-changing endpoints on cookie-authenticated APIs you should still use CSRF tokens (Spring Security does this by default) and never make state changes on `GET`.
+
+### Self-contained tokens (JWT)
+
+The alternative is to put the session data *in the token itself* and sign it, so any server holding the verification key can trust it without a lookup. The token travels in a header:
+
+```http
+GET /orders HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjIwMjYtMTAifQ.eyJzdWIiOiI0MiIs...
+```
+
+**Strengths:** no shared session store, verification is a CPU-only signature check, and the token works across services and domains (mobile apps, service-to-service calls, third-party APIs).
+**Costs:** you **can't easily revoke** a token before it expires, tokens are much bigger than a session ID (often 800+ bytes), and every claim you put in a token is stale the moment someone's role changes.
+
+### Choosing
+
+| Situation | Reasonable default |
+|---|---|
+| Server-rendered web app, or a SPA served from the same site as its API | Server-side session in an `HttpOnly` cookie |
+| Mobile apps and third-party clients | OAuth 2.0 access tokens (often JWTs) with refresh tokens |
+| Microservices calling each other | Short-lived tokens (JWT, or mTLS identities) |
+| You need instant "log out everywhere" | Sessions, or very short-lived tokens plus a revocation check |
+
+"JWTs are stateless and therefore scale better" is the argument you'll hear most. It's mostly overstated: a session lookup in Redis is cheap, and the moment you add a token denylist to support logout, you've reintroduced the lookup anyway. Choose based on who your clients are, not on fashion. For a deeper look at the token options, see [Authorization Tokens](/blog/authorization-tokens).
+
+## JWTs in depth
+
+A JSON Web Token (RFC 7519) is three base64url-encoded parts joined by dots: **header**, **payload** and **signature**.
+
+![Anatomy of a JWT: header, payload and signature segments, with the decoded JSON of each and what the signature covers](/images/blog/backend/backend-04-authentication-authorization-jwt-anatomy.svg)
+
+Decoded, a typical access token looks like this:
+
+```json
+{
+  "alg": "RS256",
+  "typ": "JWT",
+  "kid": "2026-10"
+}
+```
+
+```json
+{
+  "iss": "https://auth.example.com",
+  "sub": "42",
+  "aud": "orders-api",
+  "exp": 1793000400,
+  "iat": 1792999500,
+  "scope": "orders:read orders:write",
+  "tenant": "acme"
+}
+```
+
+The registered claims you must understand:
+
+- `iss` (issuer): who created the token. You must check it matches your trusted issuer.
+- `sub` (subject): the user or client the token is about. Use it as the stable user ID.
+- `aud` (audience): who the token is *for*. An API must reject tokens whose `aud` isn't itself, or a token issued for another service could be replayed against you.
+- `exp`, `iat`, `nbf`: expiry, issued-at and not-before, as Unix timestamps in seconds. Allow a small clock skew (a minute or so) when checking.
+
+### The payload is not secret
+
+The payload is **encoded, not encrypted**. Anyone who has the token can paste it into a decoder and read every claim. Never put passwords, personal data you wouldn't print in a log, or internal secrets in a JWT. (JWE, the encrypted variant, exists, but it's rarely what you want for access tokens.)
+
+### Signing: HS256 vs RS256/ES256
+
+- **HS256** uses one shared secret (HMAC) to sign *and* verify. Every service that verifies tokens can also mint them. Fine inside one application, risky across many.
+- **RS256** (RSA) and **ES256** (ECDSA P-256) use a private key to sign and a public key to verify. Only the auth server holds the private key; APIs only need the public key. This is the normal choice for anything distributed.
+
+Public keys are published as a **JWKS** (JSON Web Key Set) at a URL the issuer advertises. The `kid` header tells the verifier which key in the set was used, which is how key rotation works: the issuer publishes the new key, starts signing with it, and removes the old key once all tokens signed with it have expired.
+
+### Verifying a JWT
+
+Verification is a checklist, and skipping any item is a vulnerability:
+
+1. Parse the header and pick the key by `kid` from the issuer's JWKS.
+2. **Only accept the algorithms you expect.** Never let the token's own `alg` header choose the verification algorithm.
+3. Verify the signature.
+4. Check `exp` and `nbf` (with small skew), `iss` and `aud`.
+5. Only then read the claims and build the principal.
+
+Use a maintained library (Nimbus JOSE + JWT, which Spring Security uses, or `jjwt`). Don't parse JWTs by hand. RFC 8725, "JSON Web Token Best Current Practices," is the reference list of what goes wrong.
+
+<Callout variant="warning" title="Classic JWT vulnerabilities">
+- **`alg: none`**: some early libraries accepted unsigned tokens if the header said `none`.
+- **Algorithm confusion**: a verifier expecting RS256 is tricked into HS256 and uses the *public* key as the HMAC secret, which the attacker also has.
+- **Missing `aud` check**: a token for service A is accepted by service B.
+- **Decoding without verifying**: calling a "decode" function and trusting the result. This happens more than anyone admits.
+</Callout>
+
+### Lifetimes, refresh tokens and revocation
+
+Since you can't revoke a JWT cheaply, you keep access tokens **short-lived** (5 to 15 minutes is common) and pair them with a longer-lived **refresh token**. When the access token expires, the client sends the refresh token to the auth server and gets a fresh pair.
+
+![Timeline of an access token expiring every 15 minutes while a rotating refresh token issues new pairs, and a stolen refresh token being detected on reuse](/images/blog/backend/backend-04-authentication-authorization-token-lifetimes.svg)
+
+Refresh tokens are usually **opaque and stored server-side**, so they *can* be revoked. Use **refresh token rotation**: every refresh returns a new refresh token and invalidates the old one. If an old refresh token is ever presented again, someone has stolen it, so revoke the entire token family and force re-login.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active: login issues RT1
+    Active --> Rotated: client uses RT1, gets RT2
+    Rotated --> Active: RT2 is now the live token
+    Rotated --> Compromised: RT1 presented again
+    Compromised --> Revoked: revoke whole family
+    Active --> Revoked: logout or admin action
+    Active --> Expired: idle or absolute timeout
+    Revoked --> [*]
+    Expired --> [*]
+```
+
+If you truly need immediate revocation of access tokens (an employee is fired, an account is compromised), your options are: keep lifetimes short and accept a few minutes of exposure, keep a denylist of revoked `jti` (token ID) values in Redis that APIs check, or use opaque access tokens that APIs validate through the auth server's introspection endpoint (RFC 7662).
+
+Where should a browser app keep tokens? `localStorage` is readable by any script on the page, so an XSS bug leaks every token. A popular, safer pattern for SPAs is the **Backend-for-Frontend (BFF)**: a thin server-side component does the OAuth dance, keeps tokens server-side, and gives the browser an ordinary `HttpOnly` session cookie. You get the token model for your APIs and the cookie model for the browser.
+
+## OAuth 2.0 and OpenID Connect
+
+OAuth 2.0 (RFC 6749) is a **delegated authorization** framework. It was built for "let this app access my photos on that service without giving it my password." It is *not*, by itself, a login protocol. **OpenID Connect (OIDC)** is a thin identity layer on top of OAuth 2.0 that adds login: an **ID token** (always a JWT) that tells the client who the user is.
+
+The four roles:
+
+- **Resource owner:** the user.
+- **Client:** the application that wants access (your SPA, mobile app, or another service).
+- **Authorization server:** issues tokens (Keycloak, Auth0, Okta, Microsoft Entra ID, Google, Spring Authorization Server).
+- **Resource server:** your API, which accepts access tokens.
+
+### Authorization Code flow with PKCE
+
+This is the flow you should use for basically every app where a human logs in, including SPAs and mobile apps. PKCE (RFC 7636, pronounced "pixie") stops an attacker who intercepts the authorization code from exchanging it for tokens.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Client app
+    participant AS as Authorization server
+    participant API as Resource server (your API)
+    C->>C: Generate code_verifier, code_challenge = SHA256 of it
+    C->>U: Redirect to AS /authorize with code_challenge, state
+    U->>AS: Log in and consent
+    AS-->>C: Redirect back with ?code=abc and state
+    C->>C: Check state matches
+    C->>AS: POST /token (code, code_verifier)
+    AS->>AS: SHA256(code_verifier) equals stored challenge?
+    AS-->>C: access_token, refresh_token, id_token
+    C->>API: GET /orders + Bearer access_token
+    API->>API: Verify signature, iss, aud, exp, scope
+    API-->>C: 200 orders
+```
+
+The details that matter:
+
+- The **`code_verifier`** is a high-entropy random string (43 to 128 characters). The **`code_challenge`** is `BASE64URL(SHA256(code_verifier))`, sent with `code_challenge_method=S256`. Only the original client knows the verifier, so a stolen code is useless.
+- The **`state`** parameter is a random value the client checks on return, which prevents CSRF on the redirect.
+- The **`redirect_uri`** must exactly match one registered for the client.
+- **Confidential clients** (server-side apps) also authenticate with a client secret or private key. **Public clients** (SPAs, mobile apps) can't keep a secret, which is why PKCE is mandatory for them.
+
+Here is what the first redirect looks like on the wire:
+
+```http
+GET /authorize?response_type=code
+  &client_id=web-shop
+  &redirect_uri=https%3A%2F%2Fshop.example.com%2Fcallback
+  &scope=openid%20profile%20orders%3Aread
+  &state=Zx81kq
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256 HTTP/1.1
+Host: auth.example.com
+```
+
+### The other flows
+
+- **Client Credentials:** no user involved. A service authenticates as itself to get a token for another service. This is how backend jobs and service-to-service calls usually work.
+- **Device Authorization (RFC 8628):** for TVs and CLIs with no good browser. The device shows a code; the user approves on their phone.
+- **Implicit** and **Resource Owner Password Credentials** grants: deprecated. The OAuth 2.0 Security Best Current Practice (RFC 9700, published January 2025) says not to use them, and the OAuth 2.1 draft removes them.
+
+### ID token vs access token
+
+This distinction comes up in interviews constantly:
+
+| | ID token | Access token |
+|---|---|---|
+| Defined by | OpenID Connect | OAuth 2.0 |
+| Audience | The **client** | The **API** (resource server) |
+| Purpose | "This is who logged in" | "This caller may do X" |
+| Format | Always a JWT | JWT or opaque string |
+| Send it to your API? | **No** | Yes, as a Bearer token |
+
+OIDC providers publish their configuration at a well-known URL, `https://<issuer>/.well-known/openid-configuration`, which lists the authorization, token and JWKS endpoints. Libraries use this discovery document so you only need to configure the issuer.
+
+### Scopes vs permissions
+
+OAuth **scopes** (`orders:read`) describe what the *client application* is allowed to do on the user's behalf. They aren't a substitute for checking what the *user* is allowed to do. A token with `orders:read` still shouldn't let user 42 read user 43's orders. That's the job of your authorization layer, below.
+
+## Authorization models
+
+Once you know who the caller is, you need a policy. There are three families worth knowing.
+
+### RBAC: role-based access control
+
+Users get **roles**; roles get **permissions**. Checks ask "does this user have a role that grants `invoice:approve`?" It's simple to understand, easy to audit and covers most business apps.
+
+```mermaid
+erDiagram
+    USER ||--o{ USER_ROLE : has
+    ROLE ||--o{ USER_ROLE : "assigned via"
+    ROLE ||--o{ ROLE_PERMISSION : grants
+    PERMISSION ||--o{ ROLE_PERMISSION : "granted via"
+    USER {
+        bigint id PK
+        text email
+        text tenant_id
+    }
+    ROLE {
+        bigint id PK
+        text name
+    }
+    PERMISSION {
+        bigint id PK
+        text code
+    }
+```
+
+Check **permissions**, not role names, in code. `hasPermission("invoice:approve")` survives a reorganisation; `if (role == "FINANCE_MANAGER")` scattered across 40 files does not. RBAC's weakness is **role explosion**: when rules depend on context ("managers can approve invoices under 10,000 EUR in their own department"), you end up inventing roles like `FINANCE_MANAGER_BERLIN_UNDER_10K`.
+
+### ABAC: attribute-based access control
+
+ABAC evaluates a policy over attributes of the **subject** (department, clearance), the **resource** (owner, amount, status), the **action** and the **environment** (time, IP, device). The invoice rule above becomes one readable policy rather than a pile of roles. The cost is that policies are harder to audit ("who can see this document?" requires evaluating rules, not reading a table). Policy engines such as Open Policy Agent (Rego) and AWS Cedar exist for this.
+
+### ReBAC: relationship-based access control
+
+Google's Zanzibar paper (2019) described the system behind permissions for Drive, YouTube and others. Permissions derive from **relationships** in a graph: "user 42 is an `editor` of folder 7; document 9 is in folder 7; editors of a folder can edit its documents." It fits collaborative products (documents, projects, organisations with nested teams) well. Open-source implementations include OpenFGA and SpiceDB.
+
+### Object-level checks: the bug everyone ships
+
+The number one item on the OWASP API Security Top 10 is **Broken Object Level Authorization** (often called IDOR). The endpoint checks that you're logged in, but never checks that the object you asked for belongs to you:
+
+```kotlin
+// BAD: any logged-in user can read any order by guessing IDs
+@GetMapping("/orders/{id}")
+fun get(@PathVariable id: Long): OrderDto =
+    orders.findById(id).orElseThrow().toDto()
+
+// GOOD: scope the query by the authenticated principal
+@GetMapping("/orders/{id}")
+fun get(@PathVariable id: Long, @AuthenticationPrincipal jwt: Jwt): OrderDto =
+    orders.findByIdAndCustomerId(id, jwt.subject)
+        ?.toDto()
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+```
+
+Scoping the query is both safer and simpler than "load, then check." In multi-tenant systems, add the tenant ID to every query too (or use PostgreSQL row-level security as a second line of defence).
+
+### Where to enforce
+
+Enforce authorization **in the service that owns the data**, close to the data. An API gateway can reject unauthenticated traffic and check coarse scopes, which is useful defence in depth, but it can't know whether order 917 belongs to user 42. If the gateway is your only check, any internal caller that bypasses it bypasses your security.
+
+## Putting it together in Spring Boot 4
+
+Here is a resource server that validates JWTs from an OIDC provider. Spring Boot 4 ships with Spring Security 7.
+
+```yaml
+# application.yaml
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://auth.example.com/realms/acme
+          audiences: orders-api
+```
+
+With `issuer-uri` set, Spring fetches the discovery document, finds the JWKS URL, caches the keys, and validates signature, `exp`, `nbf` and `iss`. The `audiences` property adds the `aud` check.
+
+```kotlin
+import org.springframework.security.config.annotation.web.invoke
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+class SecurityConfig {
+
+    @Bean
+    fun filterChain(http: HttpSecurity): SecurityFilterChain {
+        http {
+            authorizeHttpRequests {
+                authorize("/actuator/health/**", permitAll)
+                authorize(HttpMethod.GET, "/orders/**", hasAuthority("SCOPE_orders:read"))
+                authorize(HttpMethod.POST, "/orders/**", hasAuthority("SCOPE_orders:write"))
+                authorize(anyRequest, authenticated)
+            }
+            oauth2ResourceServer { jwt { } }
+            sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
+            // Bearer tokens aren't sent automatically by browsers, so CSRF
+            // protection isn't needed for this stateless API.
+            csrf { disable() }
+        }
+        return http.build()
+    }
+}
+```
+
+Two details trip people up:
+
+- By default Spring maps each value in the `scope` (or `scp`) claim to an authority with a `SCOPE_` prefix. `hasRole("ADMIN")` looks for `ROLE_ADMIN` and won't match unless you register a `JwtAuthenticationConverter` that maps your provider's roles claim.
+- The Kotlin DSL (`http { ... }`) needs that explicit `invoke` import, or it won't compile.
+
+For rules that depend on the resource, method security keeps the check next to the business logic:
+
+```kotlin
+@Service
+class InvoiceService(private val invoices: InvoiceRepository) {
+
+    @PreAuthorize("hasAuthority('SCOPE_invoices:approve')")
+    @Transactional
+    fun approve(invoiceId: Long, approver: Jwt) {
+        val invoice = invoices.findByIdAndTenantId(invoiceId, approver.getClaimAsString("tenant"))
+            ?: throw NotFoundException()
+        check(invoice.amount <= approvalLimitFor(approver)) { "Above approval limit" }
+        invoice.approve(by = approver.subject)
+    }
+}
+```
+
+## Common mistakes
+
+- **Hashing passwords with SHA-256 or MD5**, salted or not. Use Argon2id, scrypt or bcrypt.
+- **Trusting a decoded JWT without verifying it**, or not checking `aud` and `iss`.
+- **Storing personal data in JWT claims**, forgetting that anyone can read them.
+- **Long-lived access tokens** (days or weeks) with no revocation story.
+- **Tokens in `localStorage`** in an app with any XSS exposure.
+- **Sending the ID token to your API** as if it were an access token.
+- **Checking authentication but not object ownership** (IDOR).
+- **Enforcing authorization only at the gateway.**
+- **Returning different errors for "no such user" and "wrong password"**, enabling account enumeration.
+- **Rolling your own crypto or OAuth server** when a maintained one (Keycloak, Spring Authorization Server, a managed IdP) exists.
+
+## Interview questions
+
+<details>
+<summary>What is the difference between authentication and authorization, and which HTTP status codes map to each?</summary>
+
+Authentication establishes identity ("who are you?"); authorization decides whether that identity may perform an action on a resource ("may you do this?"). A failed authentication returns `401 Unauthorized` with a `WWW-Authenticate` header; an authenticated caller who lacks permission gets `403 Forbidden`. A strong answer adds that APIs sometimes return `404` instead of `403` to avoid revealing that a resource exists, and that the output of authn is a principal which authz then evaluates.
+
+</details>
+
+<details>
+<summary>How should passwords be stored, and why isn't SHA-256 with a salt enough?</summary>
+
+Use a slow, preferably memory-hard password hashing function: Argon2id (OWASP minimum: 19 MiB, 2 iterations, parallelism 1), scrypt, or bcrypt with cost 10 or more. SHA-256 is designed to be fast, so an attacker with GPUs can test billions of guesses per second against a leaked hash; a salt prevents precomputed tables but doesn't slow per-guess brute force. Mention that the encoded hash stores algorithm, parameters and salt, which allows rehash-on-login when you raise the cost, and that bcrypt truncates input at 72 bytes.
+
+</details>
+
+<details>
+<summary>Sessions or JWTs: how do you choose?</summary>
+
+Sessions keep state server-side and give the client an opaque ID in an `HttpOnly` cookie: easy revocation, small cookie, but every request needs a store lookup. JWTs are self-contained and verified with a key, so no lookup, and they work across services and non-browser clients, but they can't be revoked before expiry without reintroducing state. A good answer picks sessions (or a BFF) for first-party browser apps and short-lived tokens for mobile, third-party and service-to-service, and notes the "stateless scales better" argument is weak because a Redis lookup is sub-millisecond.
+
+</details>
+
+<details>
+<summary>Walk me through verifying a JWT. What can go wrong?</summary>
+
+Select the key by `kid` from the issuer's JWKS, enforce an allow-list of algorithms (never trust the header's `alg`), verify the signature, then check `exp`/`nbf` with small clock skew, `iss` and `aud`, and only then trust claims. Known failures: accepting `alg: none`, RS256-to-HS256 algorithm confusion where the public key is used as an HMAC secret, skipping `aud` so tokens for other services are accepted, and decoding without verifying. Also: the payload is readable by anyone, so it must not contain secrets.
+
+</details>
+
+<details>
+<summary>How do you log a user out, or revoke access, when you use JWT access tokens?</summary>
+
+Keep access tokens short-lived (minutes) and revoke the refresh token server-side, so the user loses access when the current access token expires. For immediate revocation, maintain a denylist of `jti` values (or a per-user "tokens issued before X are invalid" timestamp) checked on each request, or use opaque tokens with introspection. Use refresh token rotation with reuse detection: if an already-used refresh token appears again, revoke the whole family because it was stolen.
+
+</details>
+
+<details>
+<summary>Explain the OAuth 2.0 Authorization Code flow with PKCE. What does PKCE protect against?</summary>
+
+The client generates a random `code_verifier`, sends `code_challenge = BASE64URL(SHA256(verifier))` with `S256` on the authorize redirect along with a random `state`. The user authenticates at the authorization server, which redirects back with a short-lived code. The client checks `state`, then exchanges the code plus the original verifier at the token endpoint; the server checks the hash matches. PKCE protects against authorization-code interception (for example a malicious app registered for the same custom URL scheme), because the attacker doesn't have the verifier. It's required for public clients and recommended for all clients by RFC 9700.
+
+</details>
+
+<details>
+<summary>What's the difference between OAuth 2.0 and OpenID Connect, and between an ID token and an access token?</summary>
+
+OAuth 2.0 is delegated authorization: it issues access tokens that let a client call an API. OIDC adds authentication on top: the `openid` scope, an ID token (a JWT about the user, audience is the client), the UserInfo endpoint and discovery. The ID token is for the client to learn who logged in and must not be sent to APIs; the access token is for the resource server. Mixing them up leads to APIs accepting tokens not meant for them.
+
+</details>
+
+<details>
+<summary>Compare RBAC, ABAC and ReBAC. When would you pick each?</summary>
+
+RBAC assigns permissions to roles and roles to users: simple and auditable, ideal for internal and B2B apps, but suffers role explosion when rules depend on context. ABAC evaluates policies over subject, resource, action and environment attributes: expressive (amount limits, department, time of day) but harder to audit; engines like OPA or Cedar help. ReBAC derives permissions from a relationship graph (Zanzibar, OpenFGA, SpiceDB) and fits sharing and nested hierarchies like documents and folders. Many real systems combine RBAC for coarse permissions with attribute or ownership checks per object.
+
+</details>
+
+<details>
+<summary>What is Broken Object Level Authorization (IDOR), and how do you prevent it systematically?</summary>
+
+It's when an endpoint authenticates the caller but doesn't verify they may access the specific object ID in the request, so changing `/orders/917` to `/orders/918` leaks another user's data. It's the top item in the OWASP API Security Top 10. Prevent it by scoping data access by the principal and tenant (`findByIdAndCustomerId`), enforcing in the owning service rather than only at the gateway, using non-sequential IDs as a minor extra, and writing tests that call endpoints as a second user and expect 403 or 404.
+
+</details>
+
+## Key takeaways
+
+- Authentication produces a principal; authorization evaluates `(principal, action, resource)`. `401` vs `403`.
+- Hash passwords with Argon2id (or scrypt/bcrypt), never with a fast hash. Store the encoded string and rehash on login when parameters change.
+- Sessions in `HttpOnly`, `Secure`, `SameSite` cookies are a great default for browser apps. Tokens shine for mobile, third-party and service-to-service calls.
+- A JWT is signed, not encrypted. Verify signature, algorithm, `iss`, `aud` and `exp`, and keep access tokens short-lived with rotating refresh tokens.
+- Use Authorization Code + PKCE for user login; Client Credentials for services; never Implicit or Password grants.
+- ID tokens are for clients; access tokens are for APIs. Scopes limit the client, not the user.
+- Check object-level permissions in the service that owns the data. IDOR is the most common API vulnerability.
+
+Previous: [Part 3: Database Fundamentals](/blog/backend-03-databases-fundamentals)
+
+Next: [Part 5: Caching](/blog/backend-05-caching)

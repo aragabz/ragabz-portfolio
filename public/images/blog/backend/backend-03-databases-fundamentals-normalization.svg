@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d">
+  <title id="t">Normalizing an orders table</title>
+  <desc id="d">A single wide table repeating customer and product data is split into four tables: customers, orders, order items and products, connected by foreign keys, so each fact is stored once.</desc>
+  <rect width="800" height="480" rx="16" fill="#0d1117"/>
+  <g font-family="Inter, system-ui, sans-serif">
+    <text x="32" y="44" font-size="18" font-weight="600" fill="#e6edf3">From one wide table to one fact in one place</text>
+
+    <!-- before -->
+    <text x="32" y="80" font-size="14" font-weight="600" fill="#f78166">Before: everything repeated in every row</text>
+    <rect x="32" y="92" width="736" height="104" rx="8" fill="#161b22" stroke="#f78166"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+      <text x="48" y="116" fill="#8b949e">order_id  customer_email    customer_name  products                 total</text>
+      <line x1="48" y1="126" x2="752" y2="126" stroke="#30363d"/>
+      <text x="48" y="148" fill="#e6edf3">42        ada@example.com   Ada            "Keyboard x1, Mouse x2"  12000</text>
+      <text x="48" y="174" fill="#e6edf3">43        ada@example.com   <tspan fill="#f78166">Ada Lovelace</tspan>   "Mouse x1"               2500</text>
+    </g>
+    <text x="32" y="218" font-size="13" fill="#8b949e">Two names for one customer, and product lists packed into a string you cannot query.</text>
+
+    <!-- arrow -->
+    <path d="M400 230 V256" stroke="#8b949e" stroke-width="2"/>
+    <path d="M393 250 L400 262 L407 250 Z" fill="#8b949e"/>
+
+    <!-- after -->
+    <text x="32" y="290" font-size="14" font-weight="600" fill="#7ee787">After (3NF): each fact stored once</text>
+
+    <g font-size="13">
+      <rect x="32" y="304" width="160" height="120" rx="8" fill="#161b22" stroke="#79c0ff"/>
+      <text x="48" y="328" font-weight="600" fill="#79c0ff">customers</text>
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#e6edf3">
+        <text x="48" y="354">id PK</text><text x="48" y="376">email UNIQUE</text><text x="48" y="398">name</text>
+      </g>
+
+      <rect x="224" y="304" width="160" height="120" rx="8" fill="#161b22" stroke="#d2a8ff"/>
+      <text x="240" y="328" font-weight="600" fill="#d2a8ff">orders</text>
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#e6edf3">
+        <text x="240" y="354">id PK</text><text x="240" y="376">customer_id FK</text><text x="240" y="398">created_at</text>
+      </g>
+
+      <rect x="416" y="304" width="168" height="120" rx="8" fill="#161b22" stroke="#7ee787"/>
+      <text x="432" y="328" font-weight="600" fill="#7ee787">order_items</text>
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#e6edf3">
+        <text x="432" y="354">order_id FK</text><text x="432" y="376">product_id FK</text><text x="432" y="398">qty, unit_price</text>
+      </g>
+
+      <rect x="616" y="304" width="152" height="120" rx="8" fill="#161b22" stroke="#f78166"/>
+      <text x="632" y="328" font-weight="600" fill="#f78166">products</text>
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#e6edf3">
+        <text x="632" y="354">id PK</text><text x="632" y="376">sku UNIQUE</text><text x="632" y="398">price</text>
+      </g>
+    </g>
+    <g stroke="#8b949e" stroke-width="1.5">
+      <line x1="192" y1="364" x2="224" y2="364"/>
+      <line x1="384" y1="364" x2="416" y2="364"/>
+      <line x1="584" y1="364" x2="616" y2="364"/>
+    </g>
+    <text x="32" y="452" font-size="13" fill="#8b949e">unit_price on order_items records what was paid, even after the product price changes.</text>
+  </g>
+</svg>
