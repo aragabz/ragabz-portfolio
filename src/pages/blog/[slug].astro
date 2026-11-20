@@ -1,11 +1,12 @@
 ---
 import { render } from 'astro:content';
+import { Image } from 'astro:assets';
+import profilePhoto from '../../assets/profile.jpg';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import Navbar from '../../components/Navbar.astro';
 import RelatedPosts from '../../components/RelatedPosts.astro';
 import LevelBadge from '../../components/LevelBadge.astro';
 import SeriesNav from '../../components/SeriesNav.astro';
-import { getVisibleBlogPosts } from '../../utils/blog';
+import { getVisibleBlogPosts, byNewest, readingTime, formatDate } from '../../utils/blog';
 
 export async function getStaticPaths() {
   const blogPosts = await getVisibleBlogPosts();
@@ -19,209 +20,128 @@ const { post } = Astro.props;
 const { Content, headings } = await render(post);
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 const articleURL = new URL(Astro.url.pathname, Astro.site);
+const allPosts = (await getVisibleBlogPosts()).sort(byNewest);
+
 const { series } = post.data;
 const seriesPosts = series
-  ? (await getVisibleBlogPosts())
+  ? allPosts
       .filter((p) => p.data.series === series)
       .sort((a, b) => (a.data.seriesOrder ?? 0) - (b.data.seriesOrder ?? 0))
   : [];
 const isSeries = Boolean(series) && seriesPosts.length > 1;
 
-interface TocNode {
-  depth: number;
-  slug: string;
-  text: string;
-  number?: string;
-  children: TocNode[];
-}
+// Standalone posts page through the whole blog by date; series posts use the series pager instead.
+const position = allPosts.findIndex((p) => p.id === post.id);
+const newer = position > 0 ? allPosts[position - 1] : undefined;
+const older = position < allPosts.length - 1 ? allPosts[position + 1] : undefined;
 
-function buildToc(headings: { depth: number; slug: string; text: string }[]): TocNode[] {
-  const root: TocNode[] = [];
-  const stack: TocNode[] = [];
-  for (const h of headings) {
-    const node: TocNode = { depth: h.depth, slug: h.slug, text: h.text, children: [] };
-    while (stack.length > 0 && stack[stack.length - 1].depth >= h.depth) {
-      stack.pop();
-    }
-    if (stack.length === 0) {
-      root.push(node);
-    } else {
-      stack[stack.length - 1].children.push(node);
-    }
-    stack.push(node);
-  }
-  return root;
-}
-
-function numberToc(nodes: TocNode[], parents: number[] = []): void {
-  let i = 0;
-  for (const node of nodes) {
-    i++;
-    node.number = [...parents, i].join('.');
-    numberToc(node.children, [...parents, i]);
-  }
-}
-
-const toc = buildToc(headings.filter(h => h.depth > 1 && h.depth <= 4));
-numberToc(toc);
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }).format(date);
-}
+// "On this page" lists the top-level sections only.
+const toc = headings.filter((h) => h.depth === 2);
 ---
 
-<BaseLayout 
+<BaseLayout
   title={post.data.title}
   description={post.data.excerpt}
   type="article"
   publishedDate={post.data.date}
 >
-  <a href="#main" class="skip-link">Skip to article</a>
-  <Navbar />
-
   <div class="reading-progress" aria-hidden="true"></div>
   <p class="sr-only" aria-live="polite" data-live-status></p>
 
-  <main id="main" tabindex="-1">
-  <article class="min-h-screen pt-24 pb-24 px-6" data-article={post.id}>
-    <div class="max-w-5xl mx-auto">
-      <div class="mb-12">
-        <a href={`${base}blog`} class="back-link">← All articles</a>
-      </div>
+  <main id="main-content" tabindex="-1" class="wrap post">
+  <article data-article={post.id}>
+    <header class="post-head">
+      <p class="mono post-meta-line">
+        <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+        <span aria-hidden="true">·</span>
+        <span>{readingTime(post)} min read</span>
+        <span aria-hidden="true">·</span>
+        <span>{post.data.tags.join(', ')}</span>
+      </p>
 
-      <header class="mb-14 max-w-[720px]">
-        <h1 data-pagefind-meta="title" class="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.08] font-bold tracking-tight mb-8 text-balance" style="color: var(--color-text);">
-          {post.data.title}
-        </h1>
+      <h1 data-pagefind-meta="title">{post.data.title}</h1>
+      <p class="standfirst">{post.data.excerpt}</p>
+      {post.data.level && <p class="post-level"><LevelBadge level={post.data.level} /></p>}
+    </header>
 
-        <p class="article-meta">
-          <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
-          <span aria-hidden="true">·</span>
-          <span>{post.data.readingTime || 5} min read</span>
-          {post.data.author && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>by {post.data.author}</span>
-            </>
-          )}
-        </p>
+    <div class="post-layout">
+      {toc.length > 0 && (
+        <nav class="toc-card" aria-labelledby="toc-heading">
+          <h2 id="toc-heading" class="mono-caps">On this page</h2>
+          <ol>
+            {toc.map((section) => (
+              <li><a href={`#${section.slug}`}>{section.text}</a></li>
+            ))}
+          </ol>
+        </nav>
+      )}
 
-        <div class="flex flex-wrap items-center gap-2 mt-6">
-          {post.data.level && <LevelBadge level={post.data.level} />}
-          {post.data.tags.map(tag => (
-            <span class="tag">{tag}</span>
-          ))}
-        </div>
-      </header>
-
-      <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:gap-16">
-        <div class="max-w-[720px] min-w-0">
-          {isSeries && (
-            <SeriesNav series={series!} posts={seriesPosts} currentId={post.id} variant="outline" />
-          )}
-
-          {toc.length > 0 && (
-            <details class="toc-mobile lg:hidden">
-              <summary>
-                <span>On this page</span>
-                <span class="toc-mobile-count">{toc.length} sections</span>
-              </summary>
-              <ol>
-                {toc.map(section => (
-                  <li>
-                    <a href={`#${section.slug}`} class="toc-link" data-toc-link>
-                      <span class="toc-num">{section.number}</span>
-                      {section.text}
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            </details>
-          )}
-
-          <div class="blog-content" data-pagefind-body>
-            <Content />
-          </div>
-
-          {isSeries && (
-            <SeriesNav series={series!} posts={seriesPosts} currentId={post.id} variant="pager" />
-          )}
-
-          <div class:list={['article-actions', { 'is-standalone': !isSeries }]}>
-            <div class="article-share">
-              <span class="article-share-label">Share</span>
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(articleURL.href)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="share-btn"
-              >X</a>
-              <a
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleURL.href)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="share-btn"
-              >LinkedIn</a>
-              <button type="button" class="share-btn" data-copy-link>Copy link</button>
-              <button type="button" class="share-btn" data-print>Print</button>
-            </div>
-            <a href={`${base}blog`} class="back-link">All articles</a>
-          </div>
-
-          <RelatedPosts currentSlug={post.id} currentTags={post.data.tags} currentSeries={isSeries ? series : undefined} />
-        </div>
-
-        {toc.length > 0 && (
-          <aside class="hidden lg:block" aria-label="Table of contents">
-            <nav class="toc" data-toc>
-              <p class="toc-label">On this page</p>
-              <ul class="toc-root">
-                {toc.map(section => (
-                  <li>
-                    <a href={`#${section.slug}`} class="toc-link toc-h2" data-toc-link>
-                      <span class="toc-num">{section.number}</span>
-                      {section.text}
-                    </a>
-                    {section.children.length > 0 && (
-                      <ul class="toc-sub">
-                        {section.children.map(sub => (
-                          <li>
-                            <a href={`#${sub.slug}`} class="toc-link toc-h3" data-toc-link>
-                              <span class="toc-num">{sub.number}</span>
-                              {sub.text}
-                            </a>
-                            {sub.children.length > 0 && (
-                              <ul class="toc-sub">
-                                {sub.children.map(detail => (
-                                  <li>
-                                    <a href={`#${detail.slug}`} class="toc-link toc-h4" data-toc-link>
-                                      <span class="toc-num">{detail.number}</span>
-                                      {detail.text}
-                                    </a>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </aside>
+      <div class="post-body">
+        {isSeries && (
+          <SeriesNav series={series!} posts={seriesPosts} currentId={post.id} variant="outline" />
         )}
+
+        <div class="blog-content" data-pagefind-body>
+          <Content />
+        </div>
+
+        <div class="article-actions">
+          <div class="article-share">
+            <span class="mono-caps">Share</span>
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(articleURL.href)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="share-btn"
+            >X</a>
+            <a
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleURL.href)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="share-btn"
+            >LinkedIn</a>
+            <button type="button" class="share-btn" data-copy-link>Copy link</button>
+            <button type="button" class="share-btn" data-print>Print</button>
+          </div>
+        </div>
+
+        <aside class="author-card" aria-label="About the author">
+          <Image src={profilePhoto} alt="" width={176} height={220} format="webp" quality={80} class="author-photo" loading="lazy" />
+          <div>
+            <p class="author-name">Ahmed Ragab</p>
+            <p class="author-line">Tech lead at VOIS. I build Android apps and the backends they talk to.</p>
+            <a href="mailto:ahmedragab.se@gmail.com" class="btn btn-primary">Email me</a>
+          </div>
+        </aside>
+
+        {isSeries ? (
+          <SeriesNav series={series!} posts={seriesPosts} currentId={post.id} variant="pager" />
+        ) : (
+          <nav class="post-pager" aria-label="Previous and next posts">
+            {older ? (
+              <a href={`${base}blog/${older.id}`}>
+                <span class="mono">← Previous post</span>
+                <span class="post-pager-title">{older.data.title}</span>
+              </a>
+            ) : <span />}
+            {newer && (
+              <a href={`${base}blog/${newer.id}`} class="is-next">
+                <span class="mono">Next post →</span>
+                <span class="post-pager-title">{newer.data.title}</span>
+              </a>
+            )}
+          </nav>
+        )}
+
+        <RelatedPosts currentSlug={post.id} currentTags={post.data.tags} currentSeries={isSeries ? series : undefined} />
+
+        <p class="post-back"><a href={`${base}blog`} class="text-link"><span aria-hidden="true">←&nbsp;</span> All posts</a></p>
       </div>
     </div>
   </article>
   </main>
 
-  <a href="#main" class="back-to-top" data-back-to-top aria-label="Back to top">
+  <a href="#main-content" class="back-to-top" data-back-to-top aria-label="Back to top">
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" /></svg>
   </a>
 
@@ -232,56 +152,548 @@ function formatDate(date: Date) {
       left: 0;
       height: 3px;
       width: 100%;
-      background: var(--color-accent);
+      background: var(--color-ink);
       transform-origin: 0 50%;
       transform: scaleX(0);
       z-index: 100;
     }
 
-    .back-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.875rem;
-      color: var(--color-text-secondary);
+    .post {
+      padding-block: 32px 64px;
+    }
+
+    /* ---- Header ---- */
+    .post-head {
+      max-width: 900px;
+      margin-bottom: 56px;
+    }
+
+    .post-meta-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 10px;
+      margin-bottom: 24px;
+    }
+
+    .post-head h1 {
+      font-size: clamp(2.125rem, 6.5vw, 4.75rem);
+      line-height: 1;
+      text-wrap: balance;
+    }
+
+    .standfirst {
+      max-width: 44rem;
+      margin-top: 24px;
+      font-size: clamp(1.125rem, 2vw, 1.375rem);
+      line-height: 1.5;
+      color: var(--color-body);
+    }
+
+    .post-level {
+      margin-top: 20px;
+    }
+
+    /* ---- Layout: article with the "On this page" card beside it (above it on small screens) ---- */
+    .post-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 32px;
+    }
+
+    .post-body {
+      min-width: 0;
+      max-width: 720px;
+    }
+
+    @media (min-width: 1024px) {
+      .post-layout {
+        grid-template-columns: minmax(0, 720px) minmax(0, 320px);
+        justify-content: space-between;
+        gap: 64px;
+      }
+
+      .toc-card {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .post-body {
+        grid-column: 1;
+        grid-row: 1;
+      }
+    }
+
+    /* Deliberately not sticky: it scrolls away with the top of the article. */
+    .toc-card {
+      align-self: start;
+      max-width: 720px;
+      padding: 24px;
+      border: 1px solid var(--color-hairline);
+      border-radius: var(--radius-card);
+      background: var(--color-card);
+    }
+
+    .toc-card h2 {
+      line-height: 1.5;
+    }
+
+    .toc-card ol {
+      margin: 10px 0 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: toc;
+    }
+
+    .toc-card li {
+      counter-increment: toc;
+      border-top: 1px solid var(--color-hairline);
+    }
+
+    .toc-card li:first-child {
+      border-top: 0;
+    }
+
+    .toc-card a {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      min-height: 44px;
+      padding: 10px 0;
+      font-size: 0.9375rem;
+      line-height: 1.35;
+      color: var(--color-ink);
       text-decoration: none;
-      transition: color 0.2s;
     }
 
-    .back-link:hover {
-      color: var(--color-accent-strong);
+    .toc-card a::before {
+      content: counter(toc, decimal-leading-zero);
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--color-muted);
     }
 
-    .article-meta {
+    .toc-card a:hover {
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+
+    /* ---- Prose ---- */
+    .blog-content {
+      color: var(--color-body);
+      font-size: 1.125rem;
+      line-height: 1.75;
+    }
+
+    .blog-content h1,
+    .blog-content h2,
+    .blog-content h3,
+    .blog-content h4,
+    .blog-content h5,
+    .blog-content h6 {
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      scroll-margin-top: 1.5rem;
+      text-wrap: balance;
+    }
+
+    .blog-content h1 {
+      font-size: clamp(2rem, 4vw, 2.5rem);
+      line-height: 1.05;
+    }
+
+    .blog-content h2 {
+      margin-top: 3.5rem;
+      font-size: clamp(1.75rem, 3.6vw, 2.375rem);
+      line-height: 1.05;
+    }
+
+    .blog-content h3 {
+      font-size: clamp(1.375rem, 2.4vw, 1.625rem);
+      line-height: 1.15;
+    }
+
+    .blog-content h4,
+    .blog-content h5,
+    .blog-content h6 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .blog-content p {
+      margin-bottom: 1.5rem;
+    }
+
+    .blog-content a {
+      color: var(--color-ink);
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 0.2em;
+    }
+
+    .blog-content a:hover {
+      background: var(--color-lime);
+    }
+
+    .blog-content ul,
+    .blog-content ol {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+
+    .blog-content li {
+      margin-bottom: 0.5rem;
+    }
+
+    .blog-content ul li { list-style-type: disc; }
+    .blog-content ol li { list-style-type: decimal; }
+    .blog-content li::marker { color: var(--color-muted); }
+
+    .blog-content strong {
+      font-weight: 600;
+      color: var(--color-ink);
+    }
+
+    /* Inline code: a sunken pill. */
+    .blog-content code {
+      padding: 0.1em 0.5em;
+      border-radius: 999px;
+      background-color: var(--color-sunken);
+      color: var(--color-ink);
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
+
+    /* ---- Code blocks: the dark card with a header bar ---- */
+    .code-block {
+      margin: 2.25rem 0;
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      background-color: var(--color-dark);
+    }
+
+    .code-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 4px 8px 4px 22px;
+      border-bottom: 1px solid var(--color-dark-rule);
+      font-family: var(--font-mono);
+    }
+
+    .code-lang {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-dark-muted);
+    }
+
+    .code-copy-btn {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--color-dark-rule);
+      border-radius: 999px;
+      background-color: transparent;
+      color: var(--color-dark-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .code-copy-btn:hover {
+      border-color: var(--color-dark-text);
+      color: var(--color-dark-text);
+    }
+
+    .code-copy-btn.copied {
+      border-color: var(--color-lime);
+      background-color: var(--color-lime);
+      color: var(--color-ink);
+    }
+
+    .code-copy-btn:focus-visible,
+    .code-block pre:focus-visible {
+      outline-color: var(--color-lime);
+      outline-offset: -3px;
+    }
+
+    .blog-content pre {
+      margin: 0;
+      padding: 20px 22px 24px;
+      overflow-x: auto;
+      border-radius: 0;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      line-height: 1.65;
+      tab-size: 2;
+    }
+
+    .blog-content pre code {
+      padding: 0;
+      border-radius: 0;
+      background-color: transparent;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    /* ---- Blockquotes: the lime "heads up" box ---- */
+    .blog-content blockquote {
+      margin: 2.25rem 0;
+      padding: 22px 26px;
+      border-radius: var(--radius-card);
+      background: var(--color-lime);
+      color: var(--color-ink);
+    }
+
+    .blog-content blockquote::before {
+      content: 'Heads up';
+      display: block;
+      margin-bottom: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .blog-content blockquote > :last-child {
+      margin-bottom: 0;
+    }
+
+    /* On lime, mark links and code with ink rather than more lime or grey. */
+    .blog-content blockquote a:hover,
+    .callout a:hover {
+      background: var(--color-ink);
+      color: var(--color-lime);
+    }
+
+    .blog-content blockquote code,
+    .callout code {
+      background-color: rgb(18 18 18 / 0.1);
+    }
+
+    .blog-content img {
+      margin: 2.25rem 0;
+      border: 1px solid var(--color-hairline);
+      border-radius: var(--radius-card);
+    }
+
+    .blog-content img[src$=".svg"] {
+      width: 100%;
+      height: auto;
+      border: none;
+      border-radius: 0;
+    }
+
+    .figure-link {
+      display: block;
+      margin: 2.25rem 0;
+      cursor: zoom-in;
+    }
+
+    .figure-link img {
+      margin: 0 !important;
+    }
+
+    .blog-content .figure-link,
+    .blog-content .figure-link:hover {
+      background: none;
+      text-decoration: none;
+    }
+
+    .blog-content details {
+      margin: 1rem 0;
+      padding: 4px 20px;
+      border: 1px solid var(--color-hairline);
+      border-radius: 16px;
+      background: var(--color-card);
+    }
+
+    .blog-content summary {
+      min-height: 44px;
+      padding-block: 9px;
+      cursor: pointer;
+      font-weight: 500;
+      color: var(--color-ink);
+    }
+
+    .blog-content details[open] > summary {
+      margin-bottom: 0.5rem;
+    }
+
+    .blog-content hr {
+      height: 1rem;
+      margin: 3.5rem 0;
+      border: none;
+      text-align: center;
+    }
+
+    .blog-content hr::before {
+      content: '· · ·';
+      padding-left: 1.2em;
+      font-size: 0.875rem;
+      letter-spacing: 1.2em;
+      color: var(--color-muted);
+    }
+
+    .table-scroll {
+      margin: 2.25rem 0;
+      overflow-x: auto;
+      border: 1px solid var(--color-hairline);
+      border-radius: 16px;
+      background: var(--color-card);
+    }
+
+    .blog-content table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+    }
+
+    .blog-content td {
+      min-width: 8rem;
+    }
+
+    .blog-content td:first-child {
+      min-width: 6rem;
+    }
+
+    .blog-content th,
+    .blog-content td {
+      padding: 12px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--color-hairline);
+    }
+
+    .blog-content th {
+      background-color: var(--color-sunken);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-ink);
+    }
+
+    .blog-content tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* ---- Article end ---- */
+    .article-actions {
+      margin-top: 3.5rem;
+      padding-top: 1.5rem;
+      border-top: 2px solid var(--color-ink);
+    }
+
+    .article-share {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.5rem 0.75rem;
-      font-size: 0.875rem;
-      color: var(--color-text-tertiary);
+      gap: 8px;
     }
 
-    .skip-link {
-      position: fixed;
-      top: 0.75rem;
-      left: 0.75rem;
-      z-index: 200;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      background: var(--color-text);
-      color: var(--color-bg);
-      font-size: 0.875rem;
-      font-weight: 600;
+    .article-share .mono-caps {
+      margin-right: 6px;
+    }
+
+    .share-btn {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid var(--color-hairline);
+      border-radius: 999px;
+      background: var(--color-card);
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: var(--color-ink);
       text-decoration: none;
-      transform: translateY(-200%);
+      cursor: pointer;
     }
 
-    .skip-link:focus-visible {
-      transform: none;
+    .share-btn:hover {
+      border-color: var(--color-ink);
     }
 
-    #main:focus {
-      outline: none;
+    .author-card {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-top: 2rem;
+      padding: 24px;
+      border: 1px solid var(--color-hairline);
+      border-radius: var(--radius-card);
+      background: var(--color-card);
+    }
+
+    .author-photo {
+      flex-shrink: 0;
+      width: 88px;
+      height: 110px;
+      object-fit: cover;
+      object-position: center 15%;
+      border-radius: 16px;
+    }
+
+    .author-name {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--color-ink);
+    }
+
+    .author-line {
+      margin-block: 6px 16px;
+      font-size: 1rem;
+    }
+
+    .post-pager {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 2rem;
+    }
+
+    .post-pager a {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 18px 22px;
+      border: 1px solid var(--color-hairline);
+      border-radius: var(--radius-card);
+      background: var(--color-card);
+      color: var(--color-ink);
+      text-decoration: none;
+    }
+
+    .post-pager a:hover {
+      border-color: var(--color-ink);
+    }
+
+    .post-pager a.is-next {
+      grid-column: 2;
+      text-align: right;
+    }
+
+    .post-pager-title {
+      font-weight: 500;
+      line-height: 1.3;
+      text-wrap: balance;
+    }
+
+    .post-back {
+      margin-top: 2rem;
     }
 
     .back-to-top {
@@ -293,14 +705,14 @@ function formatDate(date: Date) {
       place-items: center;
       width: 2.75rem;
       height: 2.75rem;
+      border: 1.5px solid var(--color-ink);
       border-radius: 999px;
-      border: 1px solid var(--color-border-secondary);
-      background: var(--color-bg);
-      color: var(--color-text-secondary);
+      background: var(--color-card);
+      color: var(--color-ink);
       opacity: 0;
       transform: translateY(0.5rem);
       pointer-events: none;
-      transition: opacity 0.2s ease-out, transform 0.2s ease-out, color 0.2s, border-color 0.2s;
+      transition: opacity 0.2s ease-out, transform 0.2s ease-out;
     }
 
     .back-to-top.is-visible {
@@ -310,516 +722,40 @@ function formatDate(date: Date) {
     }
 
     .back-to-top:hover {
-      color: var(--color-accent-strong);
-      border-color: var(--color-accent-strong);
-    }
-
-    .tag {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.875rem;
-      border-radius: 999px;
-      color: var(--color-text-secondary);
-      background: transparent;
-      border: 1px solid var(--color-border);
-    }
-
-    /* ---- Table of contents ---- */
-    .toc {
-      position: sticky;
-      top: 6rem;
-      max-height: calc(100vh - 7.5rem);
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      padding-right: 0.25rem;
-      font-size: 0.875rem;
-      scrollbar-width: thin;
-    }
-
-    .toc-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--color-text-tertiary);
-      margin-bottom: 0.875rem;
-    }
-
-    /* Once the script runs, only the current section's subsections stay expanded. */
-    .toc[data-ready] li:not(.is-open) > .toc-sub {
-      display: none;
-    }
-
-    .toc-mobile {
-      margin: 0 0 3rem;
-      border: 1px solid var(--color-border);
-      border-radius: 0.75rem;
-    }
-
-    .toc-mobile summary {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 1rem;
-      padding: 0.875rem 1.25rem;
-      font-weight: 600;
-      color: var(--color-text);
-      cursor: pointer;
-      list-style: none;
-      border-radius: 0.75rem;
-    }
-
-    .toc-mobile summary::-webkit-details-marker { display: none; }
-
-    .toc-mobile-count {
-      font-size: 0.875rem;
-      font-weight: 400;
-      color: var(--color-text-tertiary);
-    }
-
-    .toc-mobile ol {
-      margin: 0;
-      padding: 0 0.75rem 0.75rem 0.375rem;
-      list-style: none;
-      font-size: 0.9375rem;
-    }
-
-    .toc-mobile .toc-link {
-      border-left: none;
-      padding: 0.5rem 0.875rem;
-      border-radius: 0.5rem;
-    }
-
-    .toc-mobile .toc-link.active {
-      background: var(--color-bg-secondary);
-    }
-
-    .toc ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    .toc-root {
-      border-left: 1px solid var(--color-border);
-    }
-
-    .toc-link {
-      display: flex;
-      align-items: baseline;
-      gap: 0.5rem;
-      padding: 0.3125rem 0 0.3125rem 0.875rem;
-      margin-left: -1px;
-      border-left: 1px solid transparent;
-      color: var(--color-text-secondary);
-      text-decoration: none;
-      line-height: 1.4;
-      transition: color 0.2s, border-color 0.2s;
-    }
-
-    .toc-link:hover {
-      color: var(--color-text);
-    }
-
-    .toc-link.active {
-      color: var(--color-accent-strong);
-      border-left-color: var(--color-accent-strong);
-    }
-
-    .toc-num {
-      flex-shrink: 0;
-      font-size: 0.75em;
-      color: var(--color-text-tertiary);
-    }
-
-    .toc-link.active .toc-num {
-      color: var(--color-accent-strong);
-    }
-
-    .toc-h3 { padding-left: 2rem; }
-    .toc-h4 { padding-left: 3.25rem; }
-
-    /* ---- Article end ---- */
-    .article-actions {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-top: 2rem;
-    }
-
-    .article-actions.is-standalone {
-      margin-top: 4rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--color-border);
-    }
-
-    .article-share {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .article-share-label {
-      margin-right: 0.25rem;
-      font-size: 0.875rem;
-      color: var(--color-text-tertiary);
-    }
-
-    .share-btn {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.375rem 0.875rem;
-      border-radius: 999px;
-      font-size: 0.875rem;
-      background: transparent;
-      color: var(--color-text-secondary);
-      border: 1px solid var(--color-border);
-      text-decoration: none;
-      cursor: pointer;
-      transition: color 0.2s, border-color 0.2s;
-    }
-
-    .share-btn:hover {
-      color: var(--color-accent-strong);
-      border-color: var(--color-accent-strong);
-    }
-
-    /* ---- Article prose ---- */
-    .blog-content {
-      color: var(--color-text);
-      font-size: 1.125rem;
-      line-height: 1.8;
-    }
-
-    .blog-content h1,
-    .blog-content h2,
-    .blog-content h3,
-    .blog-content h4,
-    .blog-content h5,
-    .blog-content h6 {
-      color: var(--color-text);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-      margin-top: 3rem;
-      margin-bottom: 1.125rem;
-      scroll-margin-top: 6rem;
-      text-wrap: balance;
-    }
-
-    .blog-content h1 {
-      font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.25rem);
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .blog-content h2 {
-      font-size: clamp(1.5rem, 1.25rem + 1.1vw, 1.875rem);
-      position: relative;
-      padding-bottom: 0.875rem;
-    }
-
-    .blog-content h2::after {
-      content: '';
-      position: absolute;
-      left: 0;
-      bottom: 0;
-      width: 3.5rem;
-      height: 3px;
-      border-radius: 999px;
-      background: var(--color-accent);
-    }
-
-    .blog-content h3 {
-      font-size: clamp(1.3125rem, 1.15rem + 0.7vw, 1.5rem);
-    }
-
-    .blog-content h4 {
-      font-size: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
-      color: var(--color-accent-strong);
-    }
-
-    .blog-content h5,
-    .blog-content h6 { font-size: 1.125rem; }
-
-    .blog-content p {
-      margin-bottom: 1.75rem;
-      line-height: 1.8;
-    }
-
-    .blog-content a {
-      color: var(--color-accent-strong);
-      text-decoration: underline;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 0.2em;
-      transition: text-decoration-thickness 0.2s;
-    }
-
-    .blog-content a:hover {
-      text-decoration-thickness: 2px;
-    }
-
-    .blog-content ul,
-    .blog-content ol {
-      margin-bottom: 1.75rem;
-      padding-left: 1.5rem;
-    }
-
-    .blog-content li {
-      margin-bottom: 0.625rem;
-      line-height: 1.8;
-    }
-
-    .blog-content ul li { list-style-type: disc; }
-    .blog-content ol li { list-style-type: decimal; }
-
-    .blog-content code {
-      background-color: var(--color-bg-tertiary);
-      color: var(--color-accent-strong);
-      padding: 0.2em 0.45em;
-      border-radius: 0.375rem;
-      font-size: 0.85em;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    }
-
-    .blog-content pre {
-      margin: 0;
-      padding: 1.25rem 1.5rem;
-      overflow-x: auto;
-      border-radius: 0;
-      line-height: 1.6;
-      font-size: 0.875rem;
-      tab-size: 2;
-    }
-
-    .blog-content pre code {
-      background-color: transparent;
-      padding: 0;
-      border-radius: 0;
-      color: inherit;
-      font-size: inherit;
-    }
-
-    .code-block {
-      margin: 2.5rem 0;
-      border-radius: 0.75rem;
-      overflow: hidden;
-      border: 1px solid var(--color-border);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
-      background-color: #24292e;
-    }
-
-    .code-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.625rem 1rem;
-      background-color: #1f2428;
-      border-bottom: 1px solid #343a40;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    }
-
-    .code-lang {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #8b949e;
-    }
-
-    .code-copy-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.375rem;
-      padding: 0.3125rem 0.75rem;
-      border-radius: 0.375rem;
-      border: 1px solid #3d444d;
-      background-color: transparent;
-      color: #c9d1d9;
-      font-size: 0.75rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    /* github-dark comments (#6a737d) are 3:1 on the code surface; lift them to readable contrast. */
-    .blog-content pre span[style*="#6A737D" i] {
-      color: #8b949e !important;
-    }
-
-    .code-copy-btn:hover {
-      background-color: #30363d;
-      color: #ffffff;
-    }
-
-    .code-copy-btn.copied {
-      background-color: var(--color-accent-strong);
-      border-color: var(--color-accent-strong);
-      color: #ffffff;
-    }
-
-    .blog-content blockquote {
-      margin: 2.5rem 0;
-      padding-left: 1.5rem;
-      border-left: 2px solid var(--color-accent);
-      font-style: italic;
-      font-size: 1.25rem;
-      line-height: 1.6;
-      color: var(--color-text-secondary);
-    }
-
-    .blog-content img {
-      border-radius: 0.75rem;
-      margin: 2.5rem 0;
-      border: 1px solid var(--color-border);
-    }
-
-    .blog-content details {
-      margin: 1rem 0;
-      padding: 0.875rem 1.125rem;
-      border: 1px solid var(--color-border);
-      border-radius: 0.75rem;
-      background: var(--color-bg-secondary);
-    }
-
-    .blog-content details[open] {
-      padding-bottom: 0.25rem;
-    }
-
-    .blog-content summary {
-      cursor: pointer;
-      font-weight: 600;
-      color: var(--color-text);
-    }
-
-    .blog-content summary::marker {
-      color: var(--color-accent-strong);
-    }
-
-    .blog-content details[open] > summary {
-      margin-bottom: 0.75rem;
-    }
-
-    .blog-content img[src$=".svg"] {
-      width: 100%;
-      height: auto;
-      border: none;
-    }
-
-    .figure-link {
-      display: block;
-      margin: 2.5rem 0;
-      border-radius: 0.75rem;
-      cursor: zoom-in;
-    }
-
-    .figure-link img {
-      margin: 0 !important;
-    }
-
-    .blog-content .figure-link {
-      text-decoration: none;
-    }
-
-    .blog-content hr {
-      border: none;
-      height: 1rem;
-      margin: 3.5rem 0;
-      text-align: center;
-      position: relative;
-    }
-
-    .blog-content hr::before {
-      content: '· · ·';
-      color: var(--color-text-tertiary);
-      letter-spacing: 1.2em;
-      padding-left: 1.2em;
-      font-size: 0.875rem;
-    }
-
-    .table-scroll {
-      margin: 2.5rem 0;
-      overflow-x: auto;
-      border: 1px solid var(--color-border);
-      border-radius: 0.75rem;
-      /* Scroll shadows: the cover gradients scroll with the content, the shadows stay put. */
-      background:
-        linear-gradient(to right, var(--color-bg), var(--color-bg)) left / 1.5rem 100% no-repeat local,
-        linear-gradient(to left, var(--color-bg), var(--color-bg)) right / 1.5rem 100% no-repeat local,
-        radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.14), transparent) left / 0.75rem 100% no-repeat scroll,
-        radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.14), transparent) right / 0.75rem 100% no-repeat scroll;
-    }
-
-    .blog-content table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      font-size: 0.9375rem;
-    }
-
-    .blog-content > table {
-      margin: 2.5rem 0;
-      border: 1px solid var(--color-border);
-      border-radius: 0.75rem;
-    }
-
-    .blog-content td {
-      min-width: 8rem;
-    }
-
-    .blog-content td:first-child {
-      min-width: 6rem;
-    }
-
-    .blog-content thead {
-      background-color: var(--color-bg-tertiary);
-    }
-
-    .blog-content th,
-    .blog-content td {
-      padding: 0.875rem 1.125rem;
-      text-align: left;
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .blog-content th {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--color-text-secondary);
-    }
-
-    .blog-content tbody tr:nth-child(even) {
-      background-color: color-mix(in srgb, var(--color-bg-secondary) 85%, transparent);
-    }
-
-    .blog-content tbody tr:hover {
-      background-color: var(--color-bg-tertiary);
-    }
-
-    .blog-content tbody tr:last-child td {
-      border-bottom: none;
-    }
-
-    .blog-content strong {
-      font-weight: 600;
-      color: var(--color-text);
-    }
-
-    .blog-content em {
-      font-style: italic;
-    }
-
-    @media (max-width: 768px) {
-      .blog-content { font-size: 1rem; }
-
-      .code-block {
-        margin-left: -1.5rem;
-        margin-right: -1.5rem;
-        border-radius: 0;
+      background: var(--color-ink);
+      color: var(--color-dark-text);
+    }
+
+    @media (max-width: 640px) {
+      .blog-content { font-size: 1.0625rem; }
+
+      .code-block,
+      .blog-content blockquote {
+        border-radius: 16px;
+      }
+
+      .blog-content pre {
+        padding-inline: 16px;
+        font-size: 0.8125rem;
+      }
+
+      .code-toolbar {
+        padding-left: 16px;
+      }
+
+      .author-card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .post-pager {
+        grid-template-columns: 1fr;
+      }
+
+      .post-pager a.is-next {
+        grid-column: 1;
+        order: -1;
+        text-align: left;
       }
 
       .back-to-top {
@@ -827,14 +763,15 @@ function formatDate(date: Date) {
         bottom: 1rem;
       }
 
-      /* Printing from a phone is rare; dropping it keeps the share row on one line. */
+      /* Printing from a phone is rare; dropping it keeps the share row short. */
       .share-btn[data-print] {
         display: none;
       }
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      .back-to-top { transition: none; }
+    @media print {
+      .site-header, .site-footer, .toc-card, .article-actions, .author-card, .post-pager,
+      .series-end, .related, .post-back, .back-to-top, .reading-progress, .code-copy-btn { display: none !important; }
     }
   </style>
 
@@ -885,6 +822,8 @@ function formatDate(date: Date) {
         const lang = document.createElement('span');
         lang.className = 'code-lang';
         lang.textContent = pre.dataset.language || 'code';
+        // The card has rounded corners, so keyboard users need to be able to scroll long lines.
+        pre.tabIndex = 0;
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -958,14 +897,6 @@ function formatDate(date: Date) {
 
       const progress = document.querySelector<HTMLElement>('.reading-progress');
       const backToTop = document.querySelector<HTMLElement>('[data-back-to-top]');
-      const toc = document.querySelector<HTMLElement>('[data-toc]');
-      const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
-      const headings = Array.from(
-        new Set(tocLinks.map((link) => link.getAttribute('href')!.slice(1))),
-      )
-        .map((id) => document.getElementById(id))
-        .filter((el): el is HTMLElement => el !== null);
-
       // Read state in the series outline.
       const read = readPosts();
       document.querySelectorAll<HTMLElement>('[data-series-outline] li[data-post-id]').forEach((li) => {
@@ -974,8 +905,6 @@ function formatDate(date: Date) {
       });
       let markedRead = read.includes(postId);
 
-      toc?.setAttribute('data-ready', '');
-      let activeId: string | undefined;
       let frame = 0;
 
       const update = () => {
@@ -990,44 +919,6 @@ function formatDate(date: Date) {
           markRead(postId);
           markedRead = true;
         }
-
-        if (headings.length === 0) return;
-        const atBottom = window.innerHeight + window.scrollY >= doc.scrollHeight - 4;
-        let current = headings[0].id;
-        if (atBottom) {
-          current = headings[headings.length - 1].id;
-        } else {
-          for (const heading of headings) {
-            if (heading.getBoundingClientRect().top <= 120) current = heading.id;
-            else break;
-          }
-        }
-        if (current === activeId) return;
-        activeId = current;
-
-        tocLinks.forEach((link) => {
-          const isActive = link.getAttribute('href') === `#${current}`;
-          link.classList.toggle('active', isActive);
-          if (isActive) link.setAttribute('aria-current', 'location');
-          else link.removeAttribute('aria-current');
-        });
-
-        if (toc) {
-          toc.querySelectorAll('li.is-open').forEach((li) => li.classList.remove('is-open'));
-          const active = toc.querySelector<HTMLElement>('.toc-link.active');
-          let li = active?.closest('li');
-          while (li && toc.contains(li)) {
-            li.classList.add('is-open');
-            li = li.parentElement?.closest('li');
-          }
-          // Keep the active entry visible inside the scrollable TOC.
-          if (active) {
-            const top = active.offsetTop;
-            if (top < toc.scrollTop + 48 || top > toc.scrollTop + toc.clientHeight - 48) {
-              toc.scrollTo({ top: top - toc.clientHeight / 3, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
-            }
-          }
-        }
       };
 
       const schedule = () => {
@@ -1037,17 +928,10 @@ function formatDate(date: Date) {
       window.addEventListener('resize', schedule, { passive: true, signal });
       update();
 
-      // Mobile "On this page": close after jumping to a section.
-      document.querySelectorAll<HTMLDetailsElement>('.toc-mobile').forEach((details) => {
-        details.addEventListener('click', (event) => {
-          if ((event.target as HTMLElement).closest('a')) details.open = false;
-        }, { signal });
-      });
-
       backToTop?.addEventListener('click', (event) => {
         event.preventDefault();
         window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
-        document.getElementById('main')?.focus({ preventScroll: true });
+        document.getElementById('main-content')?.focus({ preventScroll: true });
       }, { signal });
 
       document.querySelectorAll<HTMLButtonElement>('[data-copy-link]').forEach((btn) => {

@@ -1,52 +1,433 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import Navbar from '../../components/Navbar.astro';
-import BlogFilter from '../../components/react/BlogFilter';
-import { getVisibleBlogPosts, byNewest } from '../../utils/blog';
-import { getTopics, getLanguages } from '../../utils/blogFacets';
+import LevelBadge from '../../components/LevelBadge.astro';
+import { getVisibleBlogPosts, byNewest, readingTime, formatDate } from '../../utils/blog';
+import { getTopics, TOPICS } from '../../utils/blogFacets';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 
-const blogPosts = (await getVisibleBlogPosts())
-  .sort(byNewest);
-
-// Serialize dates for React client component hydration compatibility
-const serializedPosts = blogPosts.map(post => ({
-  id: post.id,
-  data: {
-    title: post.data.title,
-    excerpt: post.data.excerpt,
-    date: post.data.date.toISOString(),
-    readingTime: post.data.readingTime,
-    tags: post.data.tags || [],
-    draft: post.data.draft,
-    level: post.data.level,
-    topics: getTopics(post.data.tags || []),
-    languages: getLanguages(post.body),
-  }
+const posts = (await getVisibleBlogPosts()).sort(byNewest).map((post) => ({
+  post,
+  topics: getTopics(post.data.tags),
+  // Everything the search box matches against, lower-cased once at build time.
+  haystack: [post.data.title, post.data.excerpt, ...post.data.tags].join(' ').toLowerCase(),
 }));
+
+// Topic chips: the topics derived from tags (blogFacets.ts), only those with at least one post.
+const topics = TOPICS.filter((topic) => posts.some((p) => p.topics.includes(topic)));
+
+// Pagination is client-side so the search and topic filters keep working across every post.
+// All rows stay in the HTML (crawlers, no-JS); rows past the first page start out hidden.
+const PAGE_SIZE = 10;
 ---
 
-<BaseLayout 
-  title="Blog - Thoughts on Development & Tech"
-  description="Articles about software development, tech, and learning"
+<BaseLayout
+  title="Writing - Ahmed Ragab"
+  description="Long, practical guides on Kotlin, Android, backend engineering, system design and Rust."
 >
-  <Navbar />
+  <main id="main-content" tabindex="-1" class="wrap blog-index" data-blog-index data-page-size={PAGE_SIZE}>
+    <header class="blog-head">
+      <h1>Writing</h1>
+      <p>
+        Long guides, written for the version of me who was stuck on the same problem. Grab a coffee, some of these
+        are 50 minutes.
+      </p>
+    </header>
 
-  <div class="min-h-screen py-12 px-6">
-    <div class="max-w-container mx-auto">
-      <!-- Header -->
-      <header class="mb-12">
-        <h1 class="text-4xl md:text-5xl font-bold mb-3" style="color: var(--color-text);">
-          Blog
-        </h1>
-        <p class="text-lg" style="color: var(--color-text-secondary);">
-          Thoughts on software development, tech, and continuous learning
-        </p>
-      </header>
+    <div class="blog-tools">
+      <div class="blog-search">
+        <label for="post-search" class="mono-caps">Search posts</label>
+        <input id="post-search" type="search" autocomplete="off" placeholder="coroutines, Kafka, migrations…" data-post-search />
+      </div>
 
-      <!-- Blog Posts Filter & Search Component -->
-      <BlogFilter client:load posts={serializedPosts} base={base} />
+      <div role="group" aria-label="Filter by topic" class="topic-chips">
+        <button type="button" class="topic-chip" aria-pressed="true" data-topic="">all posts</button>
+        {topics.map((topic) => (
+          <button type="button" class="topic-chip" aria-pressed="false" data-topic={topic}>{topic}</button>
+        ))}
+      </div>
+
+      <p class="mono" aria-live="polite" data-post-count>{posts.length} posts</p>
     </div>
-  </div>
+
+    <ul class="post-list">
+      {posts.map(({ post, topics, haystack }, index) => (
+        <li class="post-row" data-post data-topics={topics.join('|')} data-haystack={haystack} hidden={index >= PAGE_SIZE}>
+          <p class="mono post-row-meta">
+            <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+            <span>{readingTime(post)} min read</span>
+          </p>
+          <div>
+            <h2><a href={`${base}blog/${post.id}`}>{post.data.title}</a></h2>
+            <p class="post-row-excerpt">{post.data.excerpt}</p>
+            <div class="post-row-tags">
+              {post.data.level && <LevelBadge level={post.data.level} />}
+              {post.data.tags.slice(0, 3).map((tag) => <span class="chip">{tag}</span>)}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+
+    <p class="post-empty" hidden data-post-empty>No posts match that yet. Maybe it's the next one.</p>
+
+    <nav class="pager" aria-label="Pagination" hidden data-pager></nav>
+
+    <noscript>
+      <style is:global>
+        .post-row[hidden] {
+          display: grid !important;
+        }
+      </style>
+    </noscript>
+
+    <section class="rss-block on-dark" aria-labelledby="rss-heading">
+      <h2 id="rss-heading">New post when there's something worth 50 minutes.</h2>
+      <a href={`${base}rss.xml`} class="btn btn-lime">Subscribe via RSS</a>
+    </section>
+  </main>
 </BaseLayout>
+
+<style>
+  .blog-index {
+    padding-block: 40px 64px;
+  }
+
+  .blog-head h1 {
+    font-size: clamp(4rem, 15vw, 10rem);
+    line-height: 0.9;
+  }
+
+  .blog-head p {
+    max-width: 36rem;
+    margin-top: 28px;
+    font-size: 1.125rem;
+  }
+
+  .blog-tools {
+    display: grid;
+    gap: 20px;
+    margin-block: 48px 8px;
+  }
+
+  .blog-search {
+    display: grid;
+    gap: 8px;
+    max-width: 30rem;
+  }
+
+  .blog-search input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 20px;
+    border: 1.5px solid var(--color-ink);
+    border-radius: 999px;
+    background: var(--color-card);
+    font-size: 1rem;
+    color: var(--color-ink);
+  }
+
+  .blog-search input::placeholder {
+    color: var(--color-muted);
+  }
+
+  .topic-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topic-chip {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1.5px solid var(--color-hairline);
+    border-radius: 999px;
+    background: var(--color-card);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+
+  .topic-chip:hover {
+    border-color: var(--color-ink);
+  }
+
+  .topic-chip[aria-pressed='true'] {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
+    color: var(--color-dark-text);
+  }
+
+  .post-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 2px solid var(--color-ink);
+  }
+
+  .post-row {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 8px 32px;
+    padding-block: 28px;
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  .post-row[hidden] {
+    display: none;
+  }
+
+  .post-row-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 6px;
+  }
+
+  .post-row h2 {
+    font-size: clamp(1.5rem, 2.6vw, 2rem);
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+
+  .post-row h2 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .post-row h2 a:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.15em;
+  }
+
+  .post-row-excerpt {
+    max-width: 44rem;
+    margin-top: 10px;
+  }
+
+  .post-row-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .post-empty {
+    padding-block: 48px;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--color-ink);
+  }
+
+  .pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 40px;
+  }
+
+  .pager[hidden] {
+    display: none;
+  }
+
+  .pager :global(button) {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1.5px solid var(--color-hairline);
+    border-radius: 999px;
+    background: var(--color-card);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+
+  .pager :global(button:hover:not(:disabled)) {
+    border-color: var(--color-ink);
+  }
+
+  .pager :global(button[aria-current='page']) {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
+    color: var(--color-dark-text);
+  }
+
+  .pager :global(button:disabled) {
+    color: var(--color-muted);
+    cursor: not-allowed;
+  }
+
+  .pager :global(.pager-gap) {
+    min-width: 24px;
+    font-family: var(--font-mono);
+    text-align: center;
+    color: var(--color-muted);
+  }
+
+  .rss-block {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px 40px;
+    margin-top: 72px;
+    padding: clamp(28px, 5vw, 56px);
+    border-radius: var(--radius-block);
+    background: var(--color-dark);
+  }
+
+  .rss-block h2 {
+    max-width: 16em;
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    line-height: 1.05;
+    color: var(--color-dark-text);
+    text-wrap: balance;
+  }
+
+  @media (max-width: 700px) {
+    .post-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .post-row-meta {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0 16px;
+      padding-top: 0;
+    }
+  }
+</style>
+
+<script>
+  // Client-side filter and pagination over the server-rendered list: free-text search plus
+  // topic toggles (OR; "all posts" clears them), then the matches are split into pages.
+  // The page lives in ?page=N so it survives reloads and can be linked. Re-initialised on
+  // every navigation.
+  function initBlogIndex() {
+    const root = document.querySelector<HTMLElement>('[data-blog-index]:not([data-ready])');
+    if (!root) return;
+    root.dataset.ready = '';
+
+    const input = root.querySelector<HTMLInputElement>('[data-post-search]')!;
+    const chips = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-topic]'));
+    const rows = Array.from(root.querySelectorAll<HTMLElement>('[data-post]'));
+    const list = root.querySelector<HTMLElement>('.post-list')!;
+    const empty = root.querySelector<HTMLElement>('[data-post-empty]')!;
+    const count = root.querySelector<HTMLElement>('[data-post-count]')!;
+    const pager = root.querySelector<HTMLElement>('[data-pager]')!;
+    const pageSize = Number(root.dataset.pageSize) || 10;
+    const active = new Set<string>();
+    let page = Math.max(1, Number(new URLSearchParams(location.search).get('page')) || 1);
+
+    // 1 … 4 5 6 … 12: first, last and the neighbours of the current page.
+    const pageNumbers = (total: number): (number | null)[] => {
+      const wanted = new Set([1, total, page - 1, page, page + 1].filter((n) => n >= 1 && n <= total));
+      if (total <= 7) for (let n = 1; n <= total; n++) wanted.add(n);
+      const out: (number | null)[] = [];
+      let previous = 0;
+      for (const n of [...wanted].sort((a, b) => a - b)) {
+        if (n - previous > 1) out.push(null);
+        out.push(n);
+        previous = n;
+      }
+      return out;
+    };
+
+    const button = (label: string, target: number, opts: { disabled?: boolean; current?: boolean; name?: string }) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.textContent = label;
+      el.disabled = Boolean(opts.disabled);
+      if (opts.name) el.setAttribute('aria-label', opts.name);
+      if (opts.current) el.setAttribute('aria-current', 'page');
+      el.addEventListener('click', () => {
+        page = target;
+        apply();
+        list.scrollIntoView({ block: 'start' });
+        // The pager is rebuilt on every change, so hand focus back to the same control.
+        const again = Array.from(pager.querySelectorAll('button')).find((b) => b.textContent === label);
+        (again && !again.disabled ? again : pager.querySelector<HTMLButtonElement>('[aria-current]'))?.focus({
+          preventScroll: true,
+        });
+      });
+      return el;
+    };
+
+    const renderPager = (total: number) => {
+      pager.replaceChildren();
+      pager.hidden = total <= 1;
+      if (total <= 1) return;
+      pager.append(button('← Newer', page - 1, { disabled: page === 1, name: 'Newer posts, previous page' }));
+      for (const n of pageNumbers(total)) {
+        if (n === null) {
+          const gap = document.createElement('span');
+          gap.className = 'pager-gap';
+          gap.setAttribute('aria-hidden', 'true');
+          gap.textContent = '…';
+          pager.append(gap);
+        } else {
+          pager.append(button(String(n), n, { current: n === page, name: `Page ${n} of ${total}` }));
+        }
+      }
+      pager.append(button('Older →', page + 1, { disabled: page === total, name: 'Older posts, next page' }));
+    };
+
+    const apply = () => {
+      const terms = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+      const matched = rows.filter((row) => {
+        const topics = row.dataset.topics ? row.dataset.topics.split('|') : [];
+        return (
+          (active.size === 0 || topics.some((topic) => active.has(topic))) &&
+          terms.every((term) => row.dataset.haystack!.includes(term))
+        );
+      });
+
+      const total = Math.max(1, Math.ceil(matched.length / pageSize));
+      page = Math.min(Math.max(1, page), total);
+      const start = (page - 1) * pageSize;
+      const visible = new Set(matched.slice(start, start + pageSize));
+      for (const row of rows) row.hidden = !visible.has(row);
+
+      empty.hidden = matched.length > 0;
+      const of = matched.length === rows.length ? `${rows.length} posts` : `${matched.length} of ${rows.length} posts`;
+      count.textContent = total > 1 ? `${of} · page ${page} of ${total}` : of;
+      chips.forEach((chip) => {
+        const topic = chip.dataset.topic!;
+        chip.setAttribute('aria-pressed', String(topic ? active.has(topic) : active.size === 0));
+      });
+      renderPager(total);
+
+      const url = new URL(location.href);
+      if (page > 1) url.searchParams.set('page', String(page));
+      else url.searchParams.delete('page');
+      if (url.href !== location.href) history.replaceState(history.state, '', url);
+    };
+
+    // A new filter starts again from the first page.
+    const refilter = () => {
+      page = 1;
+      apply();
+    };
+
+    chips.forEach((chip) =>
+      chip.addEventListener('click', () => {
+        const topic = chip.dataset.topic!;
+        if (!topic) active.clear();
+        else if (active.has(topic)) active.delete(topic);
+        else active.add(topic);
+        refilter();
+      }),
+    );
+    input.addEventListener('input', refilter);
+    apply();
+  }
+
+  document.addEventListener('astro:page-load', initBlogIndex);
+</script>

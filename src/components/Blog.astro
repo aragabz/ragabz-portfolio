@@ -1,77 +1,141 @@
 ---
-import { getVisibleBlogPosts, byNewest } from '../utils/blog';
-import LevelBadge from './LevelBadge.astro';
+// Home "Writing" section: the latest post as a big lime card, the next two as white cards.
+import { getVisibleBlogPosts, byNewest, readingTime, formatDate } from '../utils/blog';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
-
-const blogPosts = (await getVisibleBlogPosts())
-  .sort(byNewest)
-  .slice(0, 3);
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  }).format(date);
-}
+const [latest, ...rest] = (await getVisibleBlogPosts()).sort(byNewest).slice(0, 3);
 ---
 
-<section id="blog" class="py-section px-6 bg-[var(--color-bg)]">
-  <div class="max-w-container mx-auto">
-    <div class="text-center mb-16 fade-in">
-      <h2 class="text-4xl md:text-5xl font-bold mb-4">Latest Articles</h2>
-      <p style="color: var(--color-brand-gray-dark);">Thoughts on software development, tech, and learning</p>
+<section class="wrap section" aria-labelledby="writing-heading">
+  <div class="section-head">
+    <div>
+      <h2 id="writing-heading" class="section-title">Writing</h2>
+      <p class="section-sub">Long, practical guides. Mostly Kotlin, sometimes the server side of it.</p>
     </div>
-    
-    <ul class="max-w-[860px] mx-auto border-t" style="border-color: var(--color-border);">
-      {blogPosts.map((post, index) => (
-        <li class={`group relative border-b py-6 md:grid md:grid-cols-[9rem_1fr] md:gap-8 fade-in fade-in-delay-${Math.min(index + 1, 3)}`} style="border-color: var(--color-border);">
-          <div class="flex md:flex-col gap-x-3 gap-y-1 text-sm mb-2 md:mb-0 md:pt-1" style="color: var(--color-text-tertiary);">
-            <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
-            <span class="md:hidden" aria-hidden="true">•</span>
-            <span>{post.data.readingTime || 5} min read</span>
-          </div>
-
-          <div class="min-w-0">
-            <h3 class="text-xl font-semibold mb-2 transition-colors group-hover:text-[var(--color-accent-strong)]">
-              <a href={`${base}blog/${post.id}`} class="after:absolute after:inset-0 after:content-['']">
-                {post.data.title}
-              </a>
-            </h3>
-
-            <p class="mb-3 leading-relaxed-custom line-clamp-2" style="color: var(--color-text-secondary);">
-              {post.data.excerpt}
-            </p>
-
-            <div class="flex flex-wrap items-center gap-2">
-              {post.data.level && <LevelBadge level={post.data.level} />}
-              {post.data.tags.slice(0, 3).map(tag => (
-                <span class="text-xs px-3 py-1 rounded-full border" style="background: var(--color-bg-tertiary); border-color: var(--color-border); color: var(--color-text-secondary);">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        </li>
-      ))}
-    </ul>
-
-    {blogPosts.length === 0 && (
-      <p class="text-center" style="color: var(--color-brand-gray-dark);">Coming soon! Stay tuned for articles.</p>
-    )}
-    
-    {blogPosts.length > 0 && (
-      <div class="text-center mt-12">
-        <a 
-          href={`${base}blog`}
-          class="inline-flex items-center gap-2 px-8 py-4 rounded-lg font-semibold transition-all hover:scale-105 hover:shadow-lg"
-          style="background-color: var(--color-brand-orange); color: white;"
-        >
-          See More Articles
-          <span style="font-size: 1.2rem;">→</span>
-        </a>
-      </div>
-    )}
+    <a href={`${base}blog`} class="text-link">All posts <span aria-hidden="true">&nbsp;→</span></a>
   </div>
+
+  {latest && (
+    <div class="writing-grid">
+      <article class="post-card post-card-lead">
+        <p class="mono post-meta">{readingTime(latest)} min read · {formatDate(latest.data.date)}</p>
+        <h3><a href={`${base}blog/${latest.id}`}>{latest.data.title}</a></h3>
+        <p class="post-excerpt">{latest.data.excerpt}</p>
+        <ul class="post-tags" aria-label="Tags">
+          {latest.data.tags.slice(0, 4).map((tag) => <li class="chip chip-on-lime">{tag}</li>)}
+        </ul>
+      </article>
+
+      {rest.map((post) => (
+        <article class="post-card">
+          <p class="mono post-meta">{readingTime(post)} min read · {formatDate(post.data.date)}</p>
+          <h3><a href={`${base}blog/${post.id}`}>{post.data.title}</a></h3>
+          <p class="post-excerpt">{post.data.excerpt}</p>
+        </article>
+      ))}
+    </div>
+  )}
 </section>
+
+<style>
+  .writing-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .post-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 28px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+  }
+
+  .post-card:hover {
+    border-color: var(--color-ink);
+  }
+
+  .post-card-lead {
+    grid-row: span 2;
+    padding: 36px;
+    border-color: var(--color-lime);
+    background: var(--color-lime);
+  }
+
+  .post-meta {
+    margin-bottom: 16px;
+  }
+
+  .post-card-lead .post-meta,
+  .post-card-lead .post-excerpt {
+    color: var(--color-ink);
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  .post-card-lead h3 {
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1.02;
+  }
+
+  /* The whole card is the link target; the title carries the accessible name. */
+  h3 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  h3 a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-card);
+  }
+
+  .post-card:hover h3 a {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.15em;
+  }
+
+  .post-excerpt {
+    margin-top: 14px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .post-card-lead .post-excerpt {
+    max-width: 32rem;
+    font-size: 1.125rem;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+  }
+
+  .post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: auto 0 0;
+    padding: 32px 0 0;
+    list-style: none;
+  }
+
+  @media (max-width: 800px) {
+    .writing-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .post-card-lead {
+      padding: 28px;
+    }
+  }
+</style>

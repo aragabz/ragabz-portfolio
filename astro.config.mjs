@@ -6,6 +6,7 @@ import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { base, site } from './site.config.mjs';
+import codeTheme from './shiki-theme.mjs';
 
 // Markdown/MDX links and images like `[x](/blog/slug)` are written root-relative; prefix
 // them with the deploy base so they keep working on GitHub Pages project sites.
@@ -68,7 +69,7 @@ export default defineConfig({
   markdown: {
     rehypePlugins: [rehypeBaseLinks],
     shikiConfig: {
-      theme: 'github-dark',
+      theme: codeTheme,
       wrap: true,
     },
   },

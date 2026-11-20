@@ -773,10 +773,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fontsource-variable/inter@npm:^5.3.0":
+"@fontsource-variable/bricolage-grotesque@npm:^5.3.0":
   version: 5.3.0
-  resolution: "@fontsource-variable/inter@npm:5.3.0"
-  checksum: 10c0/46fbe41e8482a718f99634c8254346c6081d615415059be12e177224c903d688199125967825e75d4b8122668fd83f70880e11d4e02d08c20b503c65fe2a96d1
+  resolution: "@fontsource-variable/bricolage-grotesque@npm:5.3.0"
+  checksum: 10c0/aa6c03b2e797d199159a016f43e972874b13e25a4515bf9257a25532a98be3c0b21e95cea8c84e0a1be2f1a4b217a898c649dda87f7551ebb33ca09bc5ab3713
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/geist-mono@npm:^5.3.0":
+  version: 5.3.0
+  resolution: "@fontsource-variable/geist-mono@npm:5.3.0"
+  checksum: 10c0/21a4097b3ccce08cbc181199f68a9193adc17d997ef8d883eab7565c6d79a82b2f8d7656f32f97b66f1f0b4ebba78a1a822c6318d55e0c5f572d74683ab036ee
+  languageName: node
+  linkType: hard
+
+"@fontsource-variable/geist@npm:^5.3.0":
+  version: 5.3.0
+  resolution: "@fontsource-variable/geist@npm:5.3.0"
+  checksum: 10c0/6b1d1d249643377c885d040769bf0964f242e8d03c4470535329ad4eed3d30a8134fea0d45c0b99b8069924a1f506a3bcb5b8d9cea77b7b5234dc7dd57371842
   languageName: node
   linkType: hard
 
@@ -4025,25 +4039,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"framer-motion@npm:^14.7.1":
-  version: 14.7.1
-  resolution: "framer-motion@npm:14.7.1"
-  dependencies:
-    motion-dom: "npm:14.7.1"
-    motion-utils: "npm:14.7.0"
-    tslib: "npm:^2.4.0"
-  peerDependencies:
-    react: ^18.0.0 || ^19.0.0
-    react-dom: ^18.0.0 || ^19.0.0
-  peerDependenciesMeta:
-    react:
-      optional: true
-    react-dom:
-      optional: true
-  checksum: 10c0/6223e4ee50f14d8c3ddba49427b448350029c1c6e97be9be6ed41218c13432970a5063bd18ab611b69ac896148653ae49660e108a29f417acb0732df9d5b1d69
-  languageName: node
-  linkType: hard
-
 "fsevents@npm:~2.3.3":
   version: 2.3.3
   resolution: "fsevents@npm:2.3.3"
@@ -5654,22 +5649,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"motion-dom@npm:14.7.1":
-  version: 14.7.1
-  resolution: "motion-dom@npm:14.7.1"
-  dependencies:
-    motion-utils: "npm:14.7.0"
-  checksum: 10c0/7e3c326e759dec21de6c76effbd3115e328d3acbb8379f1f8e0c8ac9ba70594fe1233d63756759753d64ba3a7679b832f3693578995e3aafffd39b45145a4b01
-  languageName: node
-  linkType: hard
-
-"motion-utils@npm:14.7.0":
-  version: 14.7.0
-  resolution: "motion-utils@npm:14.7.0"
-  checksum: 10c0/99f4fff3c164998a053ae698f171858735631d4da980d27de67817899a708b2d6ba7246a8fb007b1d883dfd90ee06cfaa1dcfb55abb00511c8e169eb0bd14769
-  languageName: node
-  linkType: hard
-
 "mrmime@npm:^2.0.0, mrmime@npm:^2.0.1":
   version: 2.0.1
   resolution: "mrmime@npm:2.0.1"
@@ -6057,7 +6036,9 @@ __metadata:
     "@astrojs/rss": "npm:^4.0.19"
     "@astrojs/sitemap": "npm:^3.7.4"
     "@emnapi/runtime": "npm:^1.11.3"
-    "@fontsource-variable/inter": "npm:^5.3.0"
+    "@fontsource-variable/bricolage-grotesque": "npm:^5.3.0"
+    "@fontsource-variable/geist": "npm:^5.3.0"
+    "@fontsource-variable/geist-mono": "npm:^5.3.0"
     "@iconify/react": "npm:^6.0.3"
     "@playwright/test": "npm:^1.64.1"
     "@tailwindcss/vite": "npm:^4.3.3"
@@ -6068,7 +6049,6 @@ __metadata:
     "@vitejs/plugin-react": "npm:^6.1.2"
     "@vitest/ui": "npm:^5.0.5"
     astro: "npm:^7.4.3"
-    framer-motion: "npm:^14.7.1"
     jsdom: "npm:^30.1.3"
     mermaid: "npm:^12.2.0"
     pagefind: "npm:^1.5.2"

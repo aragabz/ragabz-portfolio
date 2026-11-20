@@ -100,38 +100,13 @@ export default function Search() {
         onClick={openSearch}
         aria-label="Search articles and projects"
         className="search-trigger"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.5rem 0.75rem',
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '8px',
-          color: 'var(--color-text-secondary)',
-          cursor: 'pointer',
-          fontSize: '0.875rem',
-          transition: 'all 0.2s ease',
-        }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
-        <span className="hidden lg:inline">Search</span>
-        <kbd
-          className="hidden lg:inline"
-          style={{
-            padding: '0.125rem 0.375rem',
-            background: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '4px',
-            fontSize: '0.75rem',
-            fontFamily: 'monospace',
-          }}
-        >
-          ⌘K
-        </kbd>
+        <span>Search</span>
+        <kbd className="hidden sm:inline">⌘K</kbd>
       </button>
 
       <dialog
@@ -142,18 +117,7 @@ export default function Search() {
           // Close when the backdrop (the dialog element itself) is clicked.
           if (e.target === dialogRef.current) dialogRef.current.close();
         }}
-        style={{
-          width: '90%',
-          maxWidth: '600px',
-          maxHeight: '80vh',
-          margin: '10vh auto auto',
-          padding: 0,
-          border: '1px solid var(--color-border)',
-          borderRadius: '12px',
-          background: 'var(--color-bg)',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          color: 'var(--color-text)',
-        }}
+        className="search-dialog"
       >
         <div style={{ padding: '1.5rem' }}>
           <input
@@ -163,16 +127,7 @@ export default function Search() {
             onChange={(e) => runSearch(e.target.value)}
             placeholder="Search articles, projects..."
             aria-label="Search query"
-            style={{
-              width: '100%',
-              padding: '0.75rem 1rem',
-              marginBottom: '1rem',
-              background: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '8px',
-              color: 'var(--color-text)',
-              fontSize: '1rem',
-            }}
+            className="search-input"
           />
 
           <div style={{ maxHeight: '60vh', overflowY: 'auto' }} aria-live="polite">

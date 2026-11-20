@@ -41,7 +41,7 @@ Follow this pattern (see `BaseLayout.astro`, `blog/[slug].astro`) for any new in
 
 ### Layouts
 
-- `src/layouts/BaseLayout.astro` is the real layout used by every page (SEO meta/OG tags, canonical URL, dark/light theme bootstrap via `data-theme` + `localStorage`, `ClientRouter` view transitions, and the Mermaid diagram rendering pipeline below). Pass `title`/`description`/`image`/`type`/`keywords` props per-page.
+- `src/layouts/BaseLayout.astro` is the real layout used by every page (SEO meta/OG tags, canonical URL, the skip-to-content link, `Navbar` and `Footer`, `ClientRouter` view transitions, and the Mermaid diagram rendering pipeline below). The site is light-only: there is no theme toggle and no `data-theme`. Pages render only their `<main id="main-content">`; don't add `Navbar`/`Footer` to a page. Pass `title`/`description`/`image`/`type`/`keywords` props per-page.
 
 ### Content collections (`src/content.config.ts`)
 
@@ -53,23 +53,31 @@ Always fetch blog posts through `src/utils/blog.ts#getVisibleBlogPosts()` rather
 
 ### Blog rendering & Mermaid diagrams
 
-`src/pages/blog/[slug].astro` renders MDX via `render(post)` and builds a nested table-of-contents from the returned `headings`. Mermaid is **not** wired through `rehype-mermaid`/remark at build time — instead a bundled `<script>` in `BaseLayout.astro` runs on every `astro:page-load` (initial load and each view-transition navigation), finds `.blog-content pre[data-language="mermaid"]` blocks, and only if any exist dynamically `import('mermaid')`, swaps each block for a `div.mermaid`, and calls `mermaid.run()`. Keep it a lazy import (and keep `manualChunks` in `astro.config.mjs` from pulling mermaid into an eagerly-loaded chunk) — the library is several MB. If diagrams stop rendering, check this client-side transform in `BaseLayout.astro`, not the markdown pipeline.
+`src/pages/blog/[slug].astro` renders MDX via `render(post)` and builds the non-sticky "On this page" card from the h2 entries of the returned `headings`. Mermaid is **not** wired through `rehype-mermaid`/remark at build time — instead a bundled `<script>` in `BaseLayout.astro` runs on every `astro:page-load` (initial load and each view-transition navigation), finds `.blog-content pre[data-language="mermaid"]` blocks, and only if any exist dynamically `import('mermaid')`, swaps each block for a `div.mermaid`, and calls `mermaid.run()`. Keep it a lazy import (and keep `manualChunks` in `astro.config.mjs` from pulling mermaid into an eagerly-loaded chunk) — the library is several MB. If diagrams stop rendering, check this client-side transform in `BaseLayout.astro`, not the markdown pipeline.
 
 ### React islands
 
-Interactive pieces live in `src/components/react/*.tsx` and are mounted into `.astro` components with Astro's client directives (e.g. `client:load`). Astro components (`.astro`) handle everything static/SEO; reach for a React component only when you need client-side interactivity (filters, search, forms, theme toggle, etc.), consistent with the existing split.
+Interactive pieces live in `src/components/react/*.tsx` and are mounted into `.astro` components with Astro's client directives (e.g. `client:load`). Astro components (`.astro`) handle everything static/SEO; reach for a React component only when you need client-side interactivity (currently only `Search.tsx` and `ContactForm.tsx`); anything small should be a vanilla `<script>` in the `.astro` file instead.
 
-### Home hero aurora background
+### Home page
 
-`src/components/HeroBackground.astro` renders a decorative aurora / mesh-gradient glow behind the hero. It is pure CSS: soft `radial-gradient` blobs drift via transform-only keyframes (no `filter: blur` — the gradient falloff provides the softness, so animation stays on the compositor), and a static inline-SVG `feTurbulence` grain overlay hides gradient banding. All colours come from the theme tokens via `var()`/`color-mix()` (cool tones are `--color-accent` rotated in OKLCH with relative colour syntax, with a token-only fallback), so theme switches need no JS. Phones (<768px) get three smaller blobs; `prefers-reduced-motion` gets a static gradient. A tiny script (`src/scripts/hero-background.ts`, dynamically imported on `requestIdleCallback`) only pauses the animation (`.is-paused` → `animation-play-state`) when the hero is off-screen or the tab is hidden and adds a pointer-follow drift to one blob on fine-pointer devices; it re-inits on `astro:page-load` and cleans up on `astro:before-swap`. Keep it CSS-first: the gradient must render without JS.
+`src/pages/index.astro` stacks `Hero` (with `CodeCard.astro`, the three-tab code card), `Stats`, `Blog` (the "Writing" cards), `Projects`, `Proud`, `About` and `ContactBlock`. Writing and Projects read from the content collections; the stats strip sums the posts' reading times at build time. The "Things I'm proud of" items live in `src/data/proud.ts` (an optional `post` id adds a "Read how" link, ignored if the post doesn't exist). The experience record is in `src/components/Experience.astro` and is shown on `/about`.
+
+Small interactions (code card tabs, the blog index filter in `src/pages/blog/index.astro`) are vanilla `<script>`s that initialise on `astro:page-load` and guard against double-init with a `data-ready` attribute. React is only used for `Search.tsx` and `ContactForm.tsx`.
+
+The blog index paginates client-side (`PAGE_SIZE` in `src/pages/blog/index.astro`, page kept in `?page=N`) so search and topic filters still cover every post. All rows are in the HTML; rows past page one are rendered `hidden` and a `<noscript>` style reveals them without JS. Don't switch to static `/blog/2` routes without moving the filter too.
 
 ### Styling
 
-Tailwind CSS 4 is configured via the `@theme` directive directly in `src/styles/global.css` (not `tailwind.config.ts`, which is minimal). Design tokens are CSS custom properties (`--color-brand-*`, `--color-accent`, `--color-text*`, `--color-border`, etc.) — reference them with `var(--color-*)` in inline styles or Tailwind arbitrary values rather than adding new hardcoded colors, and rather than reintroducing Tailwind 3-style color utility classes.
+Tailwind CSS 4 is configured via the `@theme` directive directly in `src/styles/global.css` (not `tailwind.config.ts`, which is minimal). The palette lives there as `--color-paper`, `--color-ink`, `--color-body`, `--color-muted`, `--color-hairline`, `--color-card`, `--color-lime`, `--color-dark*` and `--color-code-*`; reference them with `var(--color-*)` or the generated utilities rather than hardcoding hex values. The older semantic names (`--color-bg`, `--color-text`, `--color-border`, `--color-accent`, ...) are kept as aliases for components that predate the redesign; don't use them in new code.
+
+Rules of the design (see `DESIGN.md`): lime is a background behind ink text only, never text on a light surface; no gradients, shadows-as-decoration, blur or emoji icons; headings are Bricolage Grotesque, body is Geist, labels/metadata/code are Geist Mono. Shared primitives in `global.css`: `.wrap` (1200px container), `.section`, `.btn` + `.btn-primary`/`.btn-outline`/`.btn-lime`/`.btn-outline-light`, `.chip`, `.mono`, `.mono-caps`, `.text-link`, `.page*` and `.row-list` for the secondary pages. Put `.on-dark` on dark surfaces so focus outlines switch to lime. Interactive targets are at least 44px.
+
+Code blocks use the custom Shiki theme in `shiki-theme.mjs` (four syntax colours matching `--color-code-*`); the header bar with the language and copy button is added client-side in `blog/[slug].astro`.
 
 ### Build config notes (`astro.config.mjs`)
 
 - `output: 'static'`; Sharp is the image service.
 - Vite build: Terser minification with `drop_console: true`, manual chunk splitting (only React into `react-vendor`; everything else uses Vite defaults), and `rollup-plugin-visualizer` emits `stats.html` at the repo root on every build for bundle inspection (gitignored).
 - No service worker, on purpose: the site only ships a static `public/manifest.webmanifest` (install metadata + `public/icons/`), linked from `BaseLayout.astro`. Its URLs are relative so they work under any `base`.
-- Inter is self-hosted via `@fontsource-variable/inter` (imported in `BaseLayout.astro`); don't reintroduce Google Fonts.
+- Fonts are self-hosted via `@fontsource-variable/{bricolage-grotesque,geist,geist-mono}` (imported in `BaseLayout.astro`); don't reintroduce Google Fonts.

@@ -27,8 +27,8 @@ A tech lead who bridges **mobile (Android, Kotlin Multiplatform, React Native) a
 
 ## Operating Context
 
-- Visitors arrive at the home page (hero, about, experience, skills, projects, latest articles, contact), or land directly on a blog post from search or a shared link.
-- Blog readers use the blog index's search and Topic / Language / Level filters, follow series navigation between parts, and read long articles with code, Mermaid diagrams, illustrations and expandable interview questions.
+- Visitors arrive at the home page (hero, stats, writing, projects, things I'm proud of, about, contact; the full experience record is on /about), or land directly on a blog post from search or a shared link.
+- Blog readers use the blog index's search and topic chips, follow series navigation between parts, and read long articles with code, Mermaid diagrams, illustrations and expandable interview questions.
 - Supporting pages: About, Projects (with detail pages), Now (current work, learning, reading), Uses, Contact, RSS feed, site search (Pagefind, production builds only).
 
 ## Capabilities and Constraints
@@ -36,7 +36,7 @@ A tech lead who bridges **mobile (Android, Kotlin Multiplatform, React Native) a
 - Static site: Astro 7, React 19 islands for interactivity, Tailwind CSS 4, MDX content collections. Deployed to GitHub Pages from `main`; every internal URL must respect the dynamic base path.
 - Blog posts support `level` (junior, mid, senior, staff, principal), `series` and `seriesOrder` frontmatter; topics are derived from tags and languages from code blocks.
 - Content series currently published or ready: Backend Engineering: Zero to Principal (13), System Design Interview Case Studies (8), Backend in Production: Case Studies (6, composite scenarios), Rust: Zero to Principal (11), Backend Services in Rust (8), plus standalone Android, KMP, Kotlin, Spring Boot, Airflow, React Native and TypeScript posts.
-- No service worker by design; light and dark themes are both supported.
+- No service worker by design; the site is light-only (one theme).
 - Undecided: whether the site will add newsletter/subscription beyond RSS, a downloadable CV, or a services/rates page for freelance work.
 
 ## Brand Commitments

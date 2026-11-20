@@ -1,0 +1,230 @@
+---
+// The hero's dark code card: the same "Engineer" record in three languages, as ARIA tabs.
+// Highlighting is done here at build time with a tiny tokenizer, so the card ships no
+// highlighter and the tabs need only the small script below.
+
+const KEYWORDS = new Set(['data', 'class', 'val', 'struct', 'let', 'type', 'const']);
+const TYPES = new Set(['Engineer', 'String', 'List', 'string']);
+
+const files = [
+  {
+    id: 'kt',
+    name: 'Me.kt',
+    language: 'Kotlin',
+    code: `data class Engineer(
+    val name: String,
+    val base: String,
+    val stack: List<String>,
+)
+
+val me = Engineer(
+    name = "Ahmed Ragab",
+    base = "Alexandria, EG",
+    stack = listOf("Kotlin", "Spring Boot", "Kafka"),
+)`,
+  },
+  {
+    id: 'swift',
+    name: 'Me.swift',
+    language: 'Swift',
+    code: `struct Engineer {
+    let name: String
+    let base: String
+    let stack: [String]
+}
+
+let me = Engineer(
+    name: "Ahmed Ragab",
+    base: "Alexandria, EG",
+    stack: ["Kotlin", "Spring Boot", "Kafka"]
+)`,
+  },
+  {
+    id: 'ts',
+    name: 'me.ts',
+    language: 'TypeScript',
+    code: `type Engineer = {
+  name: string;
+  base: string;
+  stack: string[];
+};
+
+const me: Engineer = {
+  name: "Ahmed Ragab",
+  base: "Alexandria, EG",
+  stack: ["Kotlin", "Spring Boot", "Kafka"],
+};`,
+  },
+];
+
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function highlightLine(line: string) {
+  return [...line.matchAll(/("[^"]*")|([A-Za-z_]\w*)|([^"A-Za-z_]+)/g)]
+    .map(([text, str, word]) => {
+      const kind = str ? 'str' : word && KEYWORDS.has(word) ? 'kw' : word && TYPES.has(word) ? 'type' : undefined;
+      return kind ? `<span class="${kind}">${escape(text)}</span>` : escape(text);
+    })
+    .join('');
+}
+
+// One string per file so no template whitespace leaks into the <pre>.
+const highlight = (code: string) =>
+  code
+    .split('\n')
+    .map((line, n) => `<span class="ln" aria-hidden="true">${n + 1}</span>${highlightLine(line)}`)
+    .join('\n');
+---
+
+<div class="code-card on-dark" data-code-card>
+  <div class="code-tabs" role="tablist" aria-label="Language">
+    {files.map((file, i) => (
+      <button
+        type="button"
+        role="tab"
+        id={`code-tab-${file.id}`}
+        aria-controls={`code-panel-${file.id}`}
+        aria-selected={i === 0 ? 'true' : 'false'}
+        tabindex={i === 0 ? 0 : -1}
+      >
+        {file.name}
+      </button>
+    ))}
+  </div>
+
+  {files.map((file, i) => (
+    <div
+      role="tabpanel"
+      id={`code-panel-${file.id}`}
+      aria-labelledby={`code-tab-${file.id}`}
+      tabindex="0"
+      hidden={i !== 0}
+    >
+      <pre aria-label={`${file.language} source`}><code set:html={highlight(file.code)} /></pre>
+    </div>
+  ))}
+</div>
+<p class="code-caption mono">Same engineer, three languages. Click a tab.</p>
+
+<style>
+  .code-card {
+    border-radius: var(--radius-card);
+    background: var(--color-dark);
+    color: var(--color-dark-text);
+    overflow: hidden;
+  }
+
+  .code-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 10px 12px 0;
+    border-bottom: 1px solid var(--color-dark-rule);
+  }
+
+  .code-tabs button {
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--color-dark-muted);
+    cursor: pointer;
+  }
+
+  .code-tabs button:hover {
+    color: var(--color-dark-text);
+  }
+
+  .code-tabs button[aria-selected='true'] {
+    border-bottom-color: var(--color-lime);
+    color: var(--color-dark-text);
+  }
+
+  pre {
+    margin: 0;
+    padding: 20px 20px 24px 0;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.8;
+    tab-size: 4;
+  }
+
+  pre :global(.ln) {
+    display: inline-block;
+    width: 3em;
+    padding-right: 1.25em;
+    text-align: right;
+    color: var(--color-code-comment);
+    user-select: none;
+  }
+
+  pre :global(.kw) {
+    color: var(--color-code-keyword);
+  }
+
+  pre :global(.str) {
+    color: var(--color-code-string);
+  }
+
+  pre :global(.type) {
+    color: var(--color-code-type);
+  }
+
+  .code-caption {
+    margin-top: 12px;
+    padding-left: 4px;
+  }
+
+  @media (max-width: 480px) {
+    pre {
+      font-size: 0.75rem;
+    }
+
+    pre :global(.ln) {
+      width: 2.5em;
+      padding-right: 0.9em;
+    }
+  }
+</style>
+
+<script>
+  // ARIA tabs with roving tabindex: arrows, Home and End move between tabs.
+  function initCodeCards() {
+    document.querySelectorAll<HTMLElement>('[data-code-card]:not([data-ready])').forEach((card) => {
+      card.dataset.ready = '';
+      const tabs = Array.from(card.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+
+      const select = (tab: HTMLButtonElement, focus: boolean) => {
+        tabs.forEach((t) => {
+          const on = t === tab;
+          t.setAttribute('aria-selected', String(on));
+          t.tabIndex = on ? 0 : -1;
+          const panel = document.getElementById(t.getAttribute('aria-controls')!);
+          if (panel) panel.hidden = !on;
+        });
+        if (focus) tab.focus();
+      };
+
+      tabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => select(tab, false));
+        tab.addEventListener('keydown', (event) => {
+          const last = tabs.length - 1;
+          const next =
+            event.key === 'ArrowRight' ? (i === last ? 0 : i + 1)
+            : event.key === 'ArrowLeft' ? (i === 0 ? last : i - 1)
+            : event.key === 'Home' ? 0
+            : event.key === 'End' ? last
+            : -1;
+          if (next < 0) return;
+          event.preventDefault();
+          select(tabs[next], true);
+        });
+      });
+    });
+  }
+
+  document.addEventListener('astro:page-load', initCodeCards);
+</script>

@@ -2,220 +2,289 @@
 
 @theme {
   /* Typography */
-  --font-family-sans: 'Inter Variable', 'Inter', system-ui, sans-serif;
-  --line-height-relaxed-custom: 1.7;
-  --letter-spacing-tight-1: -0.01em;
-  --letter-spacing-tight-2: -0.02em;
-  
-  /* Spacing */
-  --spacing-section: clamp(4rem, 8vw, 6rem);
-  
-  /* Max Widths */
-  --max-width-container: 1100px;
-  
-  /* Transitions */
-  --transition-duration-300: 300ms;
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-sans: 'Geist Variable', 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Palette (also available as Tailwind utilities: bg-lime, text-ink, border-hairline, ...) */
+  --color-paper: #f7f7f4;
+  --color-ink: #121212;
+  --color-body: #3a3a36;
+  --color-muted: #5f5f5a;
+  --color-hairline: #dcdcd6;
+  --color-card: #ffffff;
+  --color-lime: #c8f169;
+  --color-sunken: #ebebe5;
+  --color-dot: #5fa800;
+  --color-dark: #121212;
+  --color-dark-text: #ededea;
+  --color-dark-secondary: #c9c9c3;
+  --color-dark-muted: #a8a8a2;
+  --color-dark-rule: #2e2e2b;
+
+  /* Code syntax on dark */
+  --color-code-keyword: #ff9e64;
+  --color-code-string: #c8f169;
+  --color-code-type: #7dcfff;
+  --color-code-comment: #8b8b85;
+
+  /* Radius */
+  --radius-card: 22px;
+  --radius-block: 28px;
+
+  /* Layout */
+  --spacing-section: clamp(4.5rem, 7vw, 5.5rem);
+  --max-width-container: 1200px;
 }
 
-/* Theme Colors - Light Mode (Default) */
 :root {
-  /* Brand Colors */
-  --color-brand-black: #0a0a0a;
-  --color-brand-gray-dark: #666666;
-  --color-brand-gray-light: #e5e5e5;
-  --color-brand-white: #fafafa;
-  --color-brand-orange: #ff5d01;
-  
-  /* Semantic Colors - Light Mode */
-  --color-bg: #ffffff;
-  --color-bg-secondary: #f9fafb;
-  --color-bg-tertiary: #f3f4f6;
-  
-  --color-text: #111827;
-  --color-text-secondary: #4b5563;
-  --color-text-tertiary: #6b7280;
-  
-  --color-border: #e5e7eb;
-  --color-border-secondary: #d1d5db;
-  
-  --color-accent: #ff5d01;
-  --color-accent-strong: #c2410c;
+  /* Semantic aliases. Older components read these names; they now resolve to the
+     light palette. Lime is a background only, so both "accent" names are ink. */
+  --color-bg: var(--color-paper);
+  --color-bg-secondary: var(--color-card);
+  --color-bg-tertiary: var(--color-sunken);
+  --color-text: var(--color-ink);
+  --color-text-secondary: var(--color-body);
+  --color-text-tertiary: var(--color-muted);
+  --color-border: var(--color-hairline);
+  --color-border-secondary: #b4b4ad;
+  --color-accent: var(--color-ink);
+  --color-accent-strong: var(--color-ink);
 }
 
-/* Theme Colors - Dark Mode */
-[data-theme="dark"] {
-  /* Semantic Colors - Dark Mode */
-  --color-bg: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-bg-tertiary: #334155;
-  
-  --color-text: #f1f5f9;
-  --color-text-secondary: #cbd5e1;
-  --color-text-tertiary: #94a3b8;
-  
-  --color-border: #334155;
-  --color-border-secondary: #475569;
-  
-  --color-accent: #ff6b35;
-  --color-accent-strong: #ff8a5c;
-  
-  /* Invert brand colors for dark mode */
-  --color-brand-black: #f1f5f9;
-  --color-brand-white: #0f172a;
-  --color-brand-gray-dark: #cbd5e1;
-  --color-brand-gray-light: #334155;
-}
-
-/* Smooth theme transitions */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-
-/* Smooth scrolling and base styles */
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 80px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+  scroll-padding-top: 24px;
 }
 
 body {
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-family-sans);
-  line-height: 1.7;
+  background-color: var(--color-paper);
+  color: var(--color-body);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Fade-in animation for sections */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--color-ink);
+  /* A single long word in a big heading must never push the page wider than the screen. */
+  overflow-wrap: break-word;
 }
 
-.fade-in {
-  opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
+h4,
+h5,
+h6 {
+  color: var(--color-ink);
 }
 
-.fade-in-delay-1 {
-  animation-delay: 0.1s;
-}
-
-.fade-in-delay-2 {
-  animation-delay: 0.2s;
-}
-
-.fade-in-delay-3 {
-  animation-delay: 0.3s;
-}
-
-/* Intersection Observer will add this class */
-.animate-in {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Headings letter-spacing */
-h1, h2, h3, h4, h5, h6 {
-  letter-spacing: -0.02em;
-}
-
-/* Link styles */
-a {
-  transition: color 0.3s ease;
-}
-
-/* Selection color */
 ::selection {
-  background-color: var(--color-brand-orange);
-  color: white;
+  background-color: var(--color-lime);
+  color: var(--color-ink);
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 10px;
+/* ---- Layout primitives ---- */
+.wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 32px;
 }
 
-::-webkit-scrollbar-track {
-  background-color: var(--color-bg-secondary);
+/* Below 480px the 32px gutter leaves too little room for code and big headings. */
+@media (max-width: 480px) {
+  .wrap {
+    padding-inline: 20px;
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-secondary);
-  border-radius: 5px;
+.section {
+  padding-block: var(--spacing-section);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-text-tertiary);
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 32px;
+  margin-bottom: 40px;
 }
 
-/* Card hover effect */
+.section-title {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+}
+
+.section-sub {
+  margin-top: 14px;
+  max-width: 34rem;
+  color: var(--color-body);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  color: var(--color-muted);
+}
+
+.mono-caps {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* An underlined text link with a comfortable tap area. */
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 500;
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.25em;
+}
+
+.text-link:hover {
+  text-decoration-thickness: 2.5px;
+}
+
+/* ---- Buttons: 48px pills ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--color-ink);
+  color: var(--color-dark-text);
+}
+
+.btn-primary:hover {
+  background: #2c2c29;
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-ink);
+}
+
+.btn-outline:hover {
+  background: var(--color-ink);
+  color: var(--color-dark-text);
+}
+
+/* On dark surfaces */
+.btn-lime {
+  background: var(--color-lime);
+  border-color: var(--color-lime);
+  color: var(--color-ink);
+}
+
+.btn-lime:hover {
+  background: #d6f58c;
+}
+
+.btn-outline-light {
+  background: transparent;
+  border-color: var(--color-dark-text);
+  color: var(--color-dark-text);
+}
+
+.btn-outline-light:hover {
+  background: var(--color-dark-text);
+  color: var(--color-ink);
+}
+
+/* ---- Chips and tags ---- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: 999px;
+  background: var(--color-card);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-body);
+  white-space: nowrap;
+}
+
+.chip-on-lime {
+  border-color: var(--color-ink);
+  background: transparent;
+  color: var(--color-ink);
+}
+
+.chip-lime {
+  border-color: var(--color-lime);
+  background: var(--color-lime);
+  color: var(--color-ink);
+}
+
+/* ---- Legacy helpers still used by the secondary pages ---- */
+.fade-in {
+  opacity: 1;
+}
+
 .card-hover {
-  transition: all 0.3s ease-out;
+  transition: border-color 0.15s ease;
 }
 
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-ink) !important;
 }
 
-[data-theme="dark"] .card-hover:hover {
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-}
-
-.hover-text-brand-orange:hover {
-  color: var(--color-accent-strong) !important;
-}
-
+.hover-text-brand-orange:hover,
 .hover-text-brand-black:hover {
-  color: var(--color-text) !important;
+  color: var(--color-ink) !important;
+  text-decoration: underline;
 }
 
 .hover-bg-brand-black:hover {
-  background-color: var(--color-text) !important;
-  color: var(--color-bg) !important;
+  background-color: var(--color-ink) !important;
+  color: var(--color-dark-text) !important;
 }
 
-.hover-bg-brand-orange:hover {
-  background-color: var(--color-accent) !important;
-}
-
-.hover-border-brand-black:hover {
-  border-color: var(--color-text) !important;
-}
-
+.hover-border-brand-black:hover,
 .hover-border-brand-gray-dark:hover {
-  border-color: var(--color-border-secondary) !important;
+  border-color: var(--color-ink) !important;
 }
 
 .focus-border-brand-black:focus {
-  border-color: var(--color-text) !important;
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  border-color: var(--color-ink) !important;
 }
 
-/* About portrait: the photo has a white studio background, so frame it as a
-   circle with an accent ring rather than a white box on the dark theme. */
-.portrait {
-  box-shadow:
-    0 0 0 6px var(--color-bg),
-    0 0 0 8px var(--color-accent),
-    0 24px 48px -12px rgb(0 0 0 / 0.35);
-}
-
-/* Accessibility */
+/* ---- Accessibility ---- */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -228,31 +297,63 @@ a {
   border-width: 0;
 }
 
-.focus\:not-sr-only:focus {
-  position: static;
-  width: auto;
-  height: auto;
-  padding: inherit;
-  margin: inherit;
-  overflow: visible;
-  clip: auto;
-  white-space: normal;
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--color-ink);
+  color: var(--color-dark-text);
+  font-weight: 500;
+  text-decoration: none;
+  transform: translateY(-200%);
 }
 
-/* Keyboard Focus Styles */
+.skip-link:focus-visible {
+  transform: none;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: 2.5px solid var(--color-ink);
+  outline-offset: 3px;
 }
 
-/* Mermaid diagrams: themed from the color tokens at render time (BaseLayout.astro),
-   and re-rendered when the theme changes, so no color filters are needed here. */
+/* On dark surfaces the ink outline would vanish; use lime there. */
+.on-dark a:focus-visible,
+.on-dark button:focus-visible,
+.on-dark [tabindex]:focus-visible {
+  outline-color: var(--color-lime);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---- Mermaid diagrams: themed from the tokens at render time (BaseLayout.astro) ---- */
 .mermaid {
   display: block;
   margin: 2.5rem auto;
@@ -281,53 +382,96 @@ textarea:focus-visible,
 .mermaid-fallback p {
   margin: 0 0 0.5rem !important;
   font-size: 0.875rem;
-  color: var(--color-text-secondary);
+  color: var(--color-body);
 }
 
-/* Search (src/components/react/Search.tsx) */
+/* ---- Search (src/components/react/Search.tsx) ---- */
+.search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-body);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
 .search-trigger:hover {
-  background: var(--color-bg-tertiary) !important;
-  border-color: var(--color-brand-orange) !important;
+  border-color: var(--color-ink);
+  color: var(--color-ink);
+}
+
+.search-trigger kbd {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.search-dialog {
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  margin: 10vh auto auto;
+  padding: 0;
+  border: 1.5px solid var(--color-ink);
+  border-radius: var(--radius-card);
+  background: var(--color-paper);
+  color: var(--color-ink);
 }
 
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.5);
-  backdrop-filter: blur(2px);
+  background: rgb(18 18 18 / 0.55);
+}
+
+.search-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  margin-bottom: 16px;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-ink);
+  font-size: 1rem;
 }
 
 .search-result {
   display: block;
-  padding: 1rem;
-  margin-bottom: 0.5rem;
-  background: var(--color-bg-secondary);
-  border-radius: 8px;
-  color: var(--color-text);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: 14px;
+  background: var(--color-card);
+  color: var(--color-ink);
   text-decoration: none;
-  transition: background 0.2s ease;
 }
 
 .search-result:hover,
 .search-result:focus-visible {
-  background: var(--color-bg-tertiary);
+  border-color: var(--color-ink);
 }
 
 .search-result h3 {
-  margin: 0 0 0.5rem;
+  margin: 0 0 6px;
   font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-accent-strong);
+  line-height: 1.2;
 }
 
 .search-result p {
   margin: 0;
   font-size: 0.875rem;
   line-height: 1.5;
-  color: var(--color-text-secondary);
+  color: var(--color-body);
 }
 
 .search-result mark {
-  background: color-mix(in srgb, var(--color-brand-orange) 25%, transparent);
-  color: inherit;
+  background: var(--color-lime);
+  color: var(--color-ink);
 }
 
 .search-hint {
@@ -335,22 +479,22 @@ dialog::backdrop {
   padding: 2rem;
   text-align: center;
   font-size: 0.875rem;
-  color: var(--color-text-secondary);
+  color: var(--color-body);
 }
 
-/* Blog post difficulty badge (LevelBadge.astro, BlogFilter.tsx) */
+/* ---- Blog post difficulty badge (LevelBadge.astro) ---- */
 .level-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.75rem;
+  gap: 8px;
+  padding: 3px 12px;
+  border: 1px solid var(--color-ink);
   border-radius: 999px;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--color-accent-strong);
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  line-height: 1.5;
+  color: var(--color-ink);
+  white-space: nowrap;
 }
 
 .level-dots {
@@ -368,4 +512,95 @@ dialog::backdrop {
 
 .level-dots > span.is-on {
   opacity: 1;
+}
+
+/* ---- Secondary pages (about, now, uses, contact, project, 404) ---- */
+.page {
+  padding-block: 40px 64px;
+}
+
+.page-narrow {
+  max-width: 880px;
+}
+
+.page-title {
+  font-size: clamp(3rem, 10vw, 6.5rem);
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+.page-intro {
+  max-width: 38rem;
+  margin-top: 24px;
+  font-size: 1.125rem;
+}
+
+.page-section {
+  margin-top: 64px;
+}
+
+.page-section > h2 {
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--color-ink);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+}
+
+/* Hairline-separated rows: a name on the left, detail on the right. */
+.row-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 4px 32px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.row-list .row-name {
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+@media (max-width: 640px) {
+  .row-list > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- Contact form (src/components/react/ContactForm.tsx) ---- */
+.form-field {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 14px;
+  background: var(--color-paper);
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--color-ink);
+}
+
+textarea.form-field {
+  resize: vertical;
+}
+
+.form-field::placeholder {
+  color: var(--color-muted);
+}
+
+.form-status {
+  padding: 14px 18px;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 14px;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.form-status-ok {
+  border-color: var(--color-lime);
+  background: var(--color-lime);
 }

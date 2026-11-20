@@ -1,0 +1,77 @@
+---
+import { proud } from '../data/proud';
+import { getVisibleBlogPosts } from '../utils/blog';
+
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
+// Only link to posts that exist and are published, so a typo in the data never ships a dead link.
+const published = new Set((await getVisibleBlogPosts()).map((post) => post.id));
+---
+
+<section class="wrap section" aria-labelledby="proud-heading">
+  <div class="section-head">
+    <h2 id="proud-heading" class="section-title">Things I'm proud of</h2>
+  </div>
+
+  <ul class="proud-grid">
+    {proud.map((item) => (
+      <li>
+        <p class="mono-caps">{item.where}</p>
+        <h3>{item.headline}</h3>
+        <p class="proud-stakes">{item.stakes}</p>
+        {item.post && published.has(item.post) && (
+          <a href={`${base}blog/${item.post}`} class="text-link">
+            Read how<span class="sr-only">: {item.headline}</span> <span aria-hidden="true">&nbsp;→</span>
+          </a>
+        )}
+      </li>
+    ))}
+  </ul>
+</section>
+
+<style>
+  .proud-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 2px solid var(--color-ink);
+  }
+
+  li {
+    padding: 28px 28px 32px 0;
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  /* Hairlines between columns: every cell but the first in a row gets a left rule. */
+  li:not(:nth-child(3n + 1)) {
+    padding-left: 28px;
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  h3 {
+    margin-top: 14px;
+    font-size: clamp(2rem, 3.4vw, 2.75rem);
+    text-wrap: balance;
+  }
+
+  .proud-stakes {
+    margin-top: 14px;
+  }
+
+  .text-link {
+    margin-top: 8px;
+  }
+
+  @media (max-width: 900px) {
+    .proud-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    li,
+    li:not(:nth-child(3n + 1)) {
+      padding: 24px 0 28px;
+      border-left: 0;
+    }
+  }
+</style>

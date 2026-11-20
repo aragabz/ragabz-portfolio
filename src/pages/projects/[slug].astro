@@ -1,7 +1,6 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import Navbar from '../../components/Navbar.astro';
 
 export async function getStaticPaths() {
   const projects = await getCollection('projects');
@@ -12,179 +11,169 @@ export async function getStaticPaths() {
 }
 
 const { project } = Astro.props;
-const { title, description, tech, github, live, image, category, featured, year, status, overview, features } = project.data;
+const { title, description, tech, github, live, image, category, year, status, overview, features } = project.data;
 
-const allProjects = (await getCollection('projects')).sort((a, b) => b.data.order - a.data.order);
+const allProjects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
 const currentIndex = allProjects.findIndex((p) => p.id === project.id);
-const prev = currentIndex > 0 ? allProjects[currentIndex - 1] : allProjects[allProjects.length - 1];
-const next = currentIndex < allProjects.length - 1 ? allProjects[currentIndex + 1] : allProjects[0];
+const prev = allProjects[(currentIndex - 1 + allProjects.length) % allProjects.length];
+const next = allProjects[(currentIndex + 1) % allProjects.length];
+const hasOthers = allProjects.length > 1;
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 const withBase = (path: string) => (path.startsWith('/') ? `${base}${path.slice(1)}` : path);
+const isNpm = (url: string) => /npmjs\.com/.test(url);
 ---
- 
-<BaseLayout 
-  title={`${title} - Project`}
-  description={description}
-  image={withBase(image) || `${base}og-image.jpg`}
->
-  <Navbar />
 
-  <main data-pagefind-body class="min-h-screen pt-24 pb-16 px-6" style="background-color: var(--color-bg);">
-    <div class="max-w-4xl mx-auto">
-      <a 
-        href={`${base}#projects`}
-        class="inline-flex items-center gap-2 mb-8 transition-colors hover-text-brand-orange"
-        style="color: var(--color-text-muted);"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Projects
-      </a>
+<BaseLayout title={`${title} - Project`} description={description}>
+  <main id="main-content" tabindex="-1" data-pagefind-body class="wrap page">
+    <div class="page-narrow">
+      <a href={`${base}#projects`} class="text-link"><span aria-hidden="true">←&nbsp;</span> All projects</a>
 
-      {/* Hero image */}
-      <div class="mb-10 overflow-hidden rounded-xl border" style="border-color: var(--color-border);">
-        <img
-          src={withBase(image)}
-          alt={title}
-          class="w-full h-auto object-cover"
-          fetchpriority="high"
-        />
-      </div>
-
-      <header class="mb-10">
-        <div class="flex flex-wrap items-center gap-3 mb-4">
-          <span class="text-xs font-semibold px-3 py-1 rounded-full" style="background-color: var(--color-text); color: var(--color-bg);">
-            {category}
-          </span>
-          {featured && (
-            <span class="text-xs font-semibold px-3 py-1 rounded-full" style="background-color: var(--color-accent); color: #ffffff;">
-              Featured
-            </span>
-          )}
-          {status && (
-            <span class="text-xs font-medium px-3 py-1 rounded-full" style="background-color: var(--color-border); color: var(--color-text);">
-              {status}
-            </span>
-          )}
-          {year && (
-            <span class="text-xs font-medium px-3 py-1 rounded-full" style="background-color: var(--color-border); color: var(--color-text);">
-              {year}
-            </span>
-          )}
-        </div>
-
-        <h1 
-          class="text-4xl md:text-5xl font-bold mb-4 tracking-tight"
-          style="color: var(--color-text);"
-        >
-          {title}
-        </h1>
-        <p 
-          class="text-xl leading-relaxed mb-8"
-          style="color: var(--color-text-muted);"
-        >
-          {description}
+      <header class="project-head">
+        <p class="mono project-meta">
+          <span>{category}{year && ` · ${year}`}</span>
+          {status && <span class="chip chip-lime">{status.toLowerCase()}</span>}
         </p>
+        <h1 class="page-title" data-pagefind-meta="title">{title}</h1>
+        <p class="page-intro">{description}</p>
 
-        <div class="flex flex-wrap gap-4">
-          {github && (
-            <a 
-              href={github}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
-              style="background-color: var(--color-text); color: var(--color-bg);"
-            >
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              View Code
-            </a>
-          )}
+        <div class="project-actions">
+          {github && <a href={github} class="btn btn-primary" rel="noopener noreferrer">View on GitHub</a>}
           {live && (
-            <a 
-              href={live}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-2 px-6 py-3 rounded-lg border font-medium transition-colors hover-text-brand-orange"
-              style="border-color: var(--color-border); color: var(--color-text);"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              Live Demo
+            <a href={live} class:list={['btn', github ? 'btn-outline' : 'btn-primary']} rel="noopener noreferrer">
+              {isNpm(live) ? 'View on npm' : 'View live'}
             </a>
           )}
         </div>
       </header>
 
-      {/* Overview */}
+      <img src={withBase(image)} alt="" class="project-cover" fetchpriority="high" />
+
       {overview && (
-        <section class="mb-12">
-          <h2 class="text-2xl font-bold mb-4 tracking-tight" style="color: var(--color-text);">
-            Overview
-          </h2>
-          <p class="text-lg leading-relaxed" style="color: var(--color-text-muted);">
-            {overview}
-          </p>
+        <section class="page-section">
+          <h2>Overview</h2>
+          <p class="project-overview">{overview}</p>
         </section>
       )}
 
-      {/* Key Features */}
       {features && features.length > 0 && (
-        <section class="mb-12">
-          <h2 class="text-2xl font-bold mb-5 tracking-tight" style="color: var(--color-text);">
-            Key Features
-          </h2>
-          <ul class="space-y-3 list-none m-0 p-0">
-            {features.map((feature) => (
-              <li class="flex items-start gap-3">
-                <svg class="w-5 h-5 mt-0.5 flex-none" fill="none" stroke="var(--color-accent)" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                <span style="color: var(--color-text-secondary);">{feature}</span>
-              </li>
-            ))}
+        <section class="page-section">
+          <h2>What's in it</h2>
+          <ul class="row-list feature-list">
+            {features.map((feature) => <li>{feature}</li>)}
           </ul>
         </section>
       )}
 
-      {/* Technology Stack */}
-      <section class="mb-12">
-        <h2 class="text-2xl font-bold mb-4" style="color: var(--color-text);">
-          Technology Stack
-        </h2>
-        <div class="flex flex-wrap gap-3">
-          {tech.map((technology) => (
-            <span
-              class="px-4 py-2 rounded-lg text-sm font-medium"
-              style="background-color: var(--color-border); color: var(--color-text);"
-            >
-              {technology}
-            </span>
-          ))}
-        </div>
+      <section class="page-section">
+        <h2>Stack</h2>
+        <p class="project-stack">{tech.join(' · ')}</p>
       </section>
 
-      {/* Prev / Next navigation */}
-      <nav class="mt-16 border-t pt-8" style="border-color: var(--color-border);" aria-label="Project navigation">
-        <div class="flex flex-col sm:flex-row gap-6 sm:justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-wide mb-1" style="color: var(--color-text-muted);">Previous</p>
-            <a href={`/projects/${prev.id}`} class="font-semibold transition-colors hover-text-brand-orange" style="color: var(--color-text);">
-              ← {prev.data.title}
-            </a>
-          </div>
-          <div class="sm:text-right">
-            <p class="text-xs uppercase tracking-wide mb-1" style="color: var(--color-text-muted);">Next</p>
-            <a href={`/projects/${next.id}`} class="font-semibold transition-colors hover-text-brand-orange" style="color: var(--color-text);">
-              {next.data.title} →
-            </a>
-          </div>
-        </div>
-      </nav>
+      {hasOthers && (
+        <nav class="project-pager" aria-label="Other projects">
+          <a href={`${base}projects/${prev.id}`}>
+            <span class="mono">← Previous project</span>
+            <span class="project-pager-title">{prev.data.title}</span>
+          </a>
+          <a href={`${base}projects/${next.id}`} class="is-next">
+            <span class="mono">Next project →</span>
+            <span class="project-pager-title">{next.data.title}</span>
+          </a>
+        </nav>
+      )}
     </div>
   </main>
 </BaseLayout>
+
+<style>
+  .project-head {
+    margin-block: 24px 40px;
+  }
+
+  .project-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    margin-bottom: 18px;
+  }
+
+  .page-title {
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
+  }
+
+  .project-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .project-cover {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+  }
+
+  .project-overview {
+    margin-top: 20px;
+    font-size: 1.125rem;
+    line-height: 1.7;
+  }
+
+  .feature-list > li {
+    display: block;
+    color: var(--color-ink);
+  }
+
+  .project-stack {
+    margin-top: 20px;
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    color: var(--color-ink);
+  }
+
+  .project-pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 64px;
+  }
+
+  .project-pager a {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 18px 22px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+
+  .project-pager a:hover {
+    border-color: var(--color-ink);
+  }
+
+  .project-pager .is-next {
+    text-align: right;
+  }
+
+  .project-pager-title {
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  @media (max-width: 560px) {
+    .project-pager {
+      grid-template-columns: 1fr;
+    }
+
+    .project-pager .is-next {
+      text-align: left;
+    }
+  }
+</style>

@@ -1,48 +1,15 @@
 ---
-import '@fontsource-variable/inter/wght.css';
+import '@fontsource-variable/bricolage-grotesque/wght.css';
+import '@fontsource-variable/geist/wght.css';
+import '@fontsource-variable/geist-mono/wght.css';
 import '../styles/global.css';
+import Navbar from '../components/Navbar.astro';
 import Footer from '../components/Footer.astro';
 import { ClientRouter } from 'astro:transitions';
 
-const locales = {
-  en: {
-    siteName: 'Ahmed Ragab - Portfolio',
-    navigation: {
-      home: 'Home',
-      about: 'About',
-      projects: 'Projects',
-      blog: 'Blog',
-      contact: 'Contact'
-    },
-    hero: {
-      title: 'Ahmed Ragab',
-      subtitle: 'Software Engineering Technical Lead',
-      cta: 'Get in Touch'
-    },
-    about: {
-      title: 'About Me',
-      description: 'Software Engineering Technical Lead with 9+ years of experience delivering end-to-end solutions across mobile and back-end systems.',
-      stats: {
-        experience: '9+ Years Experience',
-        companies: '7+ Companies',
-        projects: '10+ Projects'
-      }
-    },
-contact: {
-      title: 'Get In Touch',
-      description: "Have a project in mind? Let's work together to create something amazing.",
-      name: 'Name',
-      email: 'Email',
-      subject: 'Subject',
-      message: 'Message',
-      send: 'Send Message'
-    },
-    footer: {
-      copyright: '© 2026 Ahmed Ragab. All rights reserved.',
-      madeWith: 'Made with Astro'
-    }
-  }
-};
+const siteName = 'Ahmed Ragab';
+const defaultDescription =
+  'Ahmed Ragab builds Android apps and the backends they talk to. Nine years of Kotlin, Spring Boot and Kafka, plus long practical guides.';
 
 export interface Props {
   title?: string;
@@ -56,8 +23,8 @@ export interface Props {
 }
 
 const {
-  title = locales.en.siteName,
-  description = locales.en.about.description,
+  title = 'Ahmed Ragab: Android apps and the backends they talk to',
+  description = defaultDescription,
   image = '/og-image.jpg',
   type = 'website',
   noindex = false,
@@ -81,7 +48,6 @@ const {
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const socialImageURL = new URL(image.startsWith('/') && base !== '/' ? `${base}${image.slice(1)}` : image, Astro.site);
-const siteName = locales.en.siteName;
 ---
 
 <!doctype html>
@@ -94,26 +60,10 @@ const siteName = locales.en.siteName;
     <meta name="generator" content={Astro.generator} />
     
     <!-- Performance & Mobile -->
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#f7f7f4" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    
-    <!-- Theme Script (must be before body to prevent flash) -->
-    <script is:inline>
-      const theme = (() => {
-        if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
-          return localStorage.getItem('theme');
-        }
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          return 'dark';
-        }
-        return 'light';
-      })();
-      document.documentElement.setAttribute('data-theme', theme);
-      // Browser chrome follows the page background (--color-bg) in each theme.
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0f172a' : '#ffffff');
-    </script>
     
     <!-- Primary Meta Tags -->
     <title>{title}</title>
@@ -148,20 +98,18 @@ const siteName = locales.en.siteName;
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
-      "@type": ["Person", "Organization"],
+      "@type": "Person",
       "name": "Ahmed Ragab",
       "url": Astro.site?.toString(),
       "image": socialImageURL.toString(),
-      "jobTitle": "Software Engineering Technical Lead",
+      "jobTitle": "Senior Software Engineer",
       "description": description,
       "sameAs": [
         "https://github.com/aragabz",
         "https://www.linkedin.com/in/aragabz/"
       ],
       "knowsAbout": keywords,
-      "founder": "Ahmed Ragab",
-      "founded": "2015",
-      "location": "Remote"
+      "location": "Alexandria, Egypt"
     })} />
     
     {type === 'article' && (
@@ -197,30 +145,12 @@ const siteName = locales.en.siteName;
     })} />
   </head>
   <body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
+    <Navbar />
+
     <slot />
-    
+
     <Footer />
-    
-    <!-- Intersection Observer for fade-in animations -->
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        const observerOptions = {
-          threshold: 0.1,
-          rootMargin: '0px 0px -50px 0px'
-        };
-        
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('animate-in');
-              observer.unobserve(entry.target);
-            }
-          });
-        }, observerOptions);
-        
-        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-      });
-    </script>
 
     <!-- Mermaid diagrams: loaded on demand, only on pages that contain one -->
     <script>
@@ -229,24 +159,23 @@ const siteName = locales.en.siteName;
       const MERMAID_SELECTOR = '.blog-content pre[data-language="mermaid"]';
       let renderCount = 0;
 
-      /** Builds Mermaid's theme from the live color tokens, so diagrams match whichever theme is active. */
+      /** Builds Mermaid's theme from the live color tokens, so diagrams match the page palette. */
       function themeFromTokens(): MermaidConfig {
         const css = getComputedStyle(document.documentElement);
         const token = (name: string) => css.getPropertyValue(name).trim();
-        const bg = token('--color-bg');
-        const surface = token('--color-bg-secondary');
-        const sunken = token('--color-bg-tertiary');
-        const text = token('--color-text');
-        const muted = token('--color-text-secondary');
-        const border = token('--color-border-secondary');
-        const accent = token('--color-accent-strong');
+        const bg = token('--color-paper');
+        const surface = token('--color-card');
+        const sunken = token('--color-sunken');
+        const text = token('--color-ink');
+        const muted = token('--color-muted');
+        const border = token('--color-ink');
+        const accent = token('--color-ink');
         return {
           startOnLoad: false,
           theme: 'base',
           securityLevel: 'strict',
-          fontFamily: "'Inter Variable', Inter, system-ui, sans-serif",
+          fontFamily: "'Geist Variable', Geist, system-ui, sans-serif",
           themeVariables: {
-            darkMode: document.documentElement.dataset.theme === 'dark',
             background: bg,
             fontSize: '15px',
             primaryColor: surface,
@@ -351,13 +280,6 @@ const siteName = locales.en.siteName;
 
       // Fires on the initial load and after every view-transition navigation.
       document.addEventListener('astro:page-load', () => renderAll(true));
-
-      // Theme toggle: redraw diagrams in the new palette and update the browser chrome color.
-      new MutationObserver(() => {
-        const dark = document.documentElement.dataset.theme === 'dark';
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f172a' : '#ffffff');
-        renderAll(false);
-      }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     </script>
   </body>
 </html>

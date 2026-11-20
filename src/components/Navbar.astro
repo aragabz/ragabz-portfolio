@@ -1,71 +1,134 @@
 ---
-import ThemeToggle from './react/ThemeToggle';
-import MobileMenu from './react/MobileMenu';
 import Search from './react/Search';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
-const pathname = Astro.url.pathname;
+const path = Astro.url.pathname.replace(/\/$/, '');
 
-// Standardize route checking by removing trailing slashes
-const cleanPathname = pathname.replace(/\/$/, '') || '/';
-
-const navLinks = [
-  { href: `${base}`, label: 'Home', isExact: true },
-  { href: `${base}#about`, label: 'About', isExact: false },
-  { href: `${base}#projects`, label: 'Projects', isExact: false },
-  { href: `${base}blog`, label: 'Blog', isExact: false },
-  { href: `${base}contact`, label: 'Contact', isExact: false },
-];
-
-function isLinkActive(linkHref: string, isExact: boolean) {
-  const cleanLinkHref = linkHref.replace(/\/$/, '') || '/';
-  if (isExact) {
-    return cleanPathname === cleanLinkHref;
-  }
-  return cleanPathname.startsWith(cleanLinkHref);
-}
+const links = [
+  { href: `${base}blog`, label: 'Writing', current: path.includes('/blog') },
+  { href: `${base}#projects`, label: 'Projects', current: path.includes('/projects') },
+  { href: `${base}#about`, label: 'About', current: path.endsWith('/about') },
+  // Hidden from the nav for now; the /uses page itself still exists. Drop `hidden` to bring it back.
+  { href: `${base}uses`, label: 'Uses', current: path.endsWith('/uses'), hidden: true },
+].filter((link) => !link.hidden);
 ---
 
-<nav
-  class="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b"
-  style="background-color: color-mix(in srgb, var(--color-bg) 80%, transparent); border-color: var(--color-border);"
-  role="navigation"
-  aria-label="Main navigation"
->
-  <div class="max-w-container mx-auto px-6 py-4">
-    <div class="flex justify-between items-center">
-      <a href={base} class="text-xl font-bold transition-colors hover:opacity-80" style="color: var(--color-accent);">
-        AR
-      </a>
-      
-      <div class="flex items-center gap-2 md:gap-8">
-        <ul class="hidden md:flex gap-8 items-center list-none m-0 p-0">
-          {navLinks.map((link) => {
-            const active = isLinkActive(link.href, link.isExact);
-            return (
-              <li>
-                <a 
-                  href={link.href} 
-                  class="transition-colors hover-text-brand-orange font-medium"
-                  style={active ? "color: var(--color-accent-strong);" : "color: var(--color-text);"}
-                >
-                  {link.label}
-                </a>
-              </li>
-            );
-          })}
-        </ul>
+<header class="site-header">
+  <div class="wrap site-header-inner">
+    <a href={base} class="wordmark" aria-label="aragabz, home">
+      aragabz<span class="wordmark-cursor" aria-hidden="true">_</span>
+    </a>
 
-        <div class="flex items-center gap-2">
+    <nav aria-label="Main navigation">
+      <ul class="site-nav">
+        {links.map((link) => (
+          <li>
+            <a href={link.href} class="site-nav-link" aria-current={link.current ? 'page' : undefined}>
+              {link.label}
+            </a>
+          </li>
+        ))}
+        <li>
           <Search client:idle />
-          <ThemeToggle client:load />
-          <div class="md:hidden">
-            <MobileMenu client:load links={navLinks} />
-          </div>
-        </div>
-      </div>
-    </div>
+        </li>
+        <li>
+          <a href={`${base}resume.pdf`} class="btn btn-outline resume-pill">Resume</a>
+        </li>
+      </ul>
+    </nav>
   </div>
-</nav>
+</header>
 
-<div class="h-[73px]"></div> <!-- Spacer to prevent content from going behind fixed navbar -->
+<style>
+  .site-header {
+    padding-block: 20px;
+  }
+
+  .site-header-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 24px;
+  }
+
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-family: var(--font-mono);
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+
+  .wordmark-cursor {
+    margin-left: 1px;
+    animation: blink 1.1s steps(1) infinite;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wordmark-cursor {
+      animation: none;
+    }
+  }
+
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-nav-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-weight: 500;
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+
+  .site-nav-link:hover,
+  .site-nav-link[aria-current='page'] {
+    text-decoration: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 0.3em;
+  }
+
+  .resume-pill {
+    min-height: 44px;
+    padding: 0 20px;
+    margin-left: 6px;
+  }
+
+  /* Small screens: the nav wraps under the wordmark; links lose their side padding so the
+     row lines up with the page gutter. */
+  @media (max-width: 520px) {
+    .site-nav {
+      gap: 4px 16px;
+    }
+
+    .site-nav-link {
+      min-width: 44px;
+      padding: 0;
+    }
+
+    .resume-pill {
+      margin-left: 0;
+    }
+  }
+</style>

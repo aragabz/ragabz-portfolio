@@ -85,34 +85,24 @@ This serves the `dist/` directory at `http://localhost:4321`
 
 ## 🎨 Design System
 
-### Colors (CSS Variables)
+The full system is described in `DESIGN.md`. In short: a light-only design on warm paper (`#F7F7F4`) with ink text, one lime accent (`#C8F169`, used only as a background behind ink text) and dark cards for code and projects.
 
-Colors are defined in `src/styles/global.css` using the `@theme` directive:
+Tokens are defined in `src/styles/global.css` with the `@theme` directive (`--color-paper`, `--color-ink`, `--color-body`, `--color-muted`, `--color-hairline`, `--color-card`, `--color-lime`, `--color-dark*`, `--color-code-*`). Use them through `var(--color-*)`:
 
-```css
-@theme {
-  --color-brand-black: #0a0a0a;
-  --color-brand-gray-dark: #666666;
-  --color-brand-gray-light: #e5e5e5;
-  --color-brand-white: #fafafa;
-  --color-brand-orange: #ff5d01;
-}
-```
-
-Use them in components:
 ```html
-<div style="color: var(--color-brand-black)">Text</div>
-<div style="background-color: var(--color-brand-orange)">Background</div>
+<div style="background: var(--color-lime); color: var(--color-ink)">Lime block</div>
 ```
 
 ### Typography
-- Font: Inter
-- Line Height: 1.7
-- Heading Letter Spacing: -0.02em
+- Headings: Bricolage Grotesque 700, letter-spacing -0.03em, line-height about 1
+- Body: Geist 400/500, 17px, line-height 1.6
+- Labels, metadata and code: Geist Mono
+- All three are self-hosted with `@fontsource-variable`
 
-### Spacing
-- Section Padding: 120px vertical
-- Container Max Width: 1100px
+### Layout
+- Container max width 1200px, 32px side padding (20px below 480px)
+- Section spacing 72 to 88px
+- Radius: cards 22px, large blocks 28px, buttons and chips fully round
 
 ## 🚀 Deployment
 

@@ -1,96 +1,47 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
 ---
 
-<BaseLayout title="404 - Page Not Found">
-  <div class="min-h-screen flex items-center justify-center px-6" style="background-color: var(--color-brand-white);">
-    <div class="max-w-2xl mx-auto text-center">
-      <!-- 404 Number -->
-      <h1 
-        class="text-9xl font-bold mb-4 tracking-tight"
-        style="color: var(--color-brand-orange);"
-      >
-        404
-      </h1>
-      
-      <!-- Message -->
-      <h2 
-        class="text-3xl md:text-4xl font-bold mb-4"
-        style="color: var(--color-brand-black);"
-      >
-        Page Not Found
-      </h2>
-      
-      <p 
-        class="text-lg md:text-xl mb-8 leading-relaxed"
-        style="color: var(--color-brand-gray-dark);"
-      >
-        Oops! The page you're looking for seems to have wandered off into the digital void.
-        Let's get you back on track.
-      </p>
-      
-      <!-- Action Buttons -->
-      <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-        <a 
-          href={base}
-          class="px-8 py-4 rounded-lg font-medium transition-all inline-block hover-bg-brand-orange"
-          style="background-color: var(--color-brand-black); color: white;"
-        >
-          ← Back to Home
-        </a>
-        <a 
-          href={`${base}#projects`}
-          class="px-8 py-4 rounded-lg font-medium transition-all inline-block border hover-border-brand-black"
-          style="border-color: var(--color-brand-gray-light); color: var(--color-brand-black);"
-        >
-          View Projects
-        </a>
-      </div>
-      
-      <!-- Helpful Links -->
-      <div style="color: var(--color-brand-gray-dark);">
-        <p class="mb-4">You might be looking for:</p>
-        <ul class="space-y-2">
-          <li>
-            <a href={`${base}about`} class="hover-text-brand-orange transition-colors">About Me</a>
-          </li>
-          <li>
-            <a href={`${base}blog`} class="hover-text-brand-orange transition-colors">Blog Posts</a>
-          </li>
-          <li>
-            <a href={`${base}contact`} class="hover-text-brand-orange transition-colors">Get in Touch</a>
-          </li>
-        </ul>
-      </div>
-      
-      <!-- Decorative Element -->
-      <div class="mt-12 opacity-20">
-        <svg 
-          class="w-32 h-32 mx-auto" 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-          style="color: var(--color-brand-gray-dark);"
-        >
-          <path 
-            stroke-linecap="round" 
-            stroke-linejoin="round" 
-            stroke-width="2" 
-            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      </div>
+<BaseLayout title="404 - Page not found" noindex>
+  <main id="main-content" tabindex="-1" class="wrap page">
+    <p class="mono-caps">Error 404</p>
+    <h1 class="page-title">Nothing <span class="hl">lives here.</span></h1>
+    <p class="page-intro">
+      The link is broken or the page moved. Nothing was lost, it just isn't at this address.
+    </p>
+
+    <div class="actions">
+      <a href={base} class="btn btn-primary"><span aria-hidden="true">←</span> Back to home</a>
+      <a href={`${base}blog`} class="btn btn-outline">Read the blog</a>
+      <a href={`${base}contact`} class="btn btn-outline">Get in touch</a>
     </div>
-  </div>
+  </main>
 </BaseLayout>
 
 <style>
-  .hover-bg-brand-orange:hover {
-    background-color: var(--color-brand-orange);
+  .page {
+    min-height: 60vh;
+    padding-top: 72px;
   }
-  
-  .hover-border-brand-black:hover {
-    border-color: var(--color-brand-black);
+
+  h1 {
+    margin-top: 20px;
+  }
+
+  .hl {
+    padding: 0 0.12em;
+    border-radius: 14px;
+    background: var(--color-lime);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 36px;
   }
 </style>

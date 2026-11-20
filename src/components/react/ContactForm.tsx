@@ -54,7 +54,7 @@ export default function ContactForm() {
   };
 
   return (
-    <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+    <div>
       <form onSubmit={handleSubmit} noValidate>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div>
@@ -69,10 +69,7 @@ export default function ContactForm() {
               required
               minLength={2}
               maxLength={100}
-              style={{
-                width: '100%', padding: '0.75rem 1rem', background: 'var(--color-bg-secondary)',
-                border: '2px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: '1rem', outline: 'none'
-              }}
+              className="form-field"
             />
           </div>
 
@@ -87,10 +84,7 @@ export default function ContactForm() {
               placeholder="john@example.com"
               required
               maxLength={100}
-              style={{
-                width: '100%', padding: '0.75rem 1rem', background: 'var(--color-bg-secondary)',
-                border: '2px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: '1rem', outline: 'none'
-              }}
+              className="form-field"
             />
           </div>
 
@@ -106,10 +100,7 @@ export default function ContactForm() {
               required
               minLength={3}
               maxLength={200}
-              style={{
-                width: '100%', padding: '0.75rem 1rem', background: 'var(--color-bg-secondary)',
-                border: '2px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: '1rem', outline: 'none'
-              }}
+              className="form-field"
             />
           </div>
 
@@ -125,47 +116,30 @@ export default function ContactForm() {
               required
               minLength={10}
               maxLength={1000}
-              style={{
-                width: '100%', padding: '0.75rem 1rem', background: 'var(--color-bg-secondary)',
-                border: '2px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: '1rem', outline: 'none',
-                resize: 'vertical', fontFamily: 'inherit'
-              }}
+              className="form-field"
             />
           </div>
 
           <button
             type="submit"
-            style={{
-              padding: '1rem 2rem',
-              background: 'var(--color-brand-orange)',
-              color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '600',
-              cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
-            }}
+            className="btn btn-primary"
             disabled={submitStatus === 'submitting'}
           >
             {submitStatus === 'submitting' ? (
               <span style={{ flexShrink: 0 }}>Sending...</span>
             ) : (
-              <span>Send Message</span>
+              <span>Send message</span>
             )}
           </button>
 
           {submitStatus === 'success' && (
-            <div role="status" aria-live="polite" style={{
-              padding: '1rem', background: 'color-mix(in srgb, var(--color-brand-orange) 10%, transparent)',
-              border: '1px solid var(--color-brand-orange)', borderRadius: '8px', color: 'var(--color-brand-orange)',
-              display: 'flex', alignItems: 'center', gap: '0.5rem'
-            }}>
+            <div role="status" aria-live="polite" className="form-status form-status-ok">
               <span>Message sent successfully!</span>
             </div>
           )}
 
           {submitStatus === 'error' && (
-            <div role="alert" aria-live="assertive" style={{
-              padding: '1rem', background: 'color-mix(in srgb, var(--color-red-500) 10%, transparent)',
-              border: '1px solid var(--color-red-500)', borderRadius: '8px', color: 'var(--color-red-500)',
-              display: 'flex', alignItems: 'center', gap: '0.5rem'
-            }}>
+            <div role="alert" aria-live="assertive" className="form-status">
               <span>{errors.form || 'Failed to send message. Please try again.'}</span>
             </div>
           )}

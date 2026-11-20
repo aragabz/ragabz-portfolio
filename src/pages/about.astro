@@ -1,24 +1,38 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Experience from '../components/Experience.astro';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
-const target = `${base}#about`;
 ---
 
 <BaseLayout
-  title="About Me - Ahmed Ragab"
-  description="Learn more about my background, skills, and professional experience as a Software Engineering Technical Lead."
-  noindex
+  title="About - Ahmed Ragab"
+  description="Ahmed Ragab's experience: nine years across Android, Kotlin, Spring Boot and data pipelines, from TE-Data to VOIS."
 >
-  <meta http-equiv="refresh" content={`0; url=${target}`} />
-  <script is:inline define:vars={{ target }}>
-    window.location.replace(target);
-  </script>
+  <main id="main-content" tabindex="-1" class="wrap page">
+    <div class="page-narrow">
+      <h1 class="page-title">About</h1>
+      <p class="page-intro">
+        I started in 2017 writing Java for a telecom's customer-care tools, moved to Android a year later and never
+        fully left. These days I lead a team at VOIS, where I split my week between a Kotlin app, the Spring Boot
+        services behind it, and the Kafka, Airflow and NiFi plumbing underneath.
+      </p>
 
-  <main id="main-content" role="main" class="min-h-screen flex items-center justify-center px-6 py-24 text-center">
-    <p>
-      The About section has moved to the home page.
-      <a href={target} style="color: var(--color-accent-strong); text-decoration: underline;">Continue to About →</a>
-    </p>
+      <div class="about-actions">
+        <a href={`${base}resume.pdf`} class="btn btn-primary">Resume (PDF)</a>
+        <a href={`${base}contact`} class="btn btn-outline">Get in touch</a>
+      </div>
+
+      <Experience />
+    </div>
   </main>
 </BaseLayout>
+
+<style>
+  .about-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+  }
+</style>

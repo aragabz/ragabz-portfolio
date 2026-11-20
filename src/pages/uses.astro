@@ -1,11 +1,9 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Navbar from '../components/Navbar.astro';
-import { FadeIn, StaggerContainer, StaggerItem } from '../components/react/Animated';
- 
+
 const categories = [
   {
-    title: '💻 Hardware',
+    title: 'Hardware',
     items: [
       { name: 'MacBook Pro M3', description: 'Primary development machine' },
       { name: 'LG 27" 4K Monitor', description: 'External display for productivity' },
@@ -14,7 +12,7 @@ const categories = [
     ],
   },
   {
-    title: '🛠️ Development Tools',
+    title: 'Development Tools',
     items: [
       { name: 'VS Code', description: 'Primary code editor with extensive customization' },
       { name: 'iTerm2', description: 'Terminal emulator with tmux' },
@@ -24,7 +22,7 @@ const categories = [
     ],
   },
   {
-    title: '🎨 Design Tools',
+    title: 'Design Tools',
     items: [
       { name: 'Figma', description: 'UI/UX design and prototyping' },
       { name: 'Adobe Photoshop', description: 'Image editing and manipulation' },
@@ -32,7 +30,7 @@ const categories = [
     ],
   },
   {
-    title: '📦 VS Code Extensions',
+    title: 'VS Code Extensions',
     items: [
       { name: 'GitHub Copilot', description: 'AI-powered code suggestions' },
       { name: 'ESLint', description: 'JavaScript linting' },
@@ -44,7 +42,7 @@ const categories = [
     ],
   },
   {
-    title: '⚡ Tech Stack',
+    title: 'Tech Stack',
     items: [
       { name: 'TypeScript', description: 'Type-safe JavaScript' },
       { name: 'React', description: 'UI component library' },
@@ -55,7 +53,7 @@ const categories = [
     ],
   },
   {
-    title: '🚀 Productivity',
+    title: 'Productivity',
     items: [
       { name: 'Notion', description: 'Notes, docs, and project management' },
       { name: 'Raycast', description: 'Launcher and productivity tool' },
@@ -65,89 +63,40 @@ const categories = [
   },
 ];
 ---
- 
-<BaseLayout 
+
+<BaseLayout
   title="Uses - Tools & Setup"
   description="Hardware, software, and tools I use for development and productivity"
 >
-  <Navbar />
+  <main id="main-content" tabindex="-1" class="wrap page">
+    <div class="page-narrow">
+      <h1 class="page-title">Uses</h1>
+      <p class="page-intro">
+        The hardware, software and tools I work with every day. Inspired by
+        <a href="https://uses.tech" class="inline-link" rel="noopener noreferrer">uses.tech</a>.
+      </p>
 
-  <div class="min-h-screen py-12 px-6">
-    <div class="max-w-container mx-auto">
-      <!-- Header -->
-      <FadeIn client:load>
-        <div class="text-center mb-16">
-          <h1 class="text-5xl md:text-6xl font-bold mb-6">
-            What I Use
-          </h1>
-          <p class="text-xl" style="color: var(--color-text-secondary); max-width: 600px; margin: 0 auto;">
-            A comprehensive list of the hardware, software, and tools that power my work.
-            Inspired by <a href="https://uses.tech" target="_blank" rel="noopener noreferrer" style="color: var(--color-brand-orange);">uses.tech</a>
-          </p>
-        </div>
-      </FadeIn>
-
-      <!-- Categories -->
-      <div class="space-y-16">
-        {categories.map((category, categoryIndex) => (
-          <section>
-            <FadeIn client:load delay={categoryIndex * 0.1}>
-              <h2 class="text-3xl font-bold mb-8" style="color: var(--color-brand-orange);">
-                {category.title}
-              </h2>
-            </FadeIn>
-
-            <StaggerContainer client:load staggerDelay={0.05}>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {category.items.map((item) => (
-                  <StaggerItem client:load>
-                    <div
-                      style={{
-                        padding: '1.5rem',
-                        background: 'var(--color-bg-secondary)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '12px',
-                        transition: 'all 0.2s ease',
-                      }}
-                      class="hover-lift"
-                    >
-                      <h3 class="text-xl font-semibold mb-2" style="color: var(--color-text);">
-                        {item.name}
-                      </h3>
-                      <p style="color: var(--color-text-secondary); font-size: 0.875rem;">
-                        {item.description}
-                      </p>
-                    </div>
-                  </StaggerItem>
-                ))}
-              </div>
-            </StaggerContainer>
-          </section>
-        ))}
-      </div>
-
-      <!-- Footer Note -->
-      <FadeIn client:load delay={0.5}>
-        <div 
-          class="mt-16 p-8 text-center"
-          style={{
-            background: 'var(--color-bg-secondary)',
-            borderRadius: '12px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <p style="color: var(--color-text-secondary); font-size: 0.875rem;">
-            This page is updated regularly as my setup evolves. Last updated: {new Date().toLocaleDateString()}
-          </p>
-        </div>
-      </FadeIn>
+      {categories.map((category) => (
+        <section class="page-section">
+          <h2>{category.title}</h2>
+          <ul class="row-list">
+            {category.items.map((item) => (
+              <li>
+                <p class="row-name">{item.name}</p>
+                <p>{item.description}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
-  </div>
+  </main>
 </BaseLayout>
 
 <style>
-  .hover-lift:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  .inline-link {
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 </style>

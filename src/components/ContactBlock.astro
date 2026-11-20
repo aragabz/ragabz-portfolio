@@ -1,0 +1,70 @@
+---
+// The big lime contact block that closes the home page.
+const email = 'ahmedragab.se@gmail.com';
+
+const socials = [
+  { label: 'LinkedIn', href: 'https://www.linkedin.com/in/aragabz/' },
+  { label: 'GitHub', href: 'https://github.com/aragabz' },
+  { label: 'X', href: 'https://twitter.com/aragabz' },
+];
+---
+
+<section class="wrap contact-wrap" aria-labelledby="contact-heading">
+  <div class="contact-block">
+    <h2 id="contact-heading">Got a slow app or a scary backend?</h2>
+    <p>I'm happy to talk about Android, Kotlin on the server, or data migrations that keep you up at night.</p>
+
+    <div class="contact-actions">
+      <a href={`mailto:${email}`} class="btn btn-primary">{email}</a>
+      {socials.map((social) => (
+        <a href={social.href} class="btn btn-outline" rel="noopener noreferrer">{social.label}</a>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .contact-wrap {
+    padding-block: 24px 64px;
+  }
+
+  .contact-block {
+    padding: clamp(32px, 6vw, 72px);
+    border-radius: var(--radius-block);
+    background: var(--color-lime);
+    color: var(--color-ink);
+  }
+
+  h2 {
+    max-width: 14em;
+    font-size: clamp(2.25rem, 6vw, 4.5rem);
+    text-wrap: balance;
+  }
+
+  p {
+    max-width: 34rem;
+    margin-top: 20px;
+    font-size: 1.125rem;
+  }
+
+  .contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 32px;
+  }
+
+  /* Long address: let it shrink instead of pushing the block wider than a 360px screen. */
+  .btn-primary {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  @media (max-width: 400px) {
+    .btn-primary {
+      padding-inline: 16px;
+      font-size: 0.9375rem;
+    }
+  }
+</style>

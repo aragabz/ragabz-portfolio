@@ -1,12 +1,11 @@
 ---
-// Experience Section Component
-import EnhancedTimeline from './react/EnhancedTimeline';
+// Experience record, shown on /about. Dates and titles follow the CV.
 
 const experiences = [
   {
     company: 'VOIS',
-    role: 'Senior Mobile Engineer',
-    duration: 'Sep 2024 - Present',
+    role: 'Senior Software Engineer',
+    duration: 'Sep 2022 – Present',
     achievements: [
       'Led full-stack engineering initiatives, bridging mobile front-end and complex back-end systems for cohesive, end-to-end features',
       'Owned a large-scale data migration (100M+ records) from CockroachDB to PostgreSQL, optimizing performance and reliability',
@@ -21,7 +20,7 @@ const experiences = [
   {
     company: 'CodeBeam',
     role: 'Senior Mobile Engineer',
-    duration: 'Sep 2021 - Sep 2024',
+    duration: 'Sep 2021 – Sep 2022',
     achievements: [
       'Designed and implemented scalable cross-platform mobile applications using React Native for iOS and Android',
       'Optimized development workflows through hot reloading and modular architecture, cutting development time by 40%+',
@@ -31,7 +30,7 @@ const experiences = [
   {
     company: 'Squadio',
     role: 'Senior Mobile Engineer',
-    duration: 'Dec 2019 - Sep 2021',
+    duration: 'Dec 2019 – Sep 2021',
     achievements: [
       'Developed high-performance Android applications for mobile and smart TV platforms with 98% code reusability',
       'Architected a fitness tracking app leveraging Google Fit API with real-time step counting and activity recognition',
@@ -42,7 +41,7 @@ const experiences = [
   {
     company: 'Elnooronline',
     role: 'Senior Mobile Engineer (Part Time)',
-    duration: 'Dec 2019 - Sep 2021',
+    duration: 'Dec 2019 – Sep 2021',
     achievements: [
       'Led a cross-platform mobile development team overseeing Android and iOS applications',
       'Orchestrated adoption of MVVM, Clean Architecture, and Reactive Programming patterns',
@@ -52,7 +51,7 @@ const experiences = [
   {
     company: 'Arabsat',
     role: 'Mobile Engineer',
-    duration: 'May 2019 - Dec 2019',
+    duration: 'May 2019 – Dec 2019',
     achievements: [
       'Implemented custom map overlays boosting user engagement by 60% with 95% positive feedback',
       'Designed robust offline mode with Room DB and data synchronization on reconnection',
@@ -62,7 +61,7 @@ const experiences = [
   {
     company: 'Modeso',
     role: 'Mobile Engineer',
-    duration: 'Apr 2018 - Dec 2019',
+    duration: 'Apr 2018 – Dec 2019',
     achievements: [
       'Architected high-performance mobile applications for Android and iOS with seamless UX',
       'Implemented real-time data sync, offline functionality, and device hardware integration',
@@ -72,7 +71,7 @@ const experiences = [
   {
     company: 'TE-Data',
     role: 'Java Developer',
-    duration: 'Jul 2017 - Mar 2018',
+    duration: 'Jul 2017 – Mar 2018',
     achievements: [
       'Enhanced the customer care portal used by all service employees with key operational features',
       'Automated complex report generation from Oracle databases',
@@ -82,10 +81,75 @@ const experiences = [
 ];
 ---
 
-<section id="experience" class="py-section px-6">
-  <div class="max-w-container mx-auto">
-    <h2 class="text-4xl md:text-5xl font-bold mb-16 text-center fade-in">Experience</h2>
-    
-    <EnhancedTimeline experiences={experiences} client:visible />
-  </div>
+<section class="page-section" aria-labelledby="experience-heading">
+  <h2 id="experience-heading">Experience</h2>
+
+  <ol class="experience">
+    {experiences.map((job) => (
+      <li>
+        <p class="mono">{job.duration}</p>
+        <div>
+          <h3>{job.company}</h3>
+          <p class="experience-role">{job.role}</p>
+          <ul>
+            {job.achievements.map((achievement) => <li>{achievement}</li>)}
+          </ul>
+        </div>
+      </li>
+    ))}
+  </ol>
 </section>
+
+<style>
+  .experience {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .experience > li {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 8px 32px;
+    padding-block: 28px;
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  .experience > li > .mono {
+    padding-top: 6px;
+  }
+
+  h3 {
+    font-size: 1.75rem;
+  }
+
+  .experience-role {
+    margin-top: 6px;
+    font-weight: 500;
+    color: var(--color-ink);
+  }
+
+  ul {
+    margin: 14px 0 0;
+    padding-left: 1.2rem;
+    list-style: disc;
+  }
+
+  ul li {
+    margin-bottom: 6px;
+  }
+
+  ul li::marker {
+    color: var(--color-muted);
+  }
+
+  @media (max-width: 700px) {
+    .experience > li {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .experience > li > .mono {
+      padding-top: 0;
+    }
+  }
+</style>
