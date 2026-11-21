@@ -224,6 +224,16 @@ h6 {
   color: var(--color-ink);
 }
 
+/* Lime highlighter behind ink text (hero headline, page titles). */
+.hl {
+  padding: 0 0.14em;
+  border-radius: 14px;
+  background: var(--color-lime);
+  color: var(--color-ink);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
 /* ---- Chips and tags ---- */
 .chip {
   display: inline-flex;

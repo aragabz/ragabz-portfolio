@@ -89,7 +89,10 @@ const experiences = [
       <li>
         <p class="mono">{job.duration}</p>
         <div>
-          <h3>{job.company}</h3>
+          <div class="experience-head">
+            <h3>{job.company}</h3>
+            {job.duration.endsWith('Present') && <span class="chip chip-lime">Current</span>}
+          </div>
           <p class="experience-role">{job.role}</p>
           <ul>
             {job.achievements.map((achievement) => <li>{achievement}</li>)}
@@ -121,6 +124,13 @@ const experiences = [
 
   h3 {
     font-size: 1.75rem;
+  }
+
+  .experience-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
   }
 
   .experience-role {
